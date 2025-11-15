@@ -1,0 +1,60 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35527.113 d17.12
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Velvet.Core", "src\Velvet.Core\Velvet.Core.csproj", "{B1D71DA9-4421-4BCA-9C59-9A4C5D2B987E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Velvet.WebGL", "src\Velvet.WebGL\Velvet.WebGL.csproj", "{80C9D5C4-1B5E-452E-99EE-66D876823B20}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Velvet.Blazor", "src\Velvet.Blazor\Velvet.Blazor.csproj", "{2ED282DE-4BB9-474E-927A-F96C1DD194D8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Velvet.Demo.Blazor", "demos\Velvet.Demo.Blazor\Velvet.Demo.Blazor.csproj", "{6B4D9D1E-BC92-4E34-A77F-EAB7422082A9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Velvet.Demo.Static", "demos\Velvet.Demo.Static\Velvet.Demo.Static.csproj", "{23889744-8FE7-488F-AB9F-8735C21211FA}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{C79FDC70-AD46-4BB5-BB92-3F236CFB774F}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "demos", "demos", "{C1E23E50-8B25-4A0B-872F-B6DED6C50A45}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+	{B1D71DA9-4421-4BCA-9C59-9A4C5D2B987E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+	{B1D71DA9-4421-4BCA-9C59-9A4C5D2B987E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+	{B1D71DA9-4421-4BCA-9C59-9A4C5D2B987E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+	{B1D71DA9-4421-4BCA-9C59-9A4C5D2B987E}.Release|Any CPU.Build.0 = Release|Any CPU
+	{80C9D5C4-1B5E-452E-99EE-66D876823B20}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+	{80C9D5C4-1B5E-452E-99EE-66D876823B20}.Debug|Any CPU.Build.0 = Debug|Any CPU
+	{80C9D5C4-1B5E-452E-99EE-66D876823B20}.Release|Any CPU.ActiveCfg = Release|Any CPU
+	{80C9D5C4-1B5E-452E-99EE-66D876823B20}.Release|Any CPU.Build.0 = Release|Any CPU
+	{2ED282DE-4BB9-474E-927A-F96C1DD194D8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+	{2ED282DE-4BB9-474E-927A-F96C1DD194D8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+	{2ED282DE-4BB9-474E-927A-F96C1DD194D8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+	{2ED282DE-4BB9-474E-927A-F96C1DD194D8}.Release|Any CPU.Build.0 = Release|Any CPU
+	{6B4D9D1E-BC92-4E34-A77F-EAB7422082A9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+	{6B4D9D1E-BC92-4E34-A77F-EAB7422082A9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+	{6B4D9D1E-BC92-4E34-A77F-EAB7422082A9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+	{6B4D9D1E-BC92-4E34-A77F-EAB7422082A9}.Release|Any CPU.Build.0 = Release|Any CPU
+	{23889744-8FE7-488F-AB9F-8735C21211FA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+	{23889744-8FE7-488F-AB9F-8735C21211FA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+	{23889744-8FE7-488F-AB9F-8735C21211FA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+	{23889744-8FE7-488F-AB9F-8735C21211FA}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(SolutionItems) = preSolution
+		README.md = README.md
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{B1D71DA9-4421-4BCA-9C59-9A4C5D2B987E} = {C79FDC70-AD46-4BB5-BB92-3F236CFB774F}
+		{80C9D5C4-1B5E-452E-99EE-66D876823B20} = {C79FDC70-AD46-4BB5-BB92-3F236CFB774F}
+		{2ED282DE-4BB9-474E-927A-F96C1DD194D8} = {C79FDC70-AD46-4BB5-BB92-3F236CFB774F}
+		{6B4D9D1E-BC92-4E34-A77F-EAB7422082A9} = {C1E23E50-8B25-4A0B-872F-B6DED6C50A45}
+		{23889744-8FE7-488F-AB9F-8735C21211FA} = {C1E23E50-8B25-4A0B-872F-B6DED6C50A45}
+	EndGlobalSection
+EndGlobal
