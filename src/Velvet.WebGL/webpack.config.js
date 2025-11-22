@@ -1,7 +1,7 @@
 const path = require('path');
 
 module.exports = {
-  entry: './src/index.ts',
+  entry: './ts/index.ts',
   output: {
     filename: 'velvet.js',
     path: path.resolve(__dirname, 'dist'),
