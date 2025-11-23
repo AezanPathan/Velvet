@@ -9,7 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Velvet.Core\Velvet.Core.csproj" />
     <ProjectReference Include="..\Velvet.WebGL\Velvet.WebGL.csproj" />
-    <PackageReference Include="Microsoft.JSInterop" Version="9.0.0" />
+    <PackageReference Include="Microsoft.JSInterop" Version="9.0.11" />
   </ItemGroup>
 
 </Project>
