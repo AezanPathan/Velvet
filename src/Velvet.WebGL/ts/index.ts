@@ -1,5 +1,6 @@
 import { WebGLContext } from './core/WebGLContext';
 import { Renderer } from './core/Renderer';
+import { Mesh } from './core/Mesh';
 
 // Import shader sources as raw strings
 import vertexShader from './shaders/basic.vert';
@@ -36,10 +37,23 @@ function ensureCanvas(): void {
 }
 
 function drawTriangle(): void {
-    if (!renderer) {
-        throw new Error('Velvet not initialized. Call init() first.');
-    }
-    renderer.drawTriangle();
+    if (!renderer) throw new Error("Velvet not initialized");
+
+    const gl = renderer.getContext().getContext();
+
+    const positions = new Float32Array([
+        0.0, 0.8,
+        -0.8, -0.8,
+        0.8, -0.8,
+    ]);
+
+    const indices = new Uint16Array([0, 1, 2]);
+
+    const mesh = new Mesh(gl, positions, indices);
+    mesh.upload();
+
+    renderer.setMesh(mesh);
+    renderer.drawMesh();
 }
 
 // Expose global API
