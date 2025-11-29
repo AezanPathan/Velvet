@@ -15,6 +15,11 @@
     "declarationMap": true,
     "sourceMap": true
   },
-  "include": ["ts/**/*"],
+ // "include": ["ts/**/*"],
+  "include": [
+  "ts/**/*.ts",
+  "ts/shaders/**/*.vert",
+  "ts/shaders/**/*.frag"
+],
   "exclude": ["node_modules", "dist"]
 }

@@ -25,10 +25,10 @@ function init(canvasId: string = 'velvetCanvas'): void {
     renderer.initialize(vertexShader, fragmentShader);
 }
 
-function ensureCanvas(): void {
-    if (!document.getElementById('velvetCanvas')) {
+function ensureCanvas(canvasId: string = 'velvetCanvas'): void {
+    if (!document.getElementById(canvasId)) {
         const canvas = document.createElement('canvas');
-        canvas.id = 'velvetCanvas';
+        canvas.id = canvasId;
         canvas.width = 800;
         canvas.height = 600;
         canvas.style.border = '1px solid black';
@@ -57,11 +57,14 @@ function drawTriangle(): void {
 }
 
 // Expose global API
-window.Velvet = {
+const Velvet = {
     init,
     ensureCanvas,
     drawTriangle,
 };
 
+window.Velvet = Velvet;
+
 // Export for module usage
 export { init, ensureCanvas, drawTriangle };
+export default Velvet;

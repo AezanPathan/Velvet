@@ -1,7 +1,7 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -9,14 +9,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Velvet.Core\Velvet.Core.csproj" />
-    <PackageReference Include="Microsoft.JSInterop" Version="9.0.0" />
+    <PackageReference Include="Microsoft.JSInterop" Version="10.0.0" />
     <PackageReference Include="Microsoft.NET.Runtime.WebAssembly.Sdk" Version="10.0.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="dist\velvet.js">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
 
 </Project>
