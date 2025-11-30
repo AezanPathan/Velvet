@@ -13,4 +13,8 @@
     <PackageReference Include="Microsoft.NET.Runtime.WebAssembly.Sdk" Version="10.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="wwwroot\**" />
+  </ItemGroup>
+
 </Project>

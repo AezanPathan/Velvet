@@ -6,6 +6,13 @@ export class Renderer {
     private readonly context: WebGLContext;
     private program: Program | null = null;
     private mesh: Mesh | null = null;
+    private uModelLocation: WebGLUniformLocation | null = null;
+    private currentModelMatrix: Float32Array = new Float32Array([
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+    ]);
 
     constructor(context: WebGLContext) {
         this.context = context;
@@ -19,10 +26,15 @@ export class Renderer {
         const gl = this.context.getContext();
         
         this.program = new Program(gl, vertexSource, fragmentSource);
+        this.uModelLocation = this.program.getUniformLocation("uModel");
     }
 
     public setMesh(mesh: Mesh): void {
         this.mesh = mesh;
+    }
+
+    public setModelMatrix(matrix: Float32Array): void {
+        this.currentModelMatrix = matrix;
     }
 
     public drawMesh(): void {
@@ -43,6 +55,9 @@ export class Renderer {
 
         // Bind the shader program
         this.program.use();
+
+        // Set model matrix uniform
+        gl.uniformMatrix4fv(this.uModelLocation, false, this.currentModelMatrix);
 
         // Enable the position attribute
         const positionLocation = this.program.getAttribLocation('position');

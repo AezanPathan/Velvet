@@ -43,4 +43,8 @@ export class Program {
     public getAttribLocation(name: string): number {
         return this.gl.getAttribLocation(this.program, name);
     }
+
+    public getUniformLocation(name: string): WebGLUniformLocation | null {
+        return this.gl.getUniformLocation(this.program, name);
+    }
 }

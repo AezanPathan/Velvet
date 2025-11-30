@@ -1,6 +1,7 @@
 import { WebGLContext } from './core/WebGLContext';
 import { Renderer } from './core/Renderer';
 import { Mesh } from './core/Mesh';
+import { Transform3D } from './core/Transform3D';
 
 // Import shader sources as raw strings
 import vertexShader from './shaders/basic.vert';
@@ -53,7 +54,20 @@ function drawTriangle(): void {
     mesh.upload();
 
     renderer.setMesh(mesh);
-    renderer.drawMesh();
+
+    // Create a Transform3D for animation
+    const transform = new Transform3D();
+
+    // Animation loop: Each frame, we update the rotation and compute the model matrix to transform the triangle,
+    // demonstrating how the uModel uniform applies transformations to vertices in the vertex shader.
+    const animate = () => {
+        transform.rotation.z += 0.01; // Increment rotation around Z-axis for visible spinning
+        renderer!.setModelMatrix(transform.getMatrix());
+        renderer!.drawMesh();
+        requestAnimationFrame(animate);
+    };
+
+    animate();
 }
 
 // Expose global API
