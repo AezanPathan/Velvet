@@ -62,12 +62,12 @@ export class Renderer {
         // Enable the position attribute
         const positionLocation = this.program.getAttribLocation('position');
         gl.enableVertexAttribArray(positionLocation);
-        gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 20, 0);
+        gl.vertexAttribPointer(positionLocation, 3, gl.FLOAT, false, 24, 0);
 
         // Enable the color attribute
         const colorLocation = this.program.getAttribLocation('color');
         gl.enableVertexAttribArray(colorLocation);
-        gl.vertexAttribPointer(colorLocation, 3, gl.FLOAT, false, 20, 8);
+        gl.vertexAttribPointer(colorLocation, 3, gl.FLOAT, false, 24, 12);
 
         // Draw
         gl.drawElements(gl.TRIANGLES, this.mesh.indexCount, gl.UNSIGNED_SHORT, 0);
