@@ -1,4 +1,4 @@
-export class Mesh {
+export class WebGLMesh {
     private gl: WebGLRenderingContext;
     private positions: Float32Array;
     private indices: Uint16Array;

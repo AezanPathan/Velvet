@@ -1,4 +1,4 @@
-import { Shader } from './Shader';
+import { Shader } from './WebGLShader';
 
 export class Program {
     private readonly gl: WebGLRenderingContext;

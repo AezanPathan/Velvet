@@ -31,7 +31,7 @@ module.exports = {
   entry: './ts/index.ts',
   output: {
     filename: 'velvet.js',
-    path: path.resolve(__dirname, 'dist'),
+    path: path.resolve(__dirname, 'wwwroot'),
     library: "Velvet",
     libraryTarget: "umd"
   },
@@ -43,7 +43,10 @@ module.exports = {
       {
         test: /\.(glsl|vs|fs|vert|frag)$/i,
         type: "asset/source",
-        include: path.resolve(__dirname, 'ts/shaders'),
+        include: [
+          path.resolve(__dirname, 'ts/shaders'),
+          path.resolve(__dirname, 'wwwroot/shaders')
+        ]
       },
       {
         test: /\.ts$/,

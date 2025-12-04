@@ -1,11 +1,11 @@
 import { WebGLContext } from './WebGLContext';
-import { Program } from './Program';
-import { Mesh } from './Mesh';
+import { Program } from './WebGLProgram';
+import { WebGLMesh } from './WebGLMesh';
 
-export class Renderer {
+export class WebGLRenderer {
     private readonly context: WebGLContext;
     private program: Program | null = null;
-    private mesh: Mesh | null = null;
+    private mesh: WebGLMesh | null = null;
     private uModelLocation: WebGLUniformLocation | null = null;
     private currentModelMatrix: Float32Array = new Float32Array([
         1, 0, 0, 0,
@@ -29,7 +29,7 @@ export class Renderer {
         this.uModelLocation = this.program.getUniformLocation("uModel");
     }
 
-    public setMesh(mesh: Mesh): void {
+    public setMesh(mesh: WebGLMesh): void {
         this.mesh = mesh;
     }
 

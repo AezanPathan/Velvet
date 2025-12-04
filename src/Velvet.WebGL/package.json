@@ -2,10 +2,9 @@
   "name": "velvet-webgl",
   "version": "1.0.0",
   "description": "Velvet WebGL rendering backend",
-  "main": "dist/velvet.js",
+  "main": "wwwroot/velvet.js",
   "scripts": {
     "build": "webpack --mode production",
-    "postbuild": "node -e \"require('fs').copyFileSync('dist/velvet.js', 'wwwroot/velvet.js')\"",
     "dev": "webpack --mode development --watch"
   },
   "devDependencies": {
