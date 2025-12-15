@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Velvet.Core.Rendering;
 
@@ -5,22 +6,27 @@ namespace Velvet.WebGL;
 
 public class WebGLGraphicsDevice : IGraphicsDevice
 {
-    private readonly IWebGLBridge _bridge;
-    private readonly string _canvasId;
+    protected readonly IWebGLBridge Bridge;
+    protected readonly object Canvas;
+    protected int RendererId = -1;
 
-    protected WebGLGraphicsDevice(IWebGLBridge bridge, string canvasId)
+    public WebGLGraphicsDevice(IWebGLBridge bridge, object canvas)
     {
-        _bridge = bridge ?? throw new ArgumentNullException(nameof(bridge));
-        _canvasId = canvasId;
+        Bridge = bridge ?? throw new ArgumentNullException(nameof(bridge));
+        Canvas = canvas ?? throw new ArgumentNullException(nameof(canvas));
     }
 
-    public virtual Task InitializeAsync()
+    public virtual async Task<int> InitializeAsync()
     {
-        return _bridge.InitAsync(_canvasId);
-    }
+        if (Canvas is string id)
+        {
+            RendererId = await Bridge.InitWithIdAsync(id);
+        }
+        else
+        {
+            RendererId = await Bridge.InitWithElementAsync(Canvas);
+        }
 
-    public Task DrawTriangleAsync()
-    {
-        return _bridge.DrawTriangleAsync();
+        return RendererId;
     }
 }

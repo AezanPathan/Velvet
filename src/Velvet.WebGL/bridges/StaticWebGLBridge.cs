@@ -1,27 +1,91 @@
+using System;
 using System.Threading.Tasks;
-using System.Runtime.InteropServices.JavaScript;
+using Microsoft.JSInterop;
 
 namespace Velvet.WebGL;
 
 /// <summary>
-/// IWebGLBridge implementation for plain WebAssembly hosts using the JS import/export APIs.
+/// Static bridge implementation that calls Velvet API using IJSRuntime.
+/// Intended for static HTML / non-Blazor WASM hosts that only have canvas IDs.
+/// Uses IJSRuntime so the same code works for many hosting scenarios.
 /// </summary>
-public sealed partial class StaticWebGLBridge : IWebGLBridge
+public sealed class StaticWebGLBridge : IWebGLBridge
 {
-    public Task InitAsync(string canvasId)
+    #region Fields
+
+    private readonly IJSRuntime _js;
+
+    #endregion
+
+    #region Constructor
+
+    /// <summary>
+    /// Create a new StaticWebGLBridge.
+    /// </summary>
+    /// <param name="js">IJSRuntime instance (available in static WASM or other hosts).</param>
+    public StaticWebGLBridge(IJSRuntime js)
     {
-        VelvetEnsureCanvas(canvasId);
-        VelvetInit(canvasId);
-        return Task.CompletedTask;
+        _js = js ?? throw new ArgumentNullException(nameof(js));
     }
 
-    public Task DrawTriangleAsync()
+    #endregion
+
+    #region Initialization
+
+    /// <inheritdoc />
+    public async Task<int> InitWithIdAsync(string canvasId)
     {
-        VelvetDrawTriangle();
-        return Task.CompletedTask;
+        if (string.IsNullOrWhiteSpace(canvasId)) throw new ArgumentNullException(nameof(canvasId));
+        // Call the Velvet.init(canvasId) convention in the demo (JS should accept either ID or element).
+        return await _js.InvokeAsync<int>("Velvet.init", canvasId).ConfigureAwait(false);
     }
 
-    [JSImport("globalThis.Velvet.ensureCanvas")] private static partial void VelvetEnsureCanvas(string canvasId);
-    [JSImport("globalThis.Velvet.init")] private static partial void VelvetInit(string canvasId);
-    [JSImport("globalThis.Velvet.drawTriangle")] private static partial void VelvetDrawTriangle();
+    /// <inheritdoc />
+    public Task<int> InitWithElementAsync(object canvasElement)
+    {
+        // Static bridge does not accept ElementReference; host should call InitWithIdAsync.
+        throw new NotSupportedException("StaticWebGLBridge supports initialization by canvas ID only. Use InitWithIdAsync.");
+    }
+
+    #endregion
+
+    #region Resource creation / management
+
+    /// <inheritdoc />
+    public Task<int> CreateShaderAsync(string source, string type)
+        => _js.InvokeAsync<int>("Velvet.createShader", source, type).AsTask();
+
+    /// <inheritdoc />
+    public Task<int> CreateProgramAsync()
+        => _js.InvokeAsync<int>("Velvet.createProgram").AsTask();
+
+    /// <inheritdoc />
+    public Task AttachShaderAsync(int programId, int shaderId)
+        => _js.InvokeVoidAsync("Velvet.attachShader", programId, shaderId).AsTask();
+
+    /// <inheritdoc />
+    public Task LinkProgramAsync(int programId)
+        => _js.InvokeVoidAsync("Velvet.linkProgram", programId).AsTask();
+
+    /// <inheritdoc />
+    public Task<int> CreateMeshAsync(float[] vertices, ushort[]? indices = null)
+        => _js.InvokeAsync<int>("Velvet.createMesh", vertices, indices).AsTask();
+
+    #endregion
+
+    #region Rendering / state
+
+    /// <inheritdoc />
+    public Task DrawMeshAsync(int meshId, int programId, int rendererId)
+        => _js.InvokeVoidAsync("Velvet.drawMesh", meshId, programId, rendererId).AsTask();
+
+    /// <inheritdoc />
+    public Task ClearAsync(float r, float g, float b, float a)
+        => _js.InvokeVoidAsync("Velvet.clear", r, g, b, a).AsTask();
+
+    /// <inheritdoc />
+    public Task ResizeAsync(int width, int height)
+        => _js.InvokeVoidAsync("Velvet.resize", width, height).AsTask();
+
+    #endregion
 }

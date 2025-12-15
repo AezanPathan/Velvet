@@ -1,14 +1,22 @@
 namespace Velvet.WebGL;
 
+/// <summary>
+/// Lightweight wrapper that provides a concrete WebGL device instance.
+/// Accepts either an IWebGLBridge + canvas, or uses the global JsBridge configured instance.
+/// </summary>
 public sealed class WebGLDevice : WebGLGraphicsDevice
 {
-    public WebGLDevice(string canvasId = "velvetCanvas")
-        : base(JsBridge.Require(), canvasId)
+    #region Constructors
+
+    public WebGLDevice(IWebGLBridge bridge, object canvas)
+        : base(bridge, canvas)
     {
     }
 
-    public WebGLDevice(IWebGLBridge bridge, string canvasId = "velvetCanvas")
-        : base(bridge, canvasId)
+    public WebGLDevice(object canvas)
+        : base(JsBridge.Require(), canvas)
     {
     }
+
+    #endregion
 }

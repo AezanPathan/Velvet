@@ -1,83 +1,221 @@
-import { WebGLContext } from '../webgl/WebGLContext';
-import { WebGLRenderer } from '../webgl/WebGLRenderer';
-import { WebGLMesh } from '../webgl/WebGLMesh';
-import { Transform3D } from '../core/math/Transform3D';
-import vertexShader from '../../wwwroot/shaders/basic.vert';
-import fragmentShader from '../../wwwroot/shaders/basic.frag';
+import { WebGLContext } from "../webgl/WebGLContext";
+import { GLRenderer } from "../webgl/GLRenderer";
+import { GLShader } from "../webgl/GLShader";
+import { GLProgram } from "../webgl/GLProgram";
+import { GLBuffer } from "../webgl/GLBuffer";
+import { GLMesh } from "../webgl/GLMesh";
+import {
+  ShaderManager,
+  ProgramManager,
+  BufferManager,
+  MeshManager,
+  RendererManager
+} from "../core/resource/Managers";
 
-let renderer: WebGLRenderer | null = null;
+/**
+ * VelvetAPI
+ * ----------
+ * This file exposes the public-facing API of the Velvet Engine.
+ *
+ * Goals:
+ *  - Provide a clean bridge between Blazor / JS / HTML and the engine backend.
+ *  - Allow creation of shaders, programs, buffers, meshes through stable IDs.
+ *  - Hide WebGL backend complexity from the user.
+ *  - Enable future multi-backend support (WebGPU, Canvas2D).
+ *
+ * VelvetAPI does NOT render demos or scenes.
+ * It only exposes engine primitives.
+ */
 
-export function init(canvasId: string = 'velvetCanvas'): void {
-    const context = WebGLContext.create(canvasId);
-    renderer = new WebGLRenderer(context);
-    renderer.initialize(vertexShader, fragmentShader);
+let context: WebGLContext | null = null;
+
+function ensureFloat32Array(data: unknown): Float32Array {
+    if (data instanceof Float32Array) return data;
+    // Blazor JS interop commonly materializes .NET float[] as a plain JS number[].
+    if (Array.isArray(data)) return new Float32Array(data);
+    // Last resort: try to treat it as array-like.
+    return new Float32Array(data as any);
 }
 
-export function ensureCanvas(): void {
-    if (!document.getElementById('velvetCanvas')) {
-        const canvas = document.createElement('canvas');
-        canvas.id = 'velvetCanvas';
-        canvas.width = 800;
-        canvas.height = 600;
-        canvas.style.border = '1px solid black';
-        document.body.appendChild(canvas);
+function ensureUint16Array(data: unknown): Uint16Array {
+    if (data instanceof Uint16Array) return data;
+    if (Array.isArray(data)) return new Uint16Array(data);
+    return new Uint16Array(data as any);
+}
+
+/**
+ * Initialize the Velvet engine with a canvas.
+ * 
+ * @param canvas - Either a canvas element ID (string) or an HTMLCanvasElement
+ * @returns Renderer ID for use with draw calls
+ * 
+ * @example
+ * // Using element ID
+ * const rendererId = Velvet.init("myCanvas");
+ * 
+ * @example
+ * // Using element reference (Blazor, React, etc.)
+ * const canvas = document.getElementById("myCanvas");
+ * const rendererId = Velvet.init(canvas);
+ */
+export function init(canvas: string | HTMLCanvasElement): number {
+    let canvasElement: HTMLCanvasElement;
+
+    // Resolve canvas element
+    if (typeof canvas === "string") {
+        // Canvas is an ID string - resolve it
+        const element = document.getElementById(canvas);
+        
+        if (!element) {
+            throw new Error(`Velvet.init: canvas '${canvas}' not found`);
+        }
+        
+        if (!(element instanceof HTMLCanvasElement)) {
+            throw new Error(`Velvet.init: element '${canvas}' is not a canvas (found ${element.tagName})`);
+        }
+        
+        canvasElement = element;
+    } else {
+        // Canvas is already an HTMLCanvasElement
+        if (!(canvas instanceof HTMLCanvasElement)) {
+            throw new Error("Velvet.init: provided element is not an HTMLCanvasElement");
+        }
+        
+        canvasElement = canvas;
+    }
+
+    // Initialize WebGL context with the resolved canvas element
+    context = new WebGLContext(canvasElement);
+
+    const renderer = new GLRenderer(context.gl, RendererManager.generateId());
+    return RendererManager.add(renderer);
+}
+
+/**
+ * Creates and compiles a shader.
+ */
+export function createShader(source: string, type: "vertex" | "fragment"): number {
+    if (!context) throw new Error("Velvet not initialized");
+
+    const gl = context.gl;
+    const shader = new GLShader(gl, ShaderManager.generateId());
+    shader.compile(source, type);
+
+    return ShaderManager.add(shader);
+}
+
+/**
+ * Creates a GPU program (shaders must be attached by Velvet internally).
+ */
+export function createProgram(): number {
+    if (!context) throw new Error("Velvet not initialized");
+
+    const gl = context.gl;
+    const program = new GLProgram(gl, ProgramManager.generateId());
+
+    return ProgramManager.add(program);
+}
+
+/**
+ * Attach a shader to a program.
+ */
+export function attachShader(programId: number, shaderId: number): void {
+    const program = ProgramManager.get(programId);
+    const shader = ShaderManager.get(shaderId);
+    program.attachShader(shader);
+}
+
+/**
+ * Link an existing program by ID.
+ */
+export function linkProgram(programId: number): void {
+    const program = ProgramManager.get(programId);
+    program.link();
+}
+
+/**
+ * Set a 4x4 matrix uniform on a program.
+ */
+export function setUniformMatrix4fv(programId: number, name: string, matrix: Float32Array): void {
+    if (!context) throw new Error("Velvet not initialized");
+    
+    const program = ProgramManager.get(programId) as any;
+    const location = program.getUniformLocation(name);
+    
+    if (location) {
+        program.use();
+        context.gl.uniformMatrix4fv(location, false, ensureFloat32Array(matrix));
     }
 }
 
-export function drawTriangle(): void {
-    drawCube();
+/**
+ * Create a mesh from raw vertex/index data.
+ * 
+ * For non-indexed geometry, pass only vertices.
+ * The mesh's attribute layout and count must be set before drawing.
+ */
+export function createMesh(
+    vertices: Float32Array,
+    indices?: Uint16Array
+): number {
+    if (!context) throw new Error("Velvet not initialized");
+
+    const gl = context.gl;
+
+    const vertexData = ensureFloat32Array(vertices);
+    const vb = new GLBuffer(gl, BufferManager.generateId(), gl.ARRAY_BUFFER);
+    vb.setData(vertexData);
+    BufferManager.add(vb);
+
+    let ib: GLBuffer | undefined;
+    let count = 0;
+    
+    if (indices) {
+        const indexData = ensureUint16Array(indices);
+        ib = new GLBuffer(gl, BufferManager.generateId(), gl.ELEMENT_ARRAY_BUFFER);
+        ib.setData(indexData);
+        BufferManager.add(ib);
+        count = indexData.length;
+    } else {
+        // Assume non-indexed triangle mesh
+        count = vertexData.length / 6; // position(3) + color(3) = 6 floats per vertex
+    }
+
+    const mesh = new GLMesh(gl, MeshManager.generateId(), vb, ib) as any;
+    
+    // Set default attributes for position (location 0) and color (location 1)
+    mesh.setAttributes([
+        { location: 0, size: 3, type: gl.FLOAT, stride: 24, offset: 0 },  // aPosition (vec3)
+        { location: 1, size: 3, type: gl.FLOAT, stride: 24, offset: 12 }  // aColor (vec3)
+    ]);
+    mesh.setCount(count);
+
+    return MeshManager.add(mesh);
 }
 
-export function drawCube(): void {
-    if (!renderer) throw new Error("Velvet not initialized");
+/**
+ * Draw a mesh using a specific program and renderer.
+ */
+export function drawMesh(meshId: number, programId: number, rendererId: number): void {
+    const mesh = MeshManager.get(meshId);
+    const program = ProgramManager.get(programId);
+    const renderer = RendererManager.get(rendererId);
 
-    const gl = renderer.getContext().getContext();
+    renderer.drawMesh(mesh, program);
+}
 
-    const vertices = new Float32Array([
-        // x, y, z, r, g, b
-        -1, -1,  1, 1,0,0,
-         1, -1,  1, 0,1,0,
-         1,  1,  1, 0,0,1,
-        -1,  1,  1, 1,1,0,
+/**
+ * Clear screen
+ */
+export function clear(rendererId: number, r: number, g: number, b: number, a: number): void {
+    const renderer = RendererManager.get(rendererId);
+    renderer.clear(r, g, b, a);
+}
 
-        -1, -1, -1, 1,0,1,
-         1, -1, -1, 0,1,1,
-         1,  1, -1, 1,1,1,
-        -1,  1, -1, 0,0,0,
-    ]);
-
-    const indices = new Uint16Array([
-        // Front
-        0, 1, 2, 0, 2, 3,
-        // Back
-        4, 6, 5, 4, 7, 6,
-        // Left
-        4, 0, 3, 4, 3, 7,
-        // Right
-        1, 5, 6, 1, 6, 2,
-        // Top
-        3, 2, 6, 3, 6, 7,
-        // Bottom
-        4, 5, 1, 4, 1, 0
-    ]);
-
-    const mesh = new WebGLMesh(gl, vertices, indices);
-    mesh.upload();
-
-    renderer.setMesh(mesh);
-
-    const transform = new Transform3D();
-    transform.scale = { x: 0.5, y: 0.5, z: 0.5 };
-
-    const animate = () => {
-        transform.rotation.x += 0.01;
-        transform.rotation.y += 0.01;
-        transform.rotation.z += 0.01;
-        
-        renderer!.setModelMatrix(transform.getMatrix());
-        renderer!.drawMesh();
-        requestAnimationFrame(animate);
-    };
-
-    animate();
+/**
+ * Resize viewport
+ */
+export function resize(width: number, height: number): void {
+    if (!context) throw new Error("Velvet not initialized");
+    context.resize(width, height);
 }
