@@ -83,9 +83,14 @@ namespace Velvet.WebGL
         Task DrawMeshAsync(int meshId, int programId, int rendererId);
 
         /// <summary>
-        /// Clear the framebuffer with the given color.
+        /// Clear the framebuffer with the given color on the specified renderer.
         /// </summary>
-        Task ClearAsync(float r, float g, float b, float a);
+        Task ClearAsync(int rendererId, float r, float g, float b, float a);
+
+        /// <summary>
+        /// Set a mat4 uniform on the given program.
+        /// </summary>
+        Task SetUniformMatrix4fvAsync(int programId, string name, float[] matrix);
 
         /// <summary>
         /// Resize the renderer's viewport (and canvas if necessary).

@@ -79,8 +79,11 @@ public sealed class BlazorWebGLBridge : IWebGLBridge
     public Task DrawMeshAsync(int meshId, int programId, int rendererId)
         => _js.InvokeVoidAsync("Velvet.drawMesh", meshId, programId, rendererId).AsTask();
 
-    public Task ClearAsync(float r, float g, float b, float a)
-        => _js.InvokeVoidAsync("Velvet.clear", r, g, b, a).AsTask();
+    public Task ClearAsync(int rendererId, float r, float g, float b, float a)
+        => _js.InvokeVoidAsync("Velvet.clear", rendererId, r, g, b, a).AsTask();
+
+    public Task SetUniformMatrix4fvAsync(int programId, string name, float[] matrix)
+        => _js.InvokeVoidAsync("Velvet.setUniformMatrix4fv", programId, name, matrix).AsTask();
 
     public Task ResizeAsync(int width, int height)
         => _js.InvokeVoidAsync("Velvet.resize", width, height).AsTask();

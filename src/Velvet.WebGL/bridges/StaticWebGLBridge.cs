@@ -80,8 +80,12 @@ public sealed class StaticWebGLBridge : IWebGLBridge
         => _js.InvokeVoidAsync("Velvet.drawMesh", meshId, programId, rendererId).AsTask();
 
     /// <inheritdoc />
-    public Task ClearAsync(float r, float g, float b, float a)
-        => _js.InvokeVoidAsync("Velvet.clear", r, g, b, a).AsTask();
+    public Task ClearAsync(int rendererId, float r, float g, float b, float a)
+        => _js.InvokeVoidAsync("Velvet.clear", rendererId, r, g, b, a).AsTask();
+
+    /// <inheritdoc />
+    public Task SetUniformMatrix4fvAsync(int programId, string name, float[] matrix)
+        => _js.InvokeVoidAsync("Velvet.setUniformMatrix4fv", programId, name, matrix).AsTask();
 
     /// <inheritdoc />
     public Task ResizeAsync(int width, int height)
