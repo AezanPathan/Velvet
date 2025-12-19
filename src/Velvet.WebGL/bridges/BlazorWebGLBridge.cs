@@ -4,23 +4,89 @@ using Microsoft.JSInterop;
 
 namespace Velvet.WebGL;
 
+/// <summary>
+/// Blazor bridge implementation that talks to the Velvet JavaScript API via IJSRuntime.
+/// This implementation intentionally avoids a compile-time dependency on Blazor types
+/// (e.g. ElementReference) so the Velvet.WebGL project remains host-agnostic.
+/// 
+/// At runtime, Blazor should pass an ElementReference object; IJSRuntime will marshal it.
+/// </summary>
 public sealed class BlazorWebGLBridge : IWebGLBridge
 {
+    #region Fields
+
     private readonly IJSRuntime _js;
+
+    #endregion
+
+    #region Constructor
 
     public BlazorWebGLBridge(IJSRuntime js)
     {
         _js = js ?? throw new ArgumentNullException(nameof(js));
     }
 
-    public async Task InitAsync(string canvasId)
+    #endregion
+
+    #region Initialization
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The parameter is declared as <see cref="object"/> to avoid a compile-time
+    /// dependency on Microsoft.AspNetCore.Components. When calling from a Razor
+    /// component, pass the ElementReference (e.g. `await Bridge.InitWithElementAsync(canvasRef)`).
+    /// </remarks>
+    public Task<int> InitWithElementAsync(object canvasElement)
     {
-        await _js.InvokeVoidAsync("Velvet.ensureCanvas", canvasId);
-        await _js.InvokeVoidAsync("Velvet.init", canvasId);
+        if (canvasElement is null) throw new ArgumentNullException(nameof(canvasElement));
+
+        // We intentionally do not type-check for ElementReference at compile-time.
+        // If you want compile-time checks, add a reference to Microsoft.AspNetCore.Components and
+        // change the parameter type to ElementReference.
+        return _js.InvokeAsync<int>("Velvet.init", canvasElement).AsTask();
     }
 
-    public Task DrawTriangleAsync()
+    /// <inheritdoc />
+    public Task<int> InitWithIdAsync(string canvasId)
     {
-        return _js.InvokeVoidAsync("Velvet.drawTriangle").AsTask();
+        // Blazor bridge intentionally does not support string id init.
+        throw new NotSupportedException("BlazorWebGLBridge does not support InitWithIdAsync. Use InitWithElementAsync with an ElementReference.");
     }
+
+    #endregion
+
+    #region Resource creation / management
+
+    public Task<int> CreateShaderAsync(string source, string type)
+        => _js.InvokeAsync<int>("Velvet.createShader", source, type).AsTask();
+
+    public Task<int> CreateProgramAsync()
+        => _js.InvokeAsync<int>("Velvet.createProgram").AsTask();
+
+    public Task AttachShaderAsync(int programId, int shaderId)
+        => _js.InvokeVoidAsync("Velvet.attachShader", programId, shaderId).AsTask();
+
+    public Task LinkProgramAsync(int programId)
+        => _js.InvokeVoidAsync("Velvet.linkProgram", programId).AsTask();
+
+    public Task<int> CreateMeshAsync(float[] vertices, ushort[]? indices = null)
+        => _js.InvokeAsync<int>("Velvet.createMesh", vertices, indices).AsTask();
+
+    #endregion
+
+    #region Rendering / state
+
+    public Task DrawMeshAsync(int meshId, int programId, int rendererId)
+        => _js.InvokeVoidAsync("Velvet.drawMesh", meshId, programId, rendererId).AsTask();
+
+    public Task ClearAsync(int rendererId, float r, float g, float b, float a)
+        => _js.InvokeVoidAsync("Velvet.clear", rendererId, r, g, b, a).AsTask();
+
+    public Task SetUniformMatrix4fvAsync(int programId, string name, float[] matrix)
+        => _js.InvokeVoidAsync("Velvet.setUniformMatrix4fv", programId, name, matrix).AsTask();
+
+    public Task ResizeAsync(int width, int height)
+        => _js.InvokeVoidAsync("Velvet.resize", width, height).AsTask();
+
+    #endregion
 }

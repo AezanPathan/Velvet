@@ -42,8 +42,9 @@ await app.RunAsync();
 ### Blazor demo
 
 ```powershell
-cd Velvet
+cd Velvet/src
 dotnet run --project Velvet.Demo.Blazor
+dotnet watch --project Velvet.Demo.Blazor run (for debug)
 ```
 
 Browse to the logged `localhost` port to see the triangle.

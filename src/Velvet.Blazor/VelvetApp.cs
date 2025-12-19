@@ -1,0 +1,165 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
+using Velvet.Core.Rendering;
+using Velvet.WebGL;
+
+namespace Velvet.Blazor;
+
+/// <summary>
+/// Blazor-first engine entry point for Velvet.
+/// Owns the WebGL renderer, shader program, uploaded meshes, and the update/render loop.
+/// </summary>
+public sealed class VelvetApp
+{
+    private readonly IWebGLBridge _bridge;
+    private readonly IMeshUploader _meshUploader;
+    private readonly int _rendererId;
+
+    private readonly List<Mesh> _meshes = new();
+
+    private ShaderProgram? _program;
+
+    private CancellationTokenSource? _loopCts;
+    private Task? _loopTask;
+
+    private VelvetApp(IWebGLBridge bridge, int rendererId)
+    {
+        _bridge = bridge;
+        _meshUploader = new WebGLMeshUploader(bridge);
+        _rendererId = rendererId;
+    }
+
+    /// <summary>
+    /// Creates and initializes a Velvet application bound to a Blazor canvas.
+    /// </summary>
+    public static async Task<VelvetApp> CreateAsync(
+        ElementReference canvas,
+        IJSRuntime js,
+        Func<IWebGLBridge, Task<ShaderProgram>>? programFactory = null)
+    {
+        ArgumentNullException.ThrowIfNull(js);
+
+        var bridge = new BlazorWebGLBridge(js);
+        var rendererId = await bridge.InitWithElementAsync(canvas).ConfigureAwait(false);
+
+        var app = new VelvetApp(bridge, rendererId);
+
+        if (programFactory is not null)
+        {
+            app._program = await programFactory(bridge).ConfigureAwait(false);
+        }
+
+        return app;
+    }
+
+    public ShaderProgram Program
+        => _program ?? throw new InvalidOperationException("Shader program not configured. Provide a programFactory to CreateAsync(...). ");
+
+    /// <summary>
+    /// Registers a mesh with the application. Upload occurs on <see cref="StartAsync"/>.
+    /// </summary>
+    public void Add(Mesh mesh)
+    {
+        ArgumentNullException.ThrowIfNull(mesh);
+        ThrowIfRunning();
+        _meshes.Add(mesh);
+    }
+
+    public Task StartAsync(Func<float, Task>? onFrame = null)
+    {
+        if (_program is null) throw new InvalidOperationException("Shader program not configured. Provide a programFactory to CreateAsync(...).");
+        if (_meshes.Count == 0) throw new InvalidOperationException("No meshes added. Call Add(mesh) before StartAsync().");
+        if (_loopTask is not null) return Task.CompletedTask;
+
+        _loopCts = new CancellationTokenSource();
+        _loopTask = RunLoopAsync(onFrame, _loopCts.Token);
+        return Task.CompletedTask;
+    }
+
+    public Task StartAsync(Action<float> onFrame)
+    {
+        ArgumentNullException.ThrowIfNull(onFrame);
+        return StartAsync(dt =>
+        {
+            onFrame(dt);
+            return Task.CompletedTask;
+        });
+    }
+
+    public async Task StopAsync()
+    {
+        var cts = _loopCts;
+        var task = _loopTask;
+
+        if (cts is null || task is null)
+        {
+            return;
+        }
+
+        _loopCts = null;
+        _loopTask = null;
+
+        cts.Cancel();
+        try
+        {
+            await task.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            cts.Dispose();
+        }
+    }
+
+    private async Task RunLoopAsync(Func<float, Task>? onFrame, CancellationToken cancellationToken)
+    {
+        var program = _program ?? throw new InvalidOperationException("Shader program not configured.");
+
+        // Ensure meshes are uploaded before we start drawing.
+        foreach (var mesh in _meshes)
+        {
+            await mesh.UploadAsync(_meshUploader, cancellationToken).ConfigureAwait(false);
+        }
+
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(16));
+
+        var stopwatch = Stopwatch.StartNew();
+        var lastSeconds = 0f;
+
+        while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var nowSeconds = (float)stopwatch.Elapsed.TotalSeconds;
+            var deltaSeconds = nowSeconds - lastSeconds;
+            lastSeconds = nowSeconds;
+
+            if (onFrame is not null)
+            {
+                await onFrame(deltaSeconds).ConfigureAwait(false);
+            }
+
+            await _bridge.ClearAsync(_rendererId, 0.08f, 0.08f, 0.10f, 1.0f).ConfigureAwait(false);
+
+            foreach (var mesh in _meshes)
+            {
+                var meshId = mesh.Resources.VertexBufferId.Value;
+
+                await program.DrawMeshAsync(meshId, _rendererId).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private void ThrowIfRunning()
+    {
+        if (_loopTask is not null)
+        {
+            throw new InvalidOperationException("Cannot modify VelvetApp while running. Call StopAsync() first.");
+        }
+    }
+}

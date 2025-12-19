@@ -1,13 +1,20 @@
-import { init, ensureCanvas, drawTriangle, drawCube } from './api/VelvetAPI';
-import './api/types';
+import * as API from "./api/VelvetAPI";
+import "./api/types";
 
-// Expose global API
-window.Velvet = {
-    init,
-    ensureCanvas,
-    drawTriangle,
-    drawCube,
+/**
+ * Expose Velvet globally for Blazor / JS / HTML usage.
+ */
+(window as any).Velvet = {
+    init: API.init,
+    createShader: API.createShader,
+    createProgram: API.createProgram,
+    attachShader: API.attachShader,
+    linkProgram: API.linkProgram,
+    createMesh: API.createMesh,
+    drawMesh: API.drawMesh,
+    setUniformMatrix4fv: API.setUniformMatrix4fv,
+    clear: API.clear,
+    resize: API.resize
 };
 
-// Export for module usage
-export { init, ensureCanvas, drawTriangle, drawCube };
+export const Velvet = (window as any).Velvet;

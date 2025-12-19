@@ -2,13 +2,12 @@ using System.Threading.Tasks;
 
 namespace Velvet.Core.Rendering;
 
-/// <summary>
-/// Represent graphic backends
-/// Abstraction for a graphics device. Engine code depends on this only.
-/// Backends implement this to perform real rendering.
-/// </summary>
 public interface IGraphicsDevice
 {
-    Task InitializeAsync();
-    Task DrawTriangleAsync();
+    Task<int> InitializeAsync();
+
+    // OPTIONAL: Add draw/clear/resize based on your engine’s needs:
+    // Task DrawMeshAsync(int meshId, int programId);
+    // Task ClearAsync(float r, float g, float b, float a);
+    // Task ResizeAsync(int width, int height);
 }
