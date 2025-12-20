@@ -64,6 +64,53 @@ public static class Mat4
     }
 
     /// <summary>
+    /// Compute the 3x3 normal matrix (inverse-transpose of the upper-left 3x3 of the model matrix).
+    /// Returns a float[9] in column-major order suitable for GLSL mat3 uniform upload.
+    /// </summary>
+    public static float[] NormalMatrix(float[] m)
+    {
+        if (m.Length != 16) throw new ArgumentException("Expected 4x4 matrix", nameof(m));
+
+        // Extract upper-left 3x3
+        var a00 = m[0]; var a01 = m[4]; var a02 = m[8];
+        var a10 = m[1]; var a11 = m[5]; var a12 = m[9];
+        var a20 = m[2]; var a21 = m[6]; var a22 = m[10];
+
+        // Compute inverse of 3x3
+        var b01 =  a22 * a11 - a12 * a21;
+        var b11 = -a22 * a10 + a12 * a20;
+        var b21 =  a21 * a10 - a11 * a20;
+
+        var det = a00 * b01 + a01 * b11 + a02 * b21;
+        if (det == 0f)
+        {
+            // Fallback to identity
+            return new float[] { 1,0,0, 0,1,0, 0,0,1 };
+        }
+
+        var invDet = 1f / det;
+
+        var c00 = b01 * invDet;
+        var c01 = (-a22 * a01 + a02 * a21) * invDet;
+        var c02 = (a12 * a01 - a02 * a11) * invDet;
+
+        var c10 = b11 * invDet;
+        var c11 = (a22 * a00 - a02 * a20) * invDet;
+        var c12 = (-a12 * a00 + a02 * a10) * invDet;
+
+        var c20 = b21 * invDet;
+        var c21 = (-a21 * a00 + a01 * a20) * invDet;
+        var c22 = (a11 * a00 - a01 * a10) * invDet;
+
+        // Transpose (inverse transpose)
+        return new float[] {
+            c00, c10, c20,
+            c01, c11, c21,
+            c02, c12, c22
+        };
+    }
+
+    /// <summary>
     /// Builds a right-handed view matrix (OpenGL/WebGL convention) using column-major storage.
     /// </summary>
     public static float[] LookAt(in Vec3 eye, in Vec3 target, in Vec3 up)

@@ -13,6 +13,9 @@ import "./api/types";
     createMesh: API.createMesh,
     drawMesh: API.drawMesh,
     setUniformMatrix4fv: API.setUniformMatrix4fv,
+    setUniformMatrix3fv: API.setUniformMatrix3fv,
+    setUniform3f: API.setUniform3f,
+    setUniform1f: API.setUniform1f,
     clear: API.clear,
     resize: API.resize
 };

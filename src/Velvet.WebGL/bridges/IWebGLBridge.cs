@@ -72,6 +72,10 @@ namespace Velvet.WebGL
         /// </summary>
         Task<int> CreateMeshAsync(float[] vertices, ushort[]? indices = null);
 
+        Task SetUniform3fAsync(int programId, string name, float x, float y, float z);
+        Task SetUniform1fAsync(int programId, string name, float value);
+        Task SetUniformMatrix3fvAsync(int programId, string name, float[] matrix);
+
         #endregion
 
         #region Rendering / state

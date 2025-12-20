@@ -38,11 +38,20 @@ public partial class CubeDemo : ComponentBase, IAsyncDisposable
         var cube = new Mesh(new CubeGeometry());
         app.Add(cube);
 
+        // Create a single directional light and upload its uniforms (engine-grade, minimal).
+        var light = new DirectionalLight(new Vec3(0.5f, -1.0f, -0.3f), new Vec3(1, 1, 1), 1.25f);
+        await app.Program.SetUniform3fAsync("uLightDirection", light.Direction.X, light.Direction.Y, light.Direction.Z);
+        await app.Program.SetUniform3fAsync("uLightColor", light.Color.X, light.Color.Y, light.Color.Z);
+        await app.Program.SetUniform1fAsync("uLightIntensity", light.Intensity);
+
         await app.StartAsync(async dt =>
         {
             angle += dt * 1.2f;
             var model = Mat4.Multiply(Mat4.RotateY(angle), Mat4.RotateX(angle * 0.7f));
             await app.Program.SetUniformMatrix4fvAsync("uModel", model);
+            // Compute and upload normal matrix (3x3 inverse-transpose of model's upper-left 3x3)
+            var normalMat3 = Mat4.NormalMatrix(model);
+            await app.Program.SetUniformMatrix3fvAsync("uNormalMatrix", normalMat3);
         });
     }
 
