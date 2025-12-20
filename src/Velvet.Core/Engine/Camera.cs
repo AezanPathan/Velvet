@@ -66,6 +66,11 @@ public sealed class Camera
 		}
 	}
 
+	/// <summary>
+	/// Forward direction (normalized), derived from <see cref="Position"/> and <see cref="Target"/>.
+	/// </summary>
+	public Vec3 Forward => (_target - _position).Normalized();
+
 	public Vec3 Up
 	{
 		get => _up;
@@ -91,6 +96,16 @@ public sealed class Camera
 		}
 	}
 
+	/// <summary>
+	/// Field of view (vertical) in radians.
+	/// Alias for <see cref="FovYRadians"/>.
+	/// </summary>
+	public float FieldOfViewRadians
+	{
+		get => FovYRadians;
+		set => FovYRadians = value;
+	}
+
 	public float AspectRatio
 	{
 		get => _aspectRatio;
@@ -103,6 +118,16 @@ public sealed class Camera
 		}
 	}
 
+	/// <summary>
+	/// Convenience helper to update aspect ratio from a viewport size.
+	/// </summary>
+	public void SetViewportSize(float width, float height)
+	{
+		if (width <= 0f) throw new ArgumentOutOfRangeException(nameof(width), "Viewport width must be > 0.");
+		if (height <= 0f) throw new ArgumentOutOfRangeException(nameof(height), "Viewport height must be > 0.");
+		AspectRatio = width / height;
+	}
+
 	public float NearPlane
 	{
 		get => _nearPlane;
@@ -110,6 +135,8 @@ public sealed class Camera
 		{
 			if (value <= 0f)
 				throw new ArgumentOutOfRangeException(nameof(value), "Near plane must be > 0.");
+			if (_farPlane > 0f && _farPlane <= value)
+				throw new ArgumentOutOfRangeException(nameof(value), "Near plane must be < far plane.");
 			_nearPlane = value;
 			_projectionDirty = true;
 		}
@@ -122,9 +149,32 @@ public sealed class Camera
 		{
 			if (value <= 0f)
 				throw new ArgumentOutOfRangeException(nameof(value), "Far plane must be > 0.");
+			if (_nearPlane > 0f && value <= _nearPlane)
+				throw new ArgumentOutOfRangeException(nameof(value), "Far plane must be > near plane.");
 			_farPlane = value;
 			_projectionDirty = true;
 		}
+	}
+
+	/// <summary>
+	/// Sets all perspective parameters in one call (avoids transient invalid states).
+	/// </summary>
+	public void SetPerspective(float fovYRadians, float aspectRatio, float nearPlane, float farPlane)
+	{
+		if (fovYRadians <= 0f || fovYRadians >= MathF.PI)
+			throw new ArgumentOutOfRangeException(nameof(fovYRadians), "FOV must be in (0, PI) radians.");
+		if (aspectRatio <= 0f)
+			throw new ArgumentOutOfRangeException(nameof(aspectRatio), "Aspect ratio must be > 0.");
+		if (nearPlane <= 0f)
+			throw new ArgumentOutOfRangeException(nameof(nearPlane), "Near plane must be > 0.");
+		if (farPlane <= nearPlane)
+			throw new ArgumentOutOfRangeException(nameof(farPlane), "Far plane must be > near plane.");
+
+		_fovYRadians = fovYRadians;
+		_aspectRatio = aspectRatio;
+		_nearPlane = nearPlane;
+		_farPlane = farPlane;
+		_projectionDirty = true;
 	}
 
 	/// <summary>
