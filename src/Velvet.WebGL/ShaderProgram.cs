@@ -66,10 +66,12 @@ public sealed class ShaderProgram
         "\n" +
         "out vec3 vColor;\n" +
         "out vec3 vNormal;\n" +
+        "out vec3 vWorldPos;\n" +
         "\n" +
         "void main() {\n" +
         "    vColor = aColor;\n" +
         "    vNormal = normalize(uNormalMatrix * aNormal);\n" +
+        "    vWorldPos = (uModel * vec4(aPosition, 1.0)).xyz;\n" +
         "    gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);\n" +
         "}\n";
 
@@ -78,19 +80,34 @@ public sealed class ShaderProgram
         "\n" +
         "in vec3 vColor;\n" +
         "in vec3 vNormal;\n" +
+        "in vec3 vWorldPos;\n" +
         "out vec4 outColor;\n" +
         "\n" +
         "uniform vec3 uLightDirection;\n" +
         "uniform vec3 uLightColor;\n" +
         "uniform float uLightIntensity;\n" +
         "\n" +
+        "uniform vec3 uPointLightPosition;\n" +
+        "uniform vec3 uPointLightColor;\n" +
+        "uniform float uPointLightIntensity;\n" +
+        "uniform float uPointLightConstant;\n" +
+        "uniform float uPointLightLinear;\n" +
+        "uniform float uPointLightQuadratic;\n" +
+        "\n" +
         "void main() {\n" +
         "    vec3 N = normalize(vNormal);\n" +
         "    vec3 L = normalize(-uLightDirection);\n" +
         "    float diff = max(dot(N, L), 0.0);\n" +
         "    vec3 diffuse = vColor * uLightColor * diff * uLightIntensity;\n" +
+        "\n" +
+        "    vec3 toPoint = uPointLightPosition - vWorldPos;\n" +
+        "    float dist = length(toPoint);\n" +
+        "    vec3 Lp = (dist > 0.0001) ? (toPoint / dist) : vec3(0.0, 0.0, 0.0);\n" +
+        "    float diffP = max(dot(N, Lp), 0.0);\n" +
+        "    float attenuation = 1.0 / (uPointLightConstant + uPointLightLinear * dist + uPointLightQuadratic * dist * dist);\n" +
+        "    vec3 pointDiffuse = vColor * uPointLightColor * diffP * uPointLightIntensity * attenuation;\n" +
         "    // Small ambient to avoid fully black faces\n" +
         "    vec3 ambient = 0.05 * vColor;\n" +
-        "    outColor = vec4(ambient + diffuse, 1.0);\n" +
+        "    outColor = vec4(ambient + diffuse + pointDiffuse, 1.0);\n" +
         "}\n";
 }
