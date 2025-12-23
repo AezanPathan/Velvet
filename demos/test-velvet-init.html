@@ -65,6 +65,14 @@
     </div>
 
     <script src="../../src/Velvet.WebGL/wwwroot/velvet.js"></script>
+    
+    <!-- Optional: Velvet debug UI (developer-only). Requires Tweakpane. -->
+    <script type="module">
+        import * as Tweakpane from 'https://cdn.jsdelivr.net/npm/tweakpane@4.0.3/dist/tweakpane.min.js';
+        window.Tweakpane = Tweakpane;
+        window.Pane = Tweakpane.Pane;
+    </script>
+    <script src="../../src/Velvet.WebGL/wwwroot/velvet-debug-ui.js"></script>
     <script>
         function showResult(elementId, success, message) {
             const result = document.getElementById(elementId);
@@ -117,6 +125,17 @@
 
         console.log('VelvetAPI test page loaded. Click buttons to run tests.');
         console.log('window.Velvet =', window.Velvet);
+
+        // Static-host wiring example:
+        // VelvetDebugUI is intentionally JS-only and calls explicit hooks.
+        // In a real static WASM host, you'd pass a DotNetObjectReference (or JS callbacks) here.
+        //
+        // window.VelvetDebugUI.init({
+        //   camera: { dotnet: dotnetRef, getState: 'GetState', setPosition: 'SetCameraPosition', ... },
+        //   directionalLight: { dotnet: dotnetRef, setDirection: 'SetDirectionalDirection', ... },
+        //   pointLight: { dotnet: dotnetRef, setPosition: 'SetPointPosition', ... },
+        //   renderer: { dotnet: dotnetRef, pause: 'PauseAsync', resume: 'ResumeAsync' },
+        // });
     </script>
 </body>
 </html>
