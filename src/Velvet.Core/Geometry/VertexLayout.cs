@@ -31,12 +31,26 @@ public sealed class VertexLayout
             new VertexElement(VertexElementSemantic.Position, OffsetFloats: 0, ComponentCount: 3),
             new VertexElement(VertexElementSemantic.Color, OffsetFloats: 3, ComponentCount: 3),
         });
+
+        /// <summary>
+        /// Layout: interleaved position (x,y,z) + color (r,g,b) + normal (nx,ny,nz) per vertex.
+        /// Format: <c>[x, y, z, r, g, b, nx, ny, nz]</c>
+        /// </summary>
+        public static VertexLayout PositionColorNormal { get; } = new(
+            strideFloats: 9,
+            elements: new[]
+            {
+                new VertexElement(VertexElementSemantic.Position, OffsetFloats: 0, ComponentCount: 3),
+                new VertexElement(VertexElementSemantic.Color, OffsetFloats: 3, ComponentCount: 3),
+                new VertexElement(VertexElementSemantic.Normal, OffsetFloats: 6, ComponentCount: 3),
+            });
 }
 
 public enum VertexElementSemantic
 {
     Position,
     Color,
+        Normal,
 }
 
 public readonly record struct VertexElement(

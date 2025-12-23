@@ -148,6 +148,42 @@ export function setUniformMatrix4fv(programId: number, name: string, matrix: Flo
     }
 }
 
+export function setUniformMatrix3fv(programId: number, name: string, matrix: Float32Array): void {
+    if (!context) throw new Error("Velvet not initialized");
+
+    const program = ProgramManager.get(programId) as any;
+    const location = program.getUniformLocation(name);
+
+    if (location) {
+        program.use();
+        context.gl.uniformMatrix3fv(location, false, ensureFloat32Array(matrix));
+    }
+}
+
+export function setUniform3f(programId: number, name: string, x: number, y: number, z: number): void {
+    if (!context) throw new Error("Velvet not initialized");
+
+    const program = ProgramManager.get(programId) as any;
+    const location = program.getUniformLocation(name);
+
+    if (location) {
+        program.use();
+        context.gl.uniform3f(location, x, y, z);
+    }
+}
+
+export function setUniform1f(programId: number, name: string, value: number): void {
+    if (!context) throw new Error("Velvet not initialized");
+
+    const program = ProgramManager.get(programId) as any;
+    const location = program.getUniformLocation(name);
+
+    if (location) {
+        program.use();
+        context.gl.uniform1f(location, value);
+    }
+}
+
 /**
  * Create a mesh from raw vertex/index data.
  * 
@@ -177,17 +213,32 @@ export function createMesh(
         BufferManager.add(ib);
         count = indexData.length;
     } else {
-        // Assume non-indexed triangle mesh
-        count = vertexData.length / 6; // position(3) + color(3) = 6 floats per vertex
+        // Infer stride: either position(3)+color(3) = 6 floats per vertex, or
+        // position+color+normal = 9 floats per vertex. Prefer 9 if divisible.
+        if (vertexData.length % 9 === 0) {
+            count = vertexData.length / 9;
+        } else {
+            count = vertexData.length / 6;
+        }
     }
 
     const mesh = new GLMesh(gl, MeshManager.generateId(), vb, ib) as any;
     
     // Set default attributes for position (location 0) and color (location 1)
-    mesh.setAttributes([
-        { location: 0, size: 3, type: gl.FLOAT, stride: 24, offset: 0 },  // aPosition (vec3)
-        { location: 1, size: 3, type: gl.FLOAT, stride: 24, offset: 12 }  // aColor (vec3)
-    ]);
+    // Configure attributes depending on inferred stride
+    if (vertexData.length % 9 === 0) {
+        // position(3) + color(3) + normal(3) -> stride 36 bytes
+        mesh.setAttributes([
+            { location: 0, size: 3, type: gl.FLOAT, stride: 36, offset: 0 },   // aPosition
+            { location: 1, size: 3, type: gl.FLOAT, stride: 36, offset: 12 },  // aColor
+            { location: 2, size: 3, type: gl.FLOAT, stride: 36, offset: 24 }   // aNormal
+        ]);
+    } else {
+        mesh.setAttributes([
+            { location: 0, size: 3, type: gl.FLOAT, stride: 24, offset: 0 },  // aPosition (vec3)
+            { location: 1, size: 3, type: gl.FLOAT, stride: 24, offset: 12 }  // aColor (vec3)
+        ]);
+    }
     mesh.setCount(count);
 
     return MeshManager.add(mesh);

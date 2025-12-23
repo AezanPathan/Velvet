@@ -40,6 +40,15 @@ public sealed class ShaderProgram
     public Task SetUniformMatrix4fvAsync(string name, float[] matrix)
         => _bridge.SetUniformMatrix4fvAsync(_programId, name, matrix);
 
+    public Task SetUniformMatrix3fvAsync(string name, float[] matrix)
+        => _bridge.SetUniformMatrix3fvAsync(_programId, name, matrix);
+
+    public Task SetUniform3fAsync(string name, float x, float y, float z)
+        => _bridge.SetUniform3fAsync(_programId, name, x, y, z);
+
+    public Task SetUniform1fAsync(string name, float value)
+        => _bridge.SetUniform1fAsync(_programId, name, value);
+
     public Task DrawMeshAsync(int meshId, int rendererId)
         => _bridge.DrawMeshAsync(meshId, _programId, rendererId);
 
@@ -48,15 +57,19 @@ public sealed class ShaderProgram
         "\n" +
         "layout(location = 0) in vec3 aPosition;\n" +
         "layout(location = 1) in vec3 aColor;\n" +
+        "layout(location = 2) in vec3 aNormal;\n" +
         "\n" +
         "uniform mat4 uModel;\n" +
         "uniform mat4 uView;\n" +
         "uniform mat4 uProjection;\n" +
+        "uniform mat3 uNormalMatrix;\n" +
         "\n" +
         "out vec3 vColor;\n" +
+        "out vec3 vNormal;\n" +
         "\n" +
         "void main() {\n" +
         "    vColor = aColor;\n" +
+        "    vNormal = normalize(uNormalMatrix * aNormal);\n" +
         "    gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);\n" +
         "}\n";
 
@@ -64,9 +77,20 @@ public sealed class ShaderProgram
         "precision mediump float;\n" +
         "\n" +
         "in vec3 vColor;\n" +
+        "in vec3 vNormal;\n" +
         "out vec4 outColor;\n" +
         "\n" +
+        "uniform vec3 uLightDirection;\n" +
+        "uniform vec3 uLightColor;\n" +
+        "uniform float uLightIntensity;\n" +
+        "\n" +
         "void main() {\n" +
-        "    outColor = vec4(vColor, 1.0);\n" +
+        "    vec3 N = normalize(vNormal);\n" +
+        "    vec3 L = normalize(-uLightDirection);\n" +
+        "    float diff = max(dot(N, L), 0.0);\n" +
+        "    vec3 diffuse = vColor * uLightColor * diff * uLightIntensity;\n" +
+        "    // Small ambient to avoid fully black faces\n" +
+        "    vec3 ambient = 0.05 * vColor;\n" +
+        "    outColor = vec4(ambient + diffuse, 1.0);\n" +
         "}\n";
 }

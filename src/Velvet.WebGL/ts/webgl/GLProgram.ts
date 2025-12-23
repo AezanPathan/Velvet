@@ -22,7 +22,8 @@ export class GLProgram implements IProgram {
     name: string;
   }> = [
     { location: 0, name: "aPosition" },
-    { location: 1, name: "aColor" }
+    { location: 1, name: "aColor" },
+    { location: 2, name: "aNormal" }
   ];
 
   constructor(private gl: WebGL2RenderingContext, id: number) {
