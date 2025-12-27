@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Velvet.Core.Rendering;
 
 namespace Velvet.WebGL;
 
@@ -49,6 +50,18 @@ public sealed class ShaderProgram
     public Task SetUniform1fAsync(string name, float value)
         => _bridge.SetUniform1fAsync(_programId, name, value);
 
+    public Task SetMaterialAsync(Material material)
+    {
+        ArgumentNullException.ThrowIfNull(material);
+
+        var c = material.AlbedoColor;
+        return Task.WhenAll(
+            SetUniform3fAsync("uMaterialColor", c.X, c.Y, c.Z),
+            SetUniform1fAsync("uMaterialAmbient", material.AmbientStrength),
+            SetUniform1fAsync("uMaterialDiffuse", material.DiffuseStrength),
+            SetUniform1fAsync("uMaterialUnlit", material.Unlit ? 1.0f : 0.0f));
+    }
+
     public Task DrawMeshAsync(int meshId, int rendererId)
         => _bridge.DrawMeshAsync(meshId, _programId, rendererId);
 
@@ -83,6 +96,11 @@ public sealed class ShaderProgram
         "in vec3 vWorldPos;\n" +
         "out vec4 outColor;\n" +
         "\n" +
+        "uniform vec3 uMaterialColor;\n" +
+        "uniform float uMaterialAmbient;\n" +
+        "uniform float uMaterialDiffuse;\n" +
+        "uniform float uMaterialUnlit;\n" +
+        "\n" +
         "uniform vec3 uLightDirection;\n" +
         "uniform vec3 uLightColor;\n" +
         "uniform float uLightIntensity;\n" +
@@ -94,20 +112,51 @@ public sealed class ShaderProgram
         "uniform float uPointLightLinear;\n" +
         "uniform float uPointLightQuadratic;\n" +
         "\n" +
+        "uniform vec3 uSpotLightPosition;\n" +
+        "uniform vec3 uSpotLightDirection;\n" +
+        "uniform vec3 uSpotLightColor;\n" +
+        "uniform float uSpotLightIntensity;\n" +
+        "uniform float uSpotLightCutoff;\n" +
+        "uniform float uSpotLightOuterCutoff;\n" +
+        "uniform float uSpotLightConstant;\n" +
+        "uniform float uSpotLightLinear;\n" +
+        "uniform float uSpotLightQuadratic;\n" +
+        "\n" +
         "void main() {\n" +
+        "    if (uMaterialUnlit > 0.5) {\n" +
+        "        outColor = vec4(uMaterialColor, 1.0);\n" +
+        "        return;\n" +
+        "    }\n" +
+        "\n" +
         "    vec3 N = normalize(vNormal);\n" +
         "    vec3 L = normalize(-uLightDirection);\n" +
         "    float diff = max(dot(N, L), 0.0);\n" +
-        "    vec3 diffuse = vColor * uLightColor * diff * uLightIntensity;\n" +
+        "    vec3 diffuse = uMaterialColor * uLightColor * diff * uLightIntensity * uMaterialDiffuse;\n" +
         "\n" +
         "    vec3 toPoint = uPointLightPosition - vWorldPos;\n" +
         "    float dist = length(toPoint);\n" +
         "    vec3 Lp = (dist > 0.0001) ? (toPoint / dist) : vec3(0.0, 0.0, 0.0);\n" +
         "    float diffP = max(dot(N, Lp), 0.0);\n" +
         "    float attenuation = 1.0 / (uPointLightConstant + uPointLightLinear * dist + uPointLightQuadratic * dist * dist);\n" +
-        "    vec3 pointDiffuse = vColor * uPointLightColor * diffP * uPointLightIntensity * attenuation;\n" +
-        "    // Small ambient to avoid fully black faces\n" +
-        "    vec3 ambient = 0.05 * vColor;\n" +
-        "    outColor = vec4(ambient + diffuse + pointDiffuse, 1.0);\n" +
+        "    vec3 pointDiffuse = uMaterialColor * uPointLightColor * diffP * uPointLightIntensity * attenuation * uMaterialDiffuse;\n" +
+        "\n" +
+        "    vec3 toSpot = uSpotLightPosition - vWorldPos;\n" +
+        "    float distS = length(toSpot);\n" +
+        "    vec3 Ls = (distS > 0.0001) ? (toSpot / distS) : vec3(0.0, 0.0, 0.0);\n" +
+        "    float diffS = max(dot(N, Ls), 0.0);\n" +
+        "    float attenuationS = 1.0 / (uSpotLightConstant + uSpotLightLinear * distS + uSpotLightQuadratic * distS * distS);\n" +
+        "\n" +
+        "    vec3 spotDir = normalize(uSpotLightDirection);\n" +
+        "    vec3 fromLight = (distS > 0.0001) ? normalize(vWorldPos - uSpotLightPosition) : vec3(0.0, 0.0, 0.0);\n" +
+        "    float theta = dot(fromLight, spotDir);\n" +
+        "    float innerCos = cos(uSpotLightCutoff);\n" +
+        "    float outerCos = cos(uSpotLightOuterCutoff);\n" +
+        "    float cone = smoothstep(outerCos, innerCos, theta);\n" +
+        "\n" +
+        "    vec3 spotDiffuse = uMaterialColor * uSpotLightColor * diffS * uSpotLightIntensity * attenuationS * cone * uMaterialDiffuse;\n" +
+        "\n" +
+        "    vec3 ambient = uMaterialAmbient * uMaterialColor;\n" +
+        "    outColor = vec4(ambient + diffuse + pointDiffuse + spotDiffuse, 1.0);\n" +
         "}\n";
 }
+

@@ -77,7 +77,18 @@ public sealed class VelvetApp
         if (_loopTask is not null) return Task.CompletedTask;
 
         _loopCts = new CancellationTokenSource();
-        _loopTask = RunLoopAsync(onFrame, _loopCts.Token);
+        _loopTask = RunLoopAsync(onFrame, beforeDrawMesh: null, _loopCts.Token);
+        return Task.CompletedTask;
+    }
+
+    public Task StartAsync(Func<float, Task>? onFrame, Func<Mesh, Task>? beforeDrawMesh)
+    {
+        if (_program is null) throw new InvalidOperationException("Shader program not configured. Provide a programFactory to CreateAsync(...).");
+        if (_meshes.Count == 0) throw new InvalidOperationException("No meshes added. Call Add(mesh) before StartAsync().");
+        if (_loopTask is not null) return Task.CompletedTask;
+
+        _loopCts = new CancellationTokenSource();
+        _loopTask = RunLoopAsync(onFrame, beforeDrawMesh, _loopCts.Token);
         return Task.CompletedTask;
     }
 
@@ -118,7 +129,7 @@ public sealed class VelvetApp
         }
     }
 
-    private async Task RunLoopAsync(Func<float, Task>? onFrame, CancellationToken cancellationToken)
+    private async Task RunLoopAsync(Func<float, Task>? onFrame, Func<Mesh, Task>? beforeDrawMesh, CancellationToken cancellationToken)
     {
         var program = _program ?? throw new InvalidOperationException("Shader program not configured.");
 
@@ -149,6 +160,13 @@ public sealed class VelvetApp
             foreach (var mesh in _meshes)
             {
                 var meshId = mesh.Resources.VertexBufferId.Value;
+
+                if (beforeDrawMesh is not null)
+                {
+                    await beforeDrawMesh(mesh).ConfigureAwait(false);
+                }
+
+                await program.SetMaterialAsync(mesh.Material ?? Material.Default).ConfigureAwait(false);
 
                 await program.DrawMeshAsync(meshId, _rendererId).ConfigureAwait(false);
             }

@@ -1,24 +1,24 @@
+using System.Net.Http;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
-using Velvet.Core.Geometry;
+using Velvet.Blazor;
+using Velvet.Core.Gltf;
 using Velvet.Core.Math;
 using Velvet.Core.Rendering;
-using Velvet.Blazor;
-using Velvet.WebGL;
 using Velvet.Demo.Blazor.Debug;
+using Velvet.WebGL;
 
 namespace Velvet.Demo.Blazor.Pages;
 
-public partial class CubeDemo : ComponentBase, IAsyncDisposable
+public partial class ModelDemo : ComponentBase, IAsyncDisposable
 {
     [Inject] private IJSRuntime JS { get; set; } = default!;
+    [Inject] private HttpClient Http { get; set; } = default!;
 
     private ElementReference canvasRef;
 
     private VelvetApp? app;
-    private Mesh? cube;
-    private Mesh? sphere;
-    private Material? sphereMaterial;
+    private Mesh? model;
     private Camera? camera;
     private DirectionalLightState? directional;
     private PointLightState? point;
@@ -27,8 +27,6 @@ public partial class CubeDemo : ComponentBase, IAsyncDisposable
     private DotNetObjectReference<VelvetDebugInterop>? debugRef;
     private VelvetDebugInterop? debugInterop;
 
-    private float angle;
-
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
@@ -36,7 +34,7 @@ public partial class CubeDemo : ComponentBase, IAsyncDisposable
         app = await VelvetApp.CreateAsync(canvasRef, JS, ShaderProgram.CreateDefaultAsync);
 
         camera = new Camera(
-            position: new Vec3(0, 0, 3.0f),
+            position: new Vec3(0, 0.2f, 2.6f),
             target: new Vec3(0, 0, 0),
             up: Vec3.UnitY,
             fovYRadians: 60.0f * (System.MathF.PI / 180.0f),
@@ -44,57 +42,43 @@ public partial class CubeDemo : ComponentBase, IAsyncDisposable
             nearPlane: 0.1f,
             farPlane: 100.0f);
 
-        // Rotating cube uses the engine default material (intent: geometry without explicit appearance).
-        cube = new Mesh(new CubeGeometry());
-
-        // Sphere is the material showcase target.
-        sphereMaterial = new Material(
-            albedoColor: new Vec3(0.20f, 0.65f, 1.0f),
-            ambientStrength: 0.08f,
-            diffuseStrength: 1.0f,
-            unlit: false);
-
-        sphere = new Mesh(new SphereGeometry(latitudeSegments: 14, longitudeSegments: 20, radius: 0.55f))
-        {
-            Material = sphereMaterial,
-        };
-
-        app.Add(cube);
-        app.Add(sphere);
-
         directional = new DirectionalLightState(
             enabled: true,
-            direction: new Vec3(0.5f, -1.0f, -0.3f),
+            direction: new Vec3(0.4f, -1.0f, -0.25f),
             color: new Vec3(1, 1, 1),
-            intensity: 1.25f);
+            intensity: 1.1f);
 
         point = new PointLightState(
             enabled: true,
-            position: new Vec3(1.5f, 1.2f, 1.5f),
-            color: new Vec3(1.0f, 0.9f, 0.8f),
+            position: new Vec3(1.5f, 1.1f, 1.6f),
+            color: new Vec3(1.0f, 0.95f, 0.9f),
             intensity: 2.0f,
             constant: 1.0f,
             linear: 0.14f,
             quadratic: 0.07f);
 
-        // Spotlight (animated direction).
-        // Keep it explicit and single-instance: no managers, no arrays.
+        // Keep spotlight uniforms valid; disable by setting intensity to 0.
         spot = new SpotLight(
             position: new Vec3(0.0f, 2.2f, 2.2f),
             direction: new Vec3(0.0f, -1.0f, -1.0f),
             color: new Vec3(1.0f, 1.0f, 1.0f),
-            intensity: 6.0f,
+            intensity: 0.0f,
             cutoff: 12.0f * (System.MathF.PI / 180.0f),
             outerCutoff: 20.0f * (System.MathF.PI / 180.0f),
             constant: 1.0f,
             linear: 0.09f,
             quadratic: 0.032f);
 
+        // Load a single demo model from wwwroot.
+        var bytes = await Http.GetByteArrayAsync("models/Box.gltf");
+        model = GltfLoader.LoadSingleMesh(bytes);
+        app.Add(model);
+
         debugInterop = new VelvetDebugInterop(
             getCamera: () => camera,
             getDirectional: () => directional,
             getPoint: () => point,
-            getMaterial: () => sphereMaterial ?? Material.Default,
+            getMaterial: () => model.Material ?? Material.Default,
             setCameraPosition: v => camera.Position = v,
             setCameraTarget: v => camera.Target = v,
             setCameraPerspective: (fovYRadians, nearPlane, farPlane) => camera.SetPerspective(fovYRadians, camera.AspectRatio, nearPlane, farPlane),
@@ -108,27 +92,15 @@ public partial class CubeDemo : ComponentBase, IAsyncDisposable
             setPointIntensity: intensity => point.Intensity = intensity,
             setPointAttenuation: (constant, linear, quadratic) =>
             {
-                // Match PointLight ctor constraints (constant > 0, linear/quadratic >= 0)
                 point.Constant = constant <= 0f ? 0.0001f : constant;
                 point.Linear = linear < 0f ? 0f : linear;
                 point.Quadratic = quadratic < 0f ? 0f : quadratic;
             },
-            setMaterialColor: v =>
-            {
-                if (sphereMaterial is not null) sphereMaterial.AlbedoColor = v;
-            },
-            setMaterialAmbient: a =>
-            {
-                if (sphereMaterial is not null) sphereMaterial.AmbientStrength = a < 0f ? 0f : a;
-            },
-            setMaterialDiffuse: d =>
-            {
-                if (sphereMaterial is not null) sphereMaterial.DiffuseStrength = d < 0f ? 0f : d;
-            },
-            setMaterialUnlit: unlit =>
-            {
-                if (sphereMaterial is not null) sphereMaterial.Unlit = unlit;
-            },
+            // Material controls intentionally omitted from this demo; keep interop no-op.
+            setMaterialColor: _ => { },
+            setMaterialAmbient: _ => { },
+            setMaterialDiffuse: _ => { },
+            setMaterialUnlit: _ => { },
             pause: async () =>
             {
                 if (app is not null) await app.StopAsync();
@@ -143,8 +115,7 @@ public partial class CubeDemo : ComponentBase, IAsyncDisposable
 
         debugRef = DotNetObjectReference.Create(debugInterop);
 
-        await app.StartAsync(OnFrameAsync, BeforeDrawMeshAsync);
-
+        await app.StartAsync(OnFrameAsync);
         await TryInitDebugUiAsync();
     }
 
@@ -152,17 +123,17 @@ public partial class CubeDemo : ComponentBase, IAsyncDisposable
     {
         if (app is null || camera is null || directional is null || point is null || spot is null) return;
 
-        angle += dt * 1.2f;
+        // Single static model at origin.
+        var modelMat = Mat4.Identity();
+        await app.Program.SetUniformMatrix4fvAsync("uModel", modelMat);
+        await app.Program.SetUniformMatrix3fvAsync("uNormalMatrix", Mat4.NormalMatrix(modelMat));
 
         await app.Program.SetUniformMatrix4fvAsync("uView", camera.ViewMatrix);
         await app.Program.SetUniformMatrix4fvAsync("uProjection", camera.ProjectionMatrix);
 
         // Directional light
         var dir = directional.Direction;
-        if (dir.LengthSquared > 0f)
-        {
-            dir = dir.Normalized();
-        }
+        if (dir.LengthSquared > 0f) dir = dir.Normalized();
         await app.Program.SetUniform3fAsync("uLightDirection", dir.X, dir.Y, dir.Z);
         await app.Program.SetUniform3fAsync("uLightColor", directional.Color.X, directional.Color.Y, directional.Color.Z);
         await app.Program.SetUniform1fAsync("uLightIntensity", directional.Enabled ? directional.Intensity : 0f);
@@ -175,13 +146,7 @@ public partial class CubeDemo : ComponentBase, IAsyncDisposable
         await app.Program.SetUniform1fAsync("uPointLightLinear", point.Linear);
         await app.Program.SetUniform1fAsync("uPointLightQuadratic", point.Quadratic);
 
-        // Spot light
-        // Sweep the cone across the cube by orbiting the target point around the origin.
-        var sweep = angle * 0.9f;
-        var target = new Vec3(System.MathF.Sin(sweep) * 0.9f, 0.0f, System.MathF.Cos(sweep) * 0.9f);
-        var spotDir = (target - spot.Position).Normalized();
-        spot.Direction = spotDir;
-
+        // Spot light (disabled, but keep uniforms valid)
         await app.Program.SetUniform3fAsync("uSpotLightPosition", spot.Position.X, spot.Position.Y, spot.Position.Z);
         await app.Program.SetUniform3fAsync("uSpotLightDirection", spot.Direction.X, spot.Direction.Y, spot.Direction.Z);
         await app.Program.SetUniform3fAsync("uSpotLightColor", spot.Color.X, spot.Color.Y, spot.Color.Z);
@@ -193,46 +158,10 @@ public partial class CubeDemo : ComponentBase, IAsyncDisposable
         await app.Program.SetUniform1fAsync("uSpotLightQuadratic", spot.Quadratic);
     }
 
-    private async Task BeforeDrawMeshAsync(Mesh mesh)
-    {
-        if (app is null || cube is null || sphere is null) return;
-
-        // Minimal per-mesh model setup (no scene graph): cube rotates, sphere stays static.
-        float[] model;
-        if (ReferenceEquals(mesh, cube))
-        {
-            var rotation = Mat4.Multiply(Mat4.RotateY(angle), Mat4.RotateX(angle * 0.7f));
-            model = Mat4.Multiply(Translate(-1.05f, 0.0f, 0.0f), rotation);
-        }
-        else if (ReferenceEquals(mesh, sphere))
-        {
-            model = Translate(1.05f, -0.05f, 0.0f);
-        }
-        else
-        {
-            model = Mat4.Identity();
-        }
-
-        await app.Program.SetUniformMatrix4fvAsync("uModel", model);
-
-        var normalMat3 = Mat4.NormalMatrix(model);
-        await app.Program.SetUniformMatrix3fvAsync("uNormalMatrix", normalMat3);
-    }
-
-    private static float[] Translate(float x, float y, float z)
-        =>
-        [
-            1, 0, 0, 0,
-            0, 1, 0, 0,
-            0, 0, 1, 0,
-            x, y, z, 1
-        ];
-
     private async Task TryInitDebugUiAsync()
     {
         if (debugRef is null) return;
 
-        // Optional: if Tweakpane or velvet-debug-ui.js isn't loaded, this should not break the demo.
         try
         {
             await JS.InvokeVoidAsync("VelvetDebugUI.init", new
@@ -264,14 +193,6 @@ public partial class CubeDemo : ComponentBase, IAsyncDisposable
                     setIntensity = nameof(VelvetDebugInterop.SetPointIntensity),
                     setAttenuation = nameof(VelvetDebugInterop.SetPointAttenuation),
                 },
-                material = new
-                {
-                    dotnet = debugRef,
-                    setColor = nameof(VelvetDebugInterop.SetMaterialColor),
-                    setAmbient = nameof(VelvetDebugInterop.SetMaterialAmbient),
-                    setDiffuse = nameof(VelvetDebugInterop.SetMaterialDiffuse),
-                    setUnlit = nameof(VelvetDebugInterop.SetMaterialUnlit),
-                },
                 renderer = new
                 {
                     dotnet = debugRef,
@@ -282,8 +203,6 @@ public partial class CubeDemo : ComponentBase, IAsyncDisposable
         }
         catch (JSException ex)
         {
-            // Intentionally swallow: debug UI is developer-only and optional.
-            // But log a hint so missing host scripts are obvious.
             System.Console.WriteLine($"[VelvetDebugUI] Init skipped: {ex.Message}");
         }
     }
