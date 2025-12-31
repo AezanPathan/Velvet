@@ -126,6 +126,7 @@
     var camera = config.camera;
     var directionalLight = config.directionalLight;
     var pointLight = config.pointLight;
+    var material = config.material;
     var renderer = config.renderer;
 
     var container = ensureContainer(config.container);
@@ -166,6 +167,11 @@
       point_constant: 1.0,
       point_linear: 0.14,
       point_quadratic: 0.07,
+
+      mat_colorHex: "#ffffff",
+      mat_ambient: 0.05,
+      mat_diffuse: 1.0,
+      mat_unlit: false,
     };
 
     var refreshInFlight = false;
@@ -204,6 +210,14 @@
           params.point_constant = safeNumber(state.pointLight.constant, params.point_constant);
           params.point_linear = safeNumber(state.pointLight.linear, params.point_linear);
           params.point_quadratic = safeNumber(state.pointLight.quadratic, params.point_quadratic);
+        }
+
+        if (state.material) {
+          var mRgb = colorFromDto(state.material.baseColor, hexToRgb01(params.mat_colorHex));
+          params.mat_colorHex = rgb01ToHex(mRgb);
+          params.mat_ambient = safeNumber(state.material.ambient, params.mat_ambient);
+          params.mat_diffuse = safeNumber(state.material.diffuse, params.mat_diffuse);
+          params.mat_unlit = !!state.material.unlit;
         }
 
         pane.refresh();
@@ -389,6 +403,40 @@
         await invoke(pointLight.dotnet, pointLight.setAttenuation, params.point_constant, params.point_linear, params.point_quadratic);
         if (typeof config.onChange === "function") config.onChange("point.attenuation");
       });
+    }
+
+    // Material (optional)
+    // Intended for a single showcase material (e.g., the demo sphere).
+    if (material) {
+      var mFolder = pane.addFolder({ title: "Material" });
+
+      mFolder.addBinding(params, "mat_colorHex", { label: "Base Color" }).on("change", async () => {
+        if (!material.setColor) return;
+        var rgb = hexToRgb01(params.mat_colorHex);
+        await invoke(material.dotnet, material.setColor, rgb.r, rgb.g, rgb.b);
+        if (typeof config.onChange === "function") config.onChange("material.color");
+      });
+
+      mFolder.addBinding(params, "mat_ambient", { label: "Ambient", min: 0, max: 1, step: 0.001 }).on("change", async () => {
+        if (!material.setAmbient) return;
+        await invoke(material.dotnet, material.setAmbient, params.mat_ambient);
+        if (typeof config.onChange === "function") config.onChange("material.ambient");
+      });
+
+      mFolder.addBinding(params, "mat_diffuse", { label: "Diffuse", min: 0, max: 2, step: 0.001 }).on("change", async () => {
+        if (!material.setDiffuse) return;
+        await invoke(material.dotnet, material.setDiffuse, params.mat_diffuse);
+        if (typeof config.onChange === "function") config.onChange("material.diffuse");
+      });
+
+      mFolder.addBinding(params, "mat_unlit", { label: "Unlit" }).on("change", async () => {
+        if (!material.setUnlit) return;
+        await invoke(material.dotnet, material.setUnlit, !!params.mat_unlit);
+        if (typeof config.onChange === "function") config.onChange("material.unlit");
+      });
+
+      // Prime UI from host (shared poller)
+      await refreshFromHost();
     }
 
     // Renderer (optional)

@@ -12,6 +12,7 @@ internal sealed class VelvetDebugInterop
     private readonly Func<Camera> _getCamera;
     private readonly Func<DirectionalLightState> _getDirectional;
     private readonly Func<PointLightState> _getPoint;
+    private readonly Func<Material> _getMaterial;
 
     private readonly Action<Vec3> _setCameraPosition;
     private readonly Action<Vec3> _setCameraTarget;
@@ -28,6 +29,11 @@ internal sealed class VelvetDebugInterop
     private readonly Action<float> _setPointIntensity;
     private readonly Action<float, float, float> _setPointAttenuation;
 
+    private readonly Action<Vec3> _setMaterialColor;
+    private readonly Action<float> _setMaterialAmbient;
+    private readonly Action<float> _setMaterialDiffuse;
+    private readonly Action<bool> _setMaterialUnlit;
+
     private readonly Func<Task> _pause;
     private readonly Func<Task> _resume;
 
@@ -35,6 +41,7 @@ internal sealed class VelvetDebugInterop
         Func<Camera> getCamera,
         Func<DirectionalLightState> getDirectional,
         Func<PointLightState> getPoint,
+        Func<Material> getMaterial,
         Action<Vec3> setCameraPosition,
         Action<Vec3> setCameraTarget,
         Action<float, float, float> setCameraPerspective,
@@ -47,12 +54,17 @@ internal sealed class VelvetDebugInterop
         Action<Vec3> setPointColor,
         Action<float> setPointIntensity,
         Action<float, float, float> setPointAttenuation,
+        Action<Vec3> setMaterialColor,
+        Action<float> setMaterialAmbient,
+        Action<float> setMaterialDiffuse,
+        Action<bool> setMaterialUnlit,
         Func<Task> pause,
         Func<Task> resume)
     {
         _getCamera = getCamera;
         _getDirectional = getDirectional;
         _getPoint = getPoint;
+        _getMaterial = getMaterial;
 
         _setCameraPosition = setCameraPosition;
         _setCameraTarget = setCameraTarget;
@@ -69,6 +81,11 @@ internal sealed class VelvetDebugInterop
         _setPointIntensity = setPointIntensity;
         _setPointAttenuation = setPointAttenuation;
 
+        _setMaterialColor = setMaterialColor;
+        _setMaterialAmbient = setMaterialAmbient;
+        _setMaterialDiffuse = setMaterialDiffuse;
+        _setMaterialUnlit = setMaterialUnlit;
+
         _pause = pause;
         _resume = resume;
     }
@@ -79,6 +96,7 @@ internal sealed class VelvetDebugInterop
         var cam = _getCamera();
         var dir = _getDirectional();
         var point = _getPoint();
+        var material = _getMaterial();
 
         return new DebugStateDto
         {
@@ -108,6 +126,13 @@ internal sealed class VelvetDebugInterop
                 Linear = point.Linear,
                 Quadratic = point.Quadratic,
             },
+            Material = new MaterialDto
+            {
+                BaseColor = ColorDto.From(material.AlbedoColor),
+                Ambient = material.AmbientStrength,
+                Diffuse = material.DiffuseStrength,
+                Unlit = material.Unlit,
+            }
         };
     }
 
@@ -160,6 +185,22 @@ internal sealed class VelvetDebugInterop
         => _setPointAttenuation(constant, linear, quadratic);
 
     [JSInvokable]
+    public void SetMaterialColor(float r, float g, float b)
+        => _setMaterialColor(new Vec3(r, g, b));
+
+    [JSInvokable]
+    public void SetMaterialAmbient(float ambient)
+        => _setMaterialAmbient(ambient);
+
+    [JSInvokable]
+    public void SetMaterialDiffuse(float diffuse)
+        => _setMaterialDiffuse(diffuse);
+
+    [JSInvokable]
+    public void SetMaterialUnlit(bool unlit)
+        => _setMaterialUnlit(unlit);
+
+    [JSInvokable]
     public Task PauseAsync() => _pause();
 
     [JSInvokable]
@@ -171,6 +212,15 @@ internal sealed class DebugStateDto
     public CameraDto Camera { get; set; } = new();
     public DirectionalLightDto DirectionalLight { get; set; } = new();
     public PointLightDto PointLight { get; set; } = new();
+    public MaterialDto Material { get; set; } = new();
+}
+
+internal sealed class MaterialDto
+{
+    public ColorDto BaseColor { get; set; } = new();
+    public float Ambient { get; set; }
+    public float Diffuse { get; set; }
+    public bool Unlit { get; set; }
 }
 
 internal sealed class CameraDto

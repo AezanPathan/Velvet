@@ -21,6 +21,12 @@ public sealed class Mesh
     }
 
     /// <summary>
+    /// Optional material assigned to this mesh.
+    /// If null, renderers should use <see cref="Material.Default"/>.
+    /// </summary>
+    public Material? Material { get; set; }
+
+    /// <summary>
     /// Source geometry (data-only, reusable across hosts).
     /// </summary>
     public GeometryBase Geometry { get; }
@@ -81,3 +87,4 @@ public sealed class Mesh
         }
     }
 }
+
