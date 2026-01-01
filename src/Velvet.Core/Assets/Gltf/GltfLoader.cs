@@ -8,7 +8,7 @@ using Velvet.Core.Geometry;
 using Velvet.Core.Math;
 using Velvet.Core.Rendering;
 
-namespace Velvet.Core.Gltf;
+namespace Velvet.Core.Assets.Gltf;
 
 /// <summary>
 /// Minimal CPU-side glTF 2.0 loader.
@@ -215,12 +215,12 @@ public static class GltfLoader
             }
         }
 
-        Vec3 color = new(1, 1, 1);
+        Vector3 color = new(1, 1, 1);
         if (m.TryGetProperty("pbrMetallicRoughness", out var pbr) && pbr.ValueKind == JsonValueKind.Object)
         {
             if (pbr.TryGetProperty("baseColorFactor", out var f) && f.ValueKind == JsonValueKind.Array && f.GetArrayLength() >= 3)
             {
-                color = new Vec3(
+                color = new Vector3(
                     (float)f[0].GetDouble(),
                     (float)f[1].GetDouble(),
                     (float)f[2].GetDouble());

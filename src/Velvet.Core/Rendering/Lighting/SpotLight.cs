@@ -1,15 +1,15 @@
 using System;
 using Velvet.Core.Math;
 
-namespace Velvet.Core.Rendering
-{
+namespace Velvet.Core.Rendering.Lighting;
+
     /// <summary>
     /// Simple engine-grade spot light (single-instance friendly).
     /// Diffuse-only shading is expected (Lambert).
     /// </summary>
     public sealed class SpotLight
     {
-        private Vec3 _direction;
+        private Vector3 _direction;
         private float _intensity;
         private float _cutoff;
         private float _outerCutoff;
@@ -18,12 +18,12 @@ namespace Velvet.Core.Rendering
         private float _linear;
         private float _quadratic;
 
-        public Vec3 Position { get; set; }
+        public Vector3 Position { get; set; }
 
         /// <summary>
         /// Direction the spot light points toward (normalized).
         /// </summary>
-        public Vec3 Direction
+        public Vector3 Direction
         {
             get => _direction;
             set
@@ -35,7 +35,7 @@ namespace Velvet.Core.Rendering
             }
         }
 
-        public Vec3 Color { get; set; }
+        public Vector3 Color { get; set; }
 
         public float Intensity
         {
@@ -110,9 +110,9 @@ namespace Velvet.Core.Rendering
         }
 
         public SpotLight(
-            in Vec3 position,
-            in Vec3 direction,
-            in Vec3 color,
+            in Vector3 position,
+            in Vector3 direction,
+            in Vector3 color,
             float intensity,
             float cutoff,
             float outerCutoff,
@@ -133,4 +133,3 @@ namespace Velvet.Core.Rendering
             Quadratic = quadratic;
         }
     }
-}

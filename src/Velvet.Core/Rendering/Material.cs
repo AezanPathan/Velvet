@@ -9,7 +9,7 @@ namespace Velvet.Core.Rendering;
 /// </summary>
 public sealed class Material
 {
-    public Material(Vec3 albedoColor, float ambientStrength, float diffuseStrength, bool unlit = false)
+    public Material(Vector3 albedoColor, float ambientStrength, float diffuseStrength, bool unlit = false)
     {
         AlbedoColor = albedoColor;
         AmbientStrength = ambientStrength;
@@ -17,7 +17,7 @@ public sealed class Material
         Unlit = unlit;
     }
 
-    public Vec3 AlbedoColor { get; set; }
+    public Vector3 AlbedoColor { get; set; }
 
     public float AmbientStrength { get; set; }
 
@@ -26,7 +26,7 @@ public sealed class Material
     public bool Unlit { get; set; }
 
     public static Material Default { get; } = new(
-        albedoColor: new Vec3(1.0f, 1.0f, 1.0f),
+        albedoColor: new Vector3(1.0f, 1.0f, 1.0f),
         ambientStrength: 0.05f,
         diffuseStrength: 1.0f,
         unlit: false);

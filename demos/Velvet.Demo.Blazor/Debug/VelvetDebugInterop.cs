@@ -14,22 +14,22 @@ internal sealed class VelvetDebugInterop
     private readonly Func<PointLightState> _getPoint;
     private readonly Func<Material> _getMaterial;
 
-    private readonly Action<Vec3> _setCameraPosition;
-    private readonly Action<Vec3> _setCameraTarget;
+    private readonly Action<Vector3> _setCameraPosition;
+    private readonly Action<Vector3> _setCameraTarget;
     private readonly Action<float, float, float> _setCameraPerspective;
 
     private readonly Action<bool> _setDirectionalEnabled;
-    private readonly Action<Vec3> _setDirectionalDirection;
-    private readonly Action<Vec3> _setDirectionalColor;
+    private readonly Action<Vector3> _setDirectionalDirection;
+    private readonly Action<Vector3> _setDirectionalColor;
     private readonly Action<float> _setDirectionalIntensity;
 
     private readonly Action<bool> _setPointEnabled;
-    private readonly Action<Vec3> _setPointPosition;
-    private readonly Action<Vec3> _setPointColor;
+    private readonly Action<Vector3> _setPointPosition;
+    private readonly Action<Vector3> _setPointColor;
     private readonly Action<float> _setPointIntensity;
     private readonly Action<float, float, float> _setPointAttenuation;
 
-    private readonly Action<Vec3> _setMaterialColor;
+    private readonly Action<Vector3> _setMaterialColor;
     private readonly Action<float> _setMaterialAmbient;
     private readonly Action<float> _setMaterialDiffuse;
     private readonly Action<bool> _setMaterialUnlit;
@@ -42,19 +42,19 @@ internal sealed class VelvetDebugInterop
         Func<DirectionalLightState> getDirectional,
         Func<PointLightState> getPoint,
         Func<Material> getMaterial,
-        Action<Vec3> setCameraPosition,
-        Action<Vec3> setCameraTarget,
+        Action<Vector3> setCameraPosition,
+        Action<Vector3> setCameraTarget,
         Action<float, float, float> setCameraPerspective,
         Action<bool> setDirectionalEnabled,
-        Action<Vec3> setDirectionalDirection,
-        Action<Vec3> setDirectionalColor,
+        Action<Vector3> setDirectionalDirection,
+        Action<Vector3> setDirectionalColor,
         Action<float> setDirectionalIntensity,
         Action<bool> setPointEnabled,
-        Action<Vec3> setPointPosition,
-        Action<Vec3> setPointColor,
+        Action<Vector3> setPointPosition,
+        Action<Vector3> setPointColor,
         Action<float> setPointIntensity,
         Action<float, float, float> setPointAttenuation,
-        Action<Vec3> setMaterialColor,
+        Action<Vector3> setMaterialColor,
         Action<float> setMaterialAmbient,
         Action<float> setMaterialDiffuse,
         Action<bool> setMaterialUnlit,
@@ -138,11 +138,11 @@ internal sealed class VelvetDebugInterop
 
     [JSInvokable]
     public void SetCameraPosition(float x, float y, float z)
-        => _setCameraPosition(new Vec3(x, y, z));
+        => _setCameraPosition(new Vector3(x, y, z));
 
     [JSInvokable]
     public void SetCameraTarget(float x, float y, float z)
-        => _setCameraTarget(new Vec3(x, y, z));
+        => _setCameraTarget(new Vector3(x, y, z));
 
     [JSInvokable]
     public void SetCameraPerspective(float fovYRadians, float nearPlane, float farPlane)
@@ -154,11 +154,11 @@ internal sealed class VelvetDebugInterop
 
     [JSInvokable]
     public void SetDirectionalDirection(float x, float y, float z)
-        => _setDirectionalDirection(new Vec3(x, y, z));
+        => _setDirectionalDirection(new Vector3(x, y, z));
 
     [JSInvokable]
     public void SetDirectionalColor(float r, float g, float b)
-        => _setDirectionalColor(new Vec3(r, g, b));
+        => _setDirectionalColor(new Vector3(r, g, b));
 
     [JSInvokable]
     public void SetDirectionalIntensity(float intensity)
@@ -170,11 +170,11 @@ internal sealed class VelvetDebugInterop
 
     [JSInvokable]
     public void SetPointPosition(float x, float y, float z)
-        => _setPointPosition(new Vec3(x, y, z));
+        => _setPointPosition(new Vector3(x, y, z));
 
     [JSInvokable]
     public void SetPointColor(float r, float g, float b)
-        => _setPointColor(new Vec3(r, g, b));
+        => _setPointColor(new Vector3(r, g, b));
 
     [JSInvokable]
     public void SetPointIntensity(float intensity)
@@ -186,7 +186,7 @@ internal sealed class VelvetDebugInterop
 
     [JSInvokable]
     public void SetMaterialColor(float r, float g, float b)
-        => _setMaterialColor(new Vec3(r, g, b));
+        => _setMaterialColor(new Vector3(r, g, b));
 
     [JSInvokable]
     public void SetMaterialAmbient(float ambient)
@@ -260,7 +260,7 @@ internal sealed class Vec3Dto
     public float y { get; set; }
     public float z { get; set; }
 
-    public static Vec3Dto From(in Vec3 v) => new() { x = v.X, y = v.Y, z = v.Z };
+    public static Vec3Dto From(in Vector3 v) => new() { x = v.X, y = v.Y, z = v.Z };
 }
 
 internal sealed class ColorDto
@@ -269,17 +269,17 @@ internal sealed class ColorDto
     public float g { get; set; }
     public float b { get; set; }
 
-    public static ColorDto From(in Vec3 v) => new() { r = v.X, g = v.Y, b = v.Z };
+    public static ColorDto From(in Vector3 v) => new() { r = v.X, g = v.Y, b = v.Z };
 }
 
 internal sealed class DirectionalLightState
 {
     public bool Enabled { get; set; }
-    public Vec3 Direction { get; set; }
-    public Vec3 Color { get; set; }
+    public Vector3 Direction { get; set; }
+    public Vector3 Color { get; set; }
     public float Intensity { get; set; }
 
-    public DirectionalLightState(bool enabled, Vec3 direction, Vec3 color, float intensity)
+    public DirectionalLightState(bool enabled, Vector3 direction, Vector3 color, float intensity)
     {
         Enabled = enabled;
         Direction = direction;
@@ -291,8 +291,8 @@ internal sealed class DirectionalLightState
 internal sealed class PointLightState
 {
     public bool Enabled { get; set; }
-    public Vec3 Position { get; set; }
-    public Vec3 Color { get; set; }
+    public Vector3 Position { get; set; }
+    public Vector3 Color { get; set; }
     public float Intensity { get; set; }
 
     public float Constant { get; set; }
@@ -301,8 +301,8 @@ internal sealed class PointLightState
 
     public PointLightState(
         bool enabled,
-        Vec3 position,
-        Vec3 color,
+        Vector3 position,
+        Vector3 color,
         float intensity,
         float constant,
         float linear,

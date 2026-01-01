@@ -1,16 +1,16 @@
 using System;
 using Velvet.Core.Math;
 
-namespace Velvet.Core.Rendering
-{
+namespace Velvet.Core.Rendering.Lighting;
+
     /// <summary>
     /// Simple engine-grade point light (single-instance friendly).
     /// Diffuse-only shading is expected (Lambert).
     /// </summary>
     public sealed class PointLight
     {
-        public Vec3 Position { get; }
-        public Vec3 Color { get; }
+        public Vector3 Position { get; }
+        public Vector3 Color { get; }
         public float Intensity { get; }
 
         public float Constant { get; }
@@ -18,8 +18,8 @@ namespace Velvet.Core.Rendering
         public float Quadratic { get; }
 
         public PointLight(
-            in Vec3 position,
-            in Vec3 color,
+            in Vector3 position,
+            in Vector3 color,
             float intensity = 1.0f,
             float constant = 1.0f,
             float linear = 0.09f,
@@ -38,4 +38,3 @@ namespace Velvet.Core.Rendering
             Quadratic = quadratic;
         }
     }
-}

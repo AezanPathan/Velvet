@@ -6,6 +6,7 @@ using Velvet.Core.Rendering;
 using Velvet.Blazor;
 using Velvet.WebGL;
 using Velvet.Demo.Blazor.Debug;
+using Velvet.Core.Rendering.Lighting;
 
 namespace Velvet.Demo.Blazor.Pages;
 
@@ -36,9 +37,9 @@ public partial class CubeDemo : ComponentBase, IAsyncDisposable
         app = await VelvetApp.CreateAsync(canvasRef, JS, ShaderProgram.CreateDefaultAsync);
 
         camera = new Camera(
-            position: new Vec3(0, 0, 3.0f),
-            target: new Vec3(0, 0, 0),
-            up: Vec3.UnitY,
+            position: new Vector3(0, 0, 3.0f),
+            target: new Vector3(0, 0, 0),
+            up: Vector3.UnitY,
             fovYRadians: 60.0f * (System.MathF.PI / 180.0f),
             aspectRatio: 800.0f / 600.0f,
             nearPlane: 0.1f,
@@ -49,7 +50,7 @@ public partial class CubeDemo : ComponentBase, IAsyncDisposable
 
         // Sphere is the material showcase target.
         sphereMaterial = new Material(
-            albedoColor: new Vec3(0.20f, 0.65f, 1.0f),
+            albedoColor: new Vector3(0.20f, 0.65f, 1.0f),
             ambientStrength: 0.08f,
             diffuseStrength: 1.0f,
             unlit: false);
@@ -64,14 +65,14 @@ public partial class CubeDemo : ComponentBase, IAsyncDisposable
 
         directional = new DirectionalLightState(
             enabled: true,
-            direction: new Vec3(0.5f, -1.0f, -0.3f),
-            color: new Vec3(1, 1, 1),
+            direction: new Vector3(0.5f, -1.0f, -0.3f),
+            color: new Vector3(1, 1, 1),
             intensity: 1.25f);
 
         point = new PointLightState(
             enabled: true,
-            position: new Vec3(1.5f, 1.2f, 1.5f),
-            color: new Vec3(1.0f, 0.9f, 0.8f),
+            position: new Vector3(1.5f, 1.2f, 1.5f),
+            color: new Vector3(1.0f, 0.9f, 0.8f),
             intensity: 2.0f,
             constant: 1.0f,
             linear: 0.14f,
@@ -80,9 +81,9 @@ public partial class CubeDemo : ComponentBase, IAsyncDisposable
         // Spotlight (animated direction).
         // Keep it explicit and single-instance: no managers, no arrays.
         spot = new SpotLight(
-            position: new Vec3(0.0f, 2.2f, 2.2f),
-            direction: new Vec3(0.0f, -1.0f, -1.0f),
-            color: new Vec3(1.0f, 1.0f, 1.0f),
+            position: new Vector3(0.0f, 2.2f, 2.2f),
+            direction: new Vector3(0.0f, -1.0f, -1.0f),
+            color: new Vector3(1.0f, 1.0f, 1.0f),
             intensity: 6.0f,
             cutoff: 12.0f * (System.MathF.PI / 180.0f),
             outerCutoff: 20.0f * (System.MathF.PI / 180.0f),
@@ -178,7 +179,7 @@ public partial class CubeDemo : ComponentBase, IAsyncDisposable
         // Spot light
         // Sweep the cone across the cube by orbiting the target point around the origin.
         var sweep = angle * 0.9f;
-        var target = new Vec3(System.MathF.Sin(sweep) * 0.9f, 0.0f, System.MathF.Cos(sweep) * 0.9f);
+        var target = new Vector3(System.MathF.Sin(sweep) * 0.9f, 0.0f, System.MathF.Cos(sweep) * 0.9f);
         var spotDir = (target - spot.Position).Normalized();
         spot.Direction = spotDir;
 
@@ -201,8 +202,8 @@ public partial class CubeDemo : ComponentBase, IAsyncDisposable
         float[] model;
         if (ReferenceEquals(mesh, cube))
         {
-            var rotation = Mat4.Multiply(Mat4.RotateY(angle), Mat4.RotateX(angle * 0.7f));
-            model = Mat4.Multiply(Translate(-1.05f, 0.0f, 0.0f), rotation);
+            var rotation = Matrix.Multiply(Matrix.RotateY(angle), Matrix.RotateX(angle * 0.7f));
+            model = Matrix.Multiply(Translate(-1.05f, 0.0f, 0.0f), rotation);
         }
         else if (ReferenceEquals(mesh, sphere))
         {
@@ -210,12 +211,12 @@ public partial class CubeDemo : ComponentBase, IAsyncDisposable
         }
         else
         {
-            model = Mat4.Identity();
+            model = Matrix.Identity();
         }
 
         await app.Program.SetUniformMatrix4fvAsync("uModel", model);
 
-        var normalMat3 = Mat4.NormalMatrix(model);
+        var normalMat3 = Matrix.NormalMatrix(model);
         await app.Program.SetUniformMatrix3fvAsync("uNormalMatrix", normalMat3);
     }
 

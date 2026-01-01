@@ -2,9 +2,10 @@ using System.Net.Http;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using Velvet.Blazor;
-using Velvet.Core.Gltf;
+using Velvet.Core.Assets.Gltf;
 using Velvet.Core.Math;
 using Velvet.Core.Rendering;
+using Velvet.Core.Rendering.Lighting;
 using Velvet.Demo.Blazor.Debug;
 using Velvet.WebGL;
 
@@ -34,9 +35,9 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
         app = await VelvetApp.CreateAsync(canvasRef, JS, ShaderProgram.CreateDefaultAsync);
 
         camera = new Camera(
-            position: new Vec3(0, 0.2f, 2.6f),
-            target: new Vec3(0, 0, 0),
-            up: Vec3.UnitY,
+            position: new Vector3(0, 0.2f, 2.6f),
+            target: new Vector3(0, 0, 0),
+            up: Vector3.UnitY,
             fovYRadians: 60.0f * (System.MathF.PI / 180.0f),
             aspectRatio: 800.0f / 600.0f,
             nearPlane: 0.1f,
@@ -44,14 +45,14 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
 
         directional = new DirectionalLightState(
             enabled: true,
-            direction: new Vec3(0.4f, -1.0f, -0.25f),
-            color: new Vec3(1, 1, 1),
+            direction: new Vector3(0.4f, -1.0f, -0.25f),
+            color: new Vector3(1, 1, 1),
             intensity: 1.1f);
 
         point = new PointLightState(
             enabled: true,
-            position: new Vec3(1.5f, 1.1f, 1.6f),
-            color: new Vec3(1.0f, 0.95f, 0.9f),
+            position: new Vector3(1.5f, 1.1f, 1.6f),
+            color: new Vector3(1.0f, 0.95f, 0.9f),
             intensity: 2.0f,
             constant: 1.0f,
             linear: 0.14f,
@@ -59,9 +60,9 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
 
         // Keep spotlight uniforms valid; disable by setting intensity to 0.
         spot = new SpotLight(
-            position: new Vec3(0.0f, 2.2f, 2.2f),
-            direction: new Vec3(0.0f, -1.0f, -1.0f),
-            color: new Vec3(1.0f, 1.0f, 1.0f),
+            position: new Vector3(0.0f, 2.2f, 2.2f),
+            direction: new Vector3(0.0f, -1.0f, -1.0f),
+            color: new Vector3(1.0f, 1.0f, 1.0f),
             intensity: 0.0f,
             cutoff: 12.0f * (System.MathF.PI / 180.0f),
             outerCutoff: 20.0f * (System.MathF.PI / 180.0f),
@@ -124,9 +125,9 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
         if (app is null || camera is null || directional is null || point is null || spot is null) return;
 
         // Single static model at origin.
-        var modelMat = Mat4.Identity();
+        var modelMat = Matrix.Identity();
         await app.Program.SetUniformMatrix4fvAsync("uModel", modelMat);
-        await app.Program.SetUniformMatrix3fvAsync("uNormalMatrix", Mat4.NormalMatrix(modelMat));
+        await app.Program.SetUniformMatrix3fvAsync("uNormalMatrix", Matrix.NormalMatrix(modelMat));
 
         await app.Program.SetUniformMatrix4fvAsync("uView", camera.ViewMatrix);
         await app.Program.SetUniformMatrix4fvAsync("uProjection", camera.ProjectionMatrix);

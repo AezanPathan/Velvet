@@ -2,7 +2,7 @@ using System;
 
 namespace Velvet.Core.Math;
 
-public static class Mat4
+public static class Matrix
 {
     public static float[] Identity() =>
     [
@@ -113,11 +113,11 @@ public static class Mat4
     /// <summary>
     /// Builds a right-handed view matrix (OpenGL/WebGL convention) using column-major storage.
     /// </summary>
-    public static float[] LookAt(in Vec3 eye, in Vec3 target, in Vec3 up)
+    public static float[] LookAt(in Vector3 eye, in Vector3 target, in Vector3 up)
     {
         var f = (target - eye).Normalized();
-        var s = Vec3.Cross(f, up).Normalized();
-        var u = Vec3.Cross(s, f);
+        var s = Vector3.Cross(f, up).Normalized();
+        var u = Vector3.Cross(s, f);
 
         // Column-major layout; matches GLSL multiplication: clip = P * V * M * position.
         return
@@ -125,7 +125,7 @@ public static class Mat4
             s.X, u.X, -f.X, 0,
             s.Y, u.Y, -f.Y, 0,
             s.Z, u.Z, -f.Z, 0,
-            -Vec3.Dot(s, eye), -Vec3.Dot(u, eye), Vec3.Dot(f, eye), 1
+            -Vector3.Dot(s, eye), -Vector3.Dot(u, eye), Vector3.Dot(f, eye), 1
         ];
     }
 

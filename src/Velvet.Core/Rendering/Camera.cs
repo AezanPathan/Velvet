@@ -9,9 +9,9 @@ namespace Velvet.Core.Rendering;
 /// </summary>
 public sealed class Camera
 {
-	private Vec3 _position;
-	private Vec3 _target;
-	private Vec3 _up;
+	private Vector3 _position;
+	private Vector3 _target;
+	private Vector3 _up;
 
 	private float _fovYRadians;
 	private float _aspectRatio;
@@ -21,13 +21,13 @@ public sealed class Camera
 	private bool _viewDirty = true;
 	private bool _projectionDirty = true;
 
-	private float[] _view = Mat4.Identity();
-	private float[] _projection = Mat4.Identity();
+	private float[] _view = Matrix.Identity();
+	private float[] _projection = Matrix.Identity();
 
 	public Camera(
-		Vec3 position,
-		Vec3 target,
-		Vec3 up,
+		Vector3 position,
+		Vector3 target,
+		Vector3 up,
 		float fovYRadians,
 		float aspectRatio,
 		float nearPlane,
@@ -46,7 +46,7 @@ public sealed class Camera
 		_projectionDirty = true;
 	}
 
-	public Vec3 Position
+	public Vector3 Position
 	{
 		get => _position;
 		set
@@ -56,7 +56,7 @@ public sealed class Camera
 		}
 	}
 
-	public Vec3 Target
+	public Vector3 Target
 	{
 		get => _target;
 		set
@@ -69,9 +69,9 @@ public sealed class Camera
 	/// <summary>
 	/// Forward direction (normalized), derived from <see cref="Position"/> and <see cref="Target"/>.
 	/// </summary>
-	public Vec3 Forward => (_target - _position).Normalized();
+	public Vector3 Forward => (_target - _position).Normalized();
 
-	public Vec3 Up
+	public Vector3 Up
 	{
 		get => _up;
 		set
@@ -186,7 +186,7 @@ public sealed class Camera
 		{
 			if (_viewDirty)
 			{
-				_view = Mat4.LookAt(_position, _target, _up);
+				_view = Matrix.LookAt(_position, _target, _up);
 				_viewDirty = false;
 			}
 
@@ -203,7 +203,7 @@ public sealed class Camera
 		{
 			if (_projectionDirty)
 			{
-				_projection = Mat4.Perspective(_fovYRadians, _aspectRatio, _nearPlane, _farPlane);
+				_projection = Matrix.Perspective(_fovYRadians, _aspectRatio, _nearPlane, _farPlane);
 				_projectionDirty = false;
 			}
 
