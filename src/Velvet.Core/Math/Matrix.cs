@@ -1,7 +1,10 @@
-using System;
-
 namespace Velvet.Core.Math;
 
+/// <summary>
+/// Stateless 4x4 matrix utilities for the engine math layer.
+/// Column-major layout matches OpenGL/WebGL conventions while staying backend-agnostic; suitable for any renderer expecting column-major data.
+/// Static form keeps this code allocation-free and hot-path friendly for real-time rendering.
+/// </summary>
 public static class Matrix
 {
     public static float[] Identity() =>
@@ -42,6 +45,9 @@ public static class Matrix
         ];
     }
 
+    /// <summary>
+    /// Column-major 4x4 multiply (a * b) matching OpenGL/WebGL memory order; returns column-major output suitable for GPU uniform uploads.
+    /// </summary>
     public static float[] Multiply(float[] a, float[] b)
     {
         if (a.Length != 16) throw new ArgumentException("Expected 4x4 matrix", nameof(a));

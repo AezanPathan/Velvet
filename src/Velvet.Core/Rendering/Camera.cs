@@ -1,31 +1,42 @@
-using System;
 using Velvet.Core.Math;
 
 namespace Velvet.Core.Rendering;
 
 /// <summary>
-/// Minimal engine-grade camera: provides view and perspective projection matrices.
-/// Pure C#; no JS-side camera logic.
+/// perspective camera.
+/// Produces view and projection matrices (column-major).
+/// Pure C#; no rendering, no JS, no UI concerns.
 /// </summary>
 public sealed class Camera
 {
+	// --- View state (world space) ---
+
 	private Vector3 _position;
 	private Vector3 _target;
 	private Vector3 _up;
+
+	// --- Projection state ---
 
 	private float _fovYRadians;
 	private float _aspectRatio;
 	private float _nearPlane;
 	private float _farPlane;
 
+	// --- Dirty flags ---
+
 	private bool _viewDirty = true;
 	private bool _projectionDirty = true;
+
+	// --- Cached matrices (column-major) ---
 
 	private float[] _view = Matrix.Identity();
 	private float[] _projection = Matrix.Identity();
 
-	public Camera(
-		Vector3 position,
+	/// <summary>
+	/// Creates a camera with fully specified perspective parameters.
+	/// Use <see cref="CreatePerspective"/> for cleaner call sites.
+	/// </summary>
+	public Camera(Vector3 position,
 		Vector3 target,
 		Vector3 up,
 		float fovYRadians,
@@ -37,14 +48,29 @@ public sealed class Camera
 		_target = target;
 		_up = up;
 
-		FovYRadians = fovYRadians;
-		AspectRatio = aspectRatio;
-		NearPlane = nearPlane;
-		FarPlane = farPlane;
-
-		_viewDirty = true;
-		_projectionDirty = true;
+		SetPerspective(fovYRadians, aspectRatio, nearPlane, farPlane);
 	}
+
+	/// <summary>
+	/// Convenience factory for a standard perspective camera.
+	/// </summary>
+	public static Camera CreatePerspective(Vector3 position,
+		Vector3 target,
+		float fovYRadians,
+		float aspectRatio,
+		float nearPlane = 0.1f,
+		float farPlane = 100f)
+	{
+		return new Camera(position,
+			target,
+			Vector3.UnitY,
+			fovYRadians,
+			aspectRatio,
+			nearPlane,
+			farPlane);
+	}
+
+	// --- View properties ---
 
 	public Vector3 Position
 	{
@@ -67,7 +93,7 @@ public sealed class Camera
 	}
 
 	/// <summary>
-	/// Forward direction (normalized), derived from <see cref="Position"/> and <see cref="Target"/>.
+	/// Normalized forward direction derived from Position and Target.
 	/// </summary>
 	public Vector3 Forward => (_target - _position).Normalized();
 
@@ -81,6 +107,8 @@ public sealed class Camera
 		}
 	}
 
+	// --- Projection properties ---
+
 	/// <summary>
 	/// Vertical field of view in radians.
 	/// </summary>
@@ -91,19 +119,10 @@ public sealed class Camera
 		{
 			if (value <= 0f || value >= MathF.PI)
 				throw new ArgumentOutOfRangeException(nameof(value), "FOV must be in (0, PI) radians.");
+
 			_fovYRadians = value;
 			_projectionDirty = true;
 		}
-	}
-
-	/// <summary>
-	/// Field of view (vertical) in radians.
-	/// Alias for <see cref="FovYRadians"/>.
-	/// </summary>
-	public float FieldOfViewRadians
-	{
-		get => FovYRadians;
-		set => FovYRadians = value;
 	}
 
 	public float AspectRatio
@@ -113,19 +132,10 @@ public sealed class Camera
 		{
 			if (value <= 0f)
 				throw new ArgumentOutOfRangeException(nameof(value), "Aspect ratio must be > 0.");
+
 			_aspectRatio = value;
 			_projectionDirty = true;
 		}
-	}
-
-	/// <summary>
-	/// Convenience helper to update aspect ratio from a viewport size.
-	/// </summary>
-	public void SetViewportSize(float width, float height)
-	{
-		if (width <= 0f) throw new ArgumentOutOfRangeException(nameof(width), "Viewport width must be > 0.");
-		if (height <= 0f) throw new ArgumentOutOfRangeException(nameof(height), "Viewport height must be > 0.");
-		AspectRatio = width / height;
 	}
 
 	public float NearPlane
@@ -135,8 +145,9 @@ public sealed class Camera
 		{
 			if (value <= 0f)
 				throw new ArgumentOutOfRangeException(nameof(value), "Near plane must be > 0.");
-			if (_farPlane > 0f && _farPlane <= value)
+			if (_farPlane > 0f && value >= _farPlane)
 				throw new ArgumentOutOfRangeException(nameof(value), "Near plane must be < far plane.");
+
 			_nearPlane = value;
 			_projectionDirty = true;
 		}
@@ -151,24 +162,25 @@ public sealed class Camera
 				throw new ArgumentOutOfRangeException(nameof(value), "Far plane must be > 0.");
 			if (_nearPlane > 0f && value <= _nearPlane)
 				throw new ArgumentOutOfRangeException(nameof(value), "Far plane must be > near plane.");
+
 			_farPlane = value;
 			_projectionDirty = true;
 		}
 	}
 
 	/// <summary>
-	/// Sets all perspective parameters in one call (avoids transient invalid states).
+	/// Updates all perspective parameters atomically.
 	/// </summary>
 	public void SetPerspective(float fovYRadians, float aspectRatio, float nearPlane, float farPlane)
 	{
 		if (fovYRadians <= 0f || fovYRadians >= MathF.PI)
-			throw new ArgumentOutOfRangeException(nameof(fovYRadians), "FOV must be in (0, PI) radians.");
+			throw new ArgumentOutOfRangeException(nameof(fovYRadians));
 		if (aspectRatio <= 0f)
-			throw new ArgumentOutOfRangeException(nameof(aspectRatio), "Aspect ratio must be > 0.");
+			throw new ArgumentOutOfRangeException(nameof(aspectRatio));
 		if (nearPlane <= 0f)
-			throw new ArgumentOutOfRangeException(nameof(nearPlane), "Near plane must be > 0.");
+			throw new ArgumentOutOfRangeException(nameof(nearPlane));
 		if (farPlane <= nearPlane)
-			throw new ArgumentOutOfRangeException(nameof(farPlane), "Far plane must be > near plane.");
+			throw new ArgumentOutOfRangeException(nameof(farPlane));
 
 		_fovYRadians = fovYRadians;
 		_aspectRatio = aspectRatio;
@@ -178,7 +190,21 @@ public sealed class Camera
 	}
 
 	/// <summary>
+	/// Updates aspect ratio from a viewport size.
+	/// </summary>
+	public void SetViewportSize(float width, float height)
+	{
+		if (width <= 0f || height <= 0f)
+			throw new ArgumentOutOfRangeException("Viewport dimensions must be > 0.");
+
+		AspectRatio = width / height;
+	}
+
+	// --- Matrices ---
+
+	/// <summary>
 	/// Column-major view matrix.
+	/// Recomputed only when view state changes.
 	/// </summary>
 	public float[] ViewMatrix
 	{
@@ -196,6 +222,7 @@ public sealed class Camera
 
 	/// <summary>
 	/// Column-major projection matrix.
+	/// Recomputed only when projection parameters change.
 	/// </summary>
 	public float[] ProjectionMatrix
 	{
@@ -203,7 +230,12 @@ public sealed class Camera
 		{
 			if (_projectionDirty)
 			{
-				_projection = Matrix.Perspective(_fovYRadians, _aspectRatio, _nearPlane, _farPlane);
+				_projection = Matrix.Perspective(
+					_fovYRadians,
+					_aspectRatio,
+					_nearPlane,
+					_farPlane);
+
 				_projectionDirty = false;
 			}
 
