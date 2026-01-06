@@ -1,4 +1,3 @@
-using System;
 using Velvet.Core.Math;
 
 namespace Velvet.Core.Rendering;
@@ -9,6 +8,30 @@ namespace Velvet.Core.Rendering;
 /// </summary>
 public sealed class Material
 {
+    #region Properties
+
+    /// <summary>
+    /// Base surface color
+    /// </summary>
+    public Vector3 AlbedoColor { get; set; }
+    /// <summary>
+    /// AmbientStrength
+    /// </summary>
+    public float AmbientStrength { get; set; }
+
+    /// <summary>
+    /// DiffuseStrength 
+    /// </summary>
+    public float DiffuseStrength { get; set; }
+
+    /// <summary>
+    /// If true, lighting is bypassed and the material renders as a flat color.
+    /// </summary>
+    public bool Unlit { get; set; }
+
+    #endregion
+
+    #region  Ctor
     public Material(Vector3 albedoColor, float ambientStrength, float diffuseStrength, bool unlit = false)
     {
         AlbedoColor = albedoColor;
@@ -17,17 +40,16 @@ public sealed class Material
         Unlit = unlit;
     }
 
-    public Vector3 AlbedoColor { get; set; }
+    #endregion
 
-    public float AmbientStrength { get; set; }
+    #region  Methods
 
-    public float DiffuseStrength { get; set; }
-
-    public bool Unlit { get; set; }
-
+    // Default material color 
     public static Material Default { get; } = new(
         albedoColor: new Vector3(1.0f, 1.0f, 1.0f),
         ambientStrength: 0.05f,
         diffuseStrength: 1.0f,
         unlit: false);
+
+    #endregion
 }
