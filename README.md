@@ -44,7 +44,12 @@ await app.RunAsync();
 ```powershell
 cd Velvet/src
 dotnet run --project Velvet.Demo.Blazor
-dotnet watch --project Velvet.Demo.Blazor run (for debug)
+
+// for debug
+dotnet watch --project Velvet.Demo.Blazor run
+netstat -ano | findstr :5052
+taskkill /PID taskid /F
+
 ```
 
 Browse to the logged `localhost` port to see the triangle.

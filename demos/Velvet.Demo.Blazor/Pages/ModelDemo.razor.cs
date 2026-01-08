@@ -71,7 +71,7 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
             quadratic: 0.032f);
 
         // Load a single demo model from wwwroot.
-        var bytes = await Http.GetByteArrayAsync("models/Box.gltf");
+        var bytes = await Http.GetByteArrayAsync("models/DragonAttenuation.glb");
         model = GltfLoader.LoadSingleMesh(bytes);
         app.Add(model);
 
