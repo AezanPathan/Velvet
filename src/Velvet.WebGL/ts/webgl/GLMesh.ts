@@ -135,12 +135,15 @@ export class GLMesh implements IMesh {
 
     gl.bindVertexArray(this.vao);
 
-    // If using indices
-    if (this.indexBuffer) {
-      gl.drawElements(gl.TRIANGLES, this.count, gl.UNSIGNED_SHORT, 0);
-    }
-    else {
-      gl.drawArrays(gl.TRIANGLES, 0, this.count);
+    // Only draw if we have a valid count
+    if (this.count > 0) {
+      // If using indices, must have index buffer
+      if (this.indexBuffer) {
+        gl.drawElements(gl.TRIANGLES, this.count, gl.UNSIGNED_INT, 0);
+      } else {
+        // Non-indexed draw with vertex count
+        gl.drawArrays(gl.TRIANGLES, 0, this.count);
+      }
     }
 
     gl.bindVertexArray(null);

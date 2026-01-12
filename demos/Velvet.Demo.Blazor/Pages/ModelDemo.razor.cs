@@ -19,7 +19,7 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
     private ElementReference canvasRef;
 
     private VelvetApp? app;
-    private Mesh? model;
+    private List<Mesh> model = new();
     private Camera? camera;
     private DirectionalLightState? directional;
     private PointLightState? point;
@@ -72,14 +72,21 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
 
         // Load a single demo model from wwwroot.
         var bytes = await Http.GetByteArrayAsync("models/DragonAttenuation.glb");
-        model = GltfLoader.LoadSingleMesh(bytes);
-        app.Add(model);
+        model = GltfLoader.LoadMeshes(bytes);
+        // model = GltfLoader.LoadSingleMesh(bytes);
+        //app.Add(model);
+        foreach (var mesh in model)
+        {
+            app.Add(mesh);
+        }
+
 
         debugInterop = new VelvetDebugInterop(
             getCamera: () => camera,
             getDirectional: () => directional,
             getPoint: () => point,
-            getMaterial: () => model.Material ?? Material.Default,
+            // getMaterial: () => model.Material ?? Material.Default,
+            getMaterial: () => model.Count > 0 ? model[0].Material ?? Material.Default : Material.Default,
             setCameraPosition: v => camera.Position = v,
             setCameraTarget: v => camera.Target = v,
             setCameraPerspective: (fovYRadians, nearPlane, farPlane) => camera.SetPerspective(fovYRadians, camera.AspectRatio, nearPlane, farPlane),

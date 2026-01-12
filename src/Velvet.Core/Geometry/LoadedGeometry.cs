@@ -8,7 +8,7 @@ namespace Velvet.Core.Geometry;
 /// </summary>
 public sealed class LoadedGeometry : GeometryBase
 {
-    public LoadedGeometry(float[] vertices, ushort[]? indices, VertexLayout? layout = null)
+    public LoadedGeometry(float[] vertices, uint[]? indices, VertexLayout? layout = null)
         : base(vertices, indices, layout ?? VertexLayout.PositionColorNormal)
     {
     }

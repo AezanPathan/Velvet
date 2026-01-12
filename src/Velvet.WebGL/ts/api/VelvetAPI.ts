@@ -37,10 +37,10 @@ function ensureFloat32Array(data: unknown): Float32Array {
     return new Float32Array(data as any);
 }
 
-function ensureUint16Array(data: unknown): Uint16Array {
-    if (data instanceof Uint16Array) return data;
-    if (Array.isArray(data)) return new Uint16Array(data);
-    return new Uint16Array(data as any);
+function ensureUint32Array(data: unknown): Uint32Array {
+    if (data instanceof Uint32Array) return data;
+    if (Array.isArray(data)) return new Uint32Array(data);
+    return new Uint32Array(data as any);
 }
 
 /**
@@ -192,7 +192,7 @@ export function setUniform1f(programId: number, name: string, value: number): vo
  */
 export function createMesh(
     vertices: Float32Array,
-    indices?: Uint16Array
+    indices?: Uint32Array
 ): number {
     if (!context) throw new Error("Velvet not initialized");
 
@@ -206,8 +206,8 @@ export function createMesh(
     let ib: GLBuffer | undefined;
     let count = 0;
     
-    if (indices) {
-        const indexData = ensureUint16Array(indices);
+    if (indices && indices.length > 0) {
+        const indexData = ensureUint32Array(indices);
         ib = new GLBuffer(gl, BufferManager.generateId(), gl.ELEMENT_ARRAY_BUFFER);
         ib.setData(indexData);
         BufferManager.add(ib);

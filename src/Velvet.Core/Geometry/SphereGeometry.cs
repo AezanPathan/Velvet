@@ -72,12 +72,12 @@ public sealed class SphereGeometry : GeometryBase
         return data.ToArray();
     }
 
-    private static ushort[] CreateIndices(int latSegments, int lonSegments)
+    private static uint[] CreateIndices(int latSegments, int lonSegments)
     {
         // Two triangles per quad.
         // Grid has (latSegments) rows of quads and (lonSegments) columns of quads.
         var indexCount = latSegments * lonSegments * 6;
-        var indices = new ushort[indexCount];
+        var indices = new uint[indexCount];
 
         var stride = lonSegments + 1;
         var idx = 0;
@@ -86,10 +86,10 @@ public sealed class SphereGeometry : GeometryBase
         {
             for (var lon = 0; lon < lonSegments; lon++)
             {
-                var a = (ushort)((lat * stride) + lon);
-                var b = (ushort)(((lat + 1) * stride) + lon);
-                var c = (ushort)(((lat + 1) * stride) + (lon + 1));
-                var d = (ushort)((lat * stride) + (lon + 1));
+                var a = (uint)((lat * stride) + lon);
+                var b = (uint)(((lat + 1) * stride) + lon);
+                var c = (uint)(((lat + 1) * stride) + (lon + 1));
+                var d = (uint)((lat * stride) + (lon + 1));
 
                 // CCW winding when viewed from outside.
                 indices[idx++] = a;

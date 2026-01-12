@@ -5,7 +5,7 @@ export interface VelvetGlobal {
     createProgram: () => number;
     linkProgram: (programId: number) => void;
 
-    createMesh: (vertices: Float32Array, indices?: Uint16Array) => number;
+    createMesh: (vertices: Float32Array, indices?: Uint32Array) => number;
     drawMesh: (meshId: number, programId: number, rendererId: number) => void;
 
     clear: (r: number, g: number, b: number, a: number) => void;

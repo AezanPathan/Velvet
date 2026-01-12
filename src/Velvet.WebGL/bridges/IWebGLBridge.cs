@@ -70,7 +70,7 @@ namespace Velvet.WebGL
         /// Vertices should be an array of floats (e.g. interleaved attributes).
         /// Indices may be null for non-indexed geometry.
         /// </summary>
-        Task<int> CreateMeshAsync(float[] vertices, ushort[]? indices = null);
+        Task<int> CreateMeshAsync(float[] vertices, uint[]? indices = null);
 
         Task SetUniform3fAsync(int programId, string name, float x, float y, float z);
         Task SetUniform1fAsync(int programId, string name, float value);

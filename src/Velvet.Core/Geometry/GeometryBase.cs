@@ -8,7 +8,7 @@ namespace Velvet.Core.Geometry;
 /// </summary>
 public abstract class GeometryBase
 {
-    protected GeometryBase(float[] vertices, ushort[]? indices, VertexLayout layout)
+    protected GeometryBase(float[] vertices, uint[]? indices, VertexLayout layout)
     {
         Vertices = vertices ?? throw new ArgumentNullException(nameof(vertices));
         Indices = indices;
@@ -27,7 +27,7 @@ public abstract class GeometryBase
     /// Optional triangle index buffer.
     /// When null, the geometry is drawn non-indexed (typically triangles).
     /// </summary>
-    public ushort[]? Indices { get; }
+    public uint[]? Indices { get; }
 
     /// <summary>
     /// Describes the meaning of the interleaved vertex data.

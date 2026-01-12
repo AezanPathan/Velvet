@@ -171,7 +171,7 @@ window.startCubeAnimation = function(meshId, programId, rendererId) {
 | `Velvet.createProgram()` | - | int | Create GPU program, returns programId |
 | `Velvet.attachShader(progId, shaderId)` | int, int | void | Attach shader to program |
 | `Velvet.linkProgram(progId)` | int | void | Link program |
-| `Velvet.createMesh(vertices, indices?)` | Float32Array, Uint16Array? | int | Upload mesh, returns meshId |
+| `Velvet.createMesh(vertices, indices?)` | Float32Array, Uint32Array? | int | Upload mesh, returns meshId |
 | `Velvet.setUniformMatrix4fv(progId, name, matrix)` | int, string, Float32Array | void | Set 4x4 matrix uniform |
 | `Velvet.clear(r, g, b, a)` | number×4 | void | Clear framebuffer |
 | `Velvet.drawMesh(meshId, progId, rendId)` | int×3 | void | Render mesh |

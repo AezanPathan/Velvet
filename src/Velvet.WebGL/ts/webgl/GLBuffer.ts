@@ -38,9 +38,9 @@ export class GLBuffer implements IBuffer {
   /**
    * Uploads data to the buffer.
    *
-   * @param data Float32Array or Uint16Array depending on vertex/index buffers
+   * @param data Float32Array or Uint32Array depending on vertex/index buffers
    */
-  public setData(data: Float32Array | Uint16Array): void {
+  public setData(data: Float32Array | Uint32Array): void {
     if (!this.handle) {
       throw new Error(`GLBuffer.setData: buffer (id=${this.id}) is deleted`);
     }

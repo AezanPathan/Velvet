@@ -69,7 +69,7 @@ public sealed class BlazorWebGLBridge : IWebGLBridge
     public Task LinkProgramAsync(int programId)
         => _js.InvokeVoidAsync("Velvet.linkProgram", programId).AsTask();
 
-    public Task<int> CreateMeshAsync(float[] vertices, ushort[]? indices = null)
+    public Task<int> CreateMeshAsync(float[] vertices, uint[]? indices = null)
         => _js.InvokeAsync<int>("Velvet.createMesh", vertices, indices).AsTask();
 
     #endregion

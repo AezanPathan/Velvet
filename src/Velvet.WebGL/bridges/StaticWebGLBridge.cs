@@ -68,7 +68,7 @@ public sealed class StaticWebGLBridge : IWebGLBridge
         => _js.InvokeVoidAsync("Velvet.linkProgram", programId).AsTask();
 
     /// <inheritdoc />
-    public Task<int> CreateMeshAsync(float[] vertices, ushort[]? indices = null)
+    public Task<int> CreateMeshAsync(float[] vertices, uint[]? indices = null)
         => _js.InvokeAsync<int>("Velvet.createMesh", vertices, indices).AsTask();
 
     #endregion
