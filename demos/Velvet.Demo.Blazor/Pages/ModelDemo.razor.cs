@@ -35,7 +35,7 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
         app = await VelvetApp.CreateAsync(canvasRef, JS, ShaderProgram.CreateDefaultAsync);
 
         camera = new Camera(
-            position: new Vector3(0, 0.2f, 2.6f),
+            position: new Vector3(0, 20f, 2.6f),
             target: new Vector3(0, 0, 0),
             up: Vector3.UnitY,
             fovYRadians: 60.0f * (System.MathF.PI / 180.0f),

@@ -185,8 +185,9 @@
         if (!state) return;
 
         if (state.camera) {
-          params.camera_position = vec3FromDto(state.camera.position, params.camera_position);
-          params.camera_target = vec3FromDto(state.camera.target, params.camera_target);
+          // DO NOT update position or target - user controls these via sliders
+          // params.camera_position = vec3FromDto(state.camera.position, params.camera_position);
+          // params.camera_target = vec3FromDto(state.camera.target, params.camera_target);
           params.camera_forward = vec3FromDto(state.camera.forward, params.camera_forward);
           params.camera_fovDeg = safeNumber(radToDeg(state.camera.fovYRadians), params.camera_fovDeg);
           params.camera_near = safeNumber(state.camera.nearPlane, params.camera_near);
@@ -233,34 +234,34 @@
       var camFolder = pane.addFolder({ title: "Camera" });
 
       var pos = camFolder.addFolder({ title: "Position" });
-      pos.addBinding(params.camera_position, "x", { min: -20, max: 20, step: 0.01 }).on("change", async () => {
+      pos.addBinding(params.camera_position, "x", { step: 0.01 }).on("change", async () => {
         if (!camera.setPosition) return;
         await invoke(camera.dotnet, camera.setPosition, params.camera_position.x, params.camera_position.y, params.camera_position.z);
         if (typeof config.onChange === "function") config.onChange("camera.position");
       });
-      pos.addBinding(params.camera_position, "y", { min: -20, max: 20, step: 0.01 }).on("change", async () => {
+      pos.addBinding(params.camera_position, "y", { step: 0.01 }).on("change", async () => {
         if (!camera.setPosition) return;
         await invoke(camera.dotnet, camera.setPosition, params.camera_position.x, params.camera_position.y, params.camera_position.z);
         if (typeof config.onChange === "function") config.onChange("camera.position");
       });
-      pos.addBinding(params.camera_position, "z", { min: -20, max: 20, step: 0.01 }).on("change", async () => {
+      pos.addBinding(params.camera_position, "z", { step: 0.01 }).on("change", async () => {
         if (!camera.setPosition) return;
         await invoke(camera.dotnet, camera.setPosition, params.camera_position.x, params.camera_position.y, params.camera_position.z);
         if (typeof config.onChange === "function") config.onChange("camera.position");
       });
 
       var tgt = camFolder.addFolder({ title: "LookAt" });
-      tgt.addBinding(params.camera_target, "x", { min: -20, max: 20, step: 0.01 }).on("change", async () => {
+      tgt.addBinding(params.camera_target, "x", { step: 0.01 }).on("change", async () => {
         if (!camera.setTarget) return;
         await invoke(camera.dotnet, camera.setTarget, params.camera_target.x, params.camera_target.y, params.camera_target.z);
         if (typeof config.onChange === "function") config.onChange("camera.target");
       });
-      tgt.addBinding(params.camera_target, "y", { min: -20, max: 20, step: 0.01 }).on("change", async () => {
+      tgt.addBinding(params.camera_target, "y", { step: 0.01 }).on("change", async () => {
         if (!camera.setTarget) return;
         await invoke(camera.dotnet, camera.setTarget, params.camera_target.x, params.camera_target.y, params.camera_target.z);
         if (typeof config.onChange === "function") config.onChange("camera.target");
       });
-      tgt.addBinding(params.camera_target, "z", { min: -20, max: 20, step: 0.01 }).on("change", async () => {
+      tgt.addBinding(params.camera_target, "z", { step: 0.01 }).on("change", async () => {
         if (!camera.setTarget) return;
         await invoke(camera.dotnet, camera.setTarget, params.camera_target.x, params.camera_target.y, params.camera_target.z);
         if (typeof config.onChange === "function") config.onChange("camera.target");
@@ -293,7 +294,7 @@
       // Prime UI from host.
       await refreshFromHost();
 
-      // Low-frequency polling keeps the pane honest if other code modifies state.
+      // Low-frequency polling for forward vector and projection parameters only.
       var pollMs = typeof config.pollMs === "number" ? config.pollMs : 500;
       if (pollMs > 0) {
         var pollHandle = window.setInterval(refreshFromHost, pollMs);
