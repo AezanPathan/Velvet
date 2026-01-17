@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
+using Velvet.Core.Engine;
 using Velvet.Core.Geometry;
 using Velvet.Core.Math;
 using Velvet.Core.Rendering;
@@ -7,6 +8,9 @@ using Velvet.Blazor;
 using Velvet.WebGL;
 using Velvet.Demo.Blazor.Debug;
 using Velvet.Core.Rendering.Lighting;
+using BlazorApp = Velvet.Blazor.VelvetApp;
+using EngineScene = Velvet.Core.Engine.Scene;
+using EngineNode = Velvet.Core.Engine.SceneNode;
 
 namespace Velvet.Demo.Blazor.Pages;
 
@@ -16,7 +20,7 @@ public partial class CubeDemo : ComponentBase, IAsyncDisposable
 
     private ElementReference canvasRef;
 
-    private VelvetApp? app;
+    private BlazorApp? app;
     private Mesh? cube;
     private Mesh? sphere;
     private Material? sphereMaterial;
@@ -34,7 +38,7 @@ public partial class CubeDemo : ComponentBase, IAsyncDisposable
     {
         if (!firstRender) return;
 
-        app = await VelvetApp.CreateAsync(canvasRef, JS, ShaderProgram.CreateDefaultAsync);
+        app = await BlazorApp.CreateAsync(canvasRef, JS, ShaderProgram.CreateDefaultAsync);
 
         camera = new Camera(
             position: new Vector3(0, 0, 3.0f),
@@ -60,8 +64,14 @@ public partial class CubeDemo : ComponentBase, IAsyncDisposable
             Material = sphereMaterial,
         };
 
-        app.Add(cube);
-        app.Add(sphere);
+        // Cube demo is manual; still add individual meshes by wrapping in a Scene for compatibility.
+        var scene = new EngineScene(new[]
+        {
+            new EngineNode(Matrix.Identity(), new[] { cube }, Array.Empty<EngineNode>()),
+            new EngineNode(Matrix.Identity(), new[] { sphere }, Array.Empty<EngineNode>())
+        });
+
+        app.Add(scene);
 
         directional = new DirectionalLightState(
             enabled: true,

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using Velvet.Core.Engine;
 using Velvet.Core.Geometry;
 using Velvet.Core.Math;
 using Velvet.Core.Rendering;
@@ -11,71 +12,52 @@ using Velvet.Core.Rendering;
 namespace Velvet.Core.Assets.Gltf;
 
 /// <summary>
-/// Minimal CPU-side glTF 2.0 loader.
-/// Supports loading a single mesh primitive with POSITION/NORMAL/indices.
-/// Prefers .glb but can also read .gltf with embedded base64 buffers (demo-friendly).
+/// Minimal CPU-side glTF 2.0 loader with scene graph support.
+/// Prefers .glb but still understands .gltf with embedded base64 buffers.
 /// </summary>
 public static class GltfLoader
 {
-    public static List<Mesh> LoadMeshes(JsonElement root, byte[] bin)
+    public static Scene LoadScene(byte[] data)
     {
-        var meshesOut = new List<Mesh>();
+        ArgumentNullException.ThrowIfNull(data);
 
-        var meshes = root.GetProperty("meshes");
-        var accessors = root.GetProperty("accessors");
-        var bufferViews = root.GetProperty("bufferViews");
-
-        /* foreach (var prim in meshes.EnumerateArray())
-         {
-             var mesh = LoadPrimitive(prim, accessors, bufferViews, bin, root);
-             if (mesh != null)
-             {
-                 meshesOut.Add(mesh);
-             }
-
-            // meshesOut.Add(LoadPrimitive(prim, accessors, bufferViews, bin, root));
-         }*/
-
-        foreach (var meshEl in meshes.EnumerateArray())
+        var gltf = LoadGltfDocument(data);
+        using (gltf.Doc)
         {
-            if (!meshEl.TryGetProperty("primitives", out var primitives))
-                continue;
-
-            foreach (var prim in primitives.EnumerateArray())
-            {
-                var mesh = LoadPrimitive(prim, accessors, bufferViews, bin, root);
-                if (mesh != null)
-                {
-                    meshesOut.Add(mesh);
-                }
-            }
+            var meshesByIndex = LoadMeshesByIndex(gltf.Doc.RootElement, gltf.Bin);
+            return BuildScene(gltf.Doc.RootElement, meshesByIndex);
         }
-
-
-        return meshesOut;
-
     }
 
     public static List<Mesh> LoadMeshes(byte[] data)
     {
-        ArgumentNullException.ThrowIfNull(data);
+        var scene = LoadScene(data);
+        var unique = new HashSet<Mesh>();
+        var meshes = new List<Mesh>();
 
-        if (IsGlb(data))
-            return LoadFromGlb(data);
+        foreach (var instance in scene.MeshInstances)
+        {
+            if (unique.Add(instance.Mesh))
+            {
+                meshes.Add(instance.Mesh);
+            }
+        }
 
-        throw new NotSupportedException("Only .glb supported for now.");
+        return meshes;
     }
 
-    private static bool IsGlb(byte[] data)
+    private static (JsonDocument Doc, byte[] Bin) LoadGltfDocument(byte[] data)
     {
-        return data.Length >= 4 &&
-               data[0] == (byte)'g' &&
-               data[1] == (byte)'l' &&
-               data[2] == (byte)'T' &&
-               data[3] == (byte)'F';
+        if (IsGlb(data))
+        {
+            return LoadFromGlb(data);
+        }
+
+        // Demo fallback: embedded-base64 .gltf
+        return LoadFromGltfJson(data);
     }
 
-    private static List<Mesh> LoadFromGlb(byte[] glb)
+    private static (JsonDocument Doc, byte[] Bin) LoadFromGlb(byte[] glb)
     {
         var version = BinaryPrimitives.ReadUInt32LittleEndian(glb.AsSpan(4, 4));
         if (version != 2)
@@ -104,20 +86,207 @@ public static class GltfLoader
 
         byte[] bin = glb.AsSpan(offset, (int)binLength).ToArray();
 
-        return ParseGltf(json, bin);
+        return (JsonDocument.Parse(json), bin);
     }
 
-    private static List<Mesh> ParseGltf(byte[] jsonUtf8, byte[] bin)
+    private static (JsonDocument Doc, byte[] Bin) LoadFromGltfJson(byte[] gltfJsonUtf8)
     {
-        jsonUtf8 = StripUtf8Bom(jsonUtf8);
-
-        using var doc = JsonDocument.Parse(jsonUtf8);
+        gltfJsonUtf8 = StripUtf8Bom(gltfJsonUtf8);
+        var doc = JsonDocument.Parse(gltfJsonUtf8);
         var root = doc.RootElement;
 
-        return LoadMeshes(root, bin);
+        if (!root.TryGetProperty("asset", out var asset) || !asset.TryGetProperty("version", out var ver) || ver.GetString() != "2.0")
+        {
+            throw new NotSupportedException("Only glTF 2.0 is supported.");
+        }
+
+        var buffers = root.GetProperty("buffers");
+        if (buffers.GetArrayLength() < 1) throw new InvalidDataException("glTF has no buffers.");
+
+        var buffer0 = buffers[0];
+        if (!buffer0.TryGetProperty("uri", out var uriEl))
+        {
+            throw new NotSupportedException(".gltf without embedded buffer URI is not supported in this minimal loader.");
+        }
+
+        var uri = uriEl.GetString() ?? string.Empty;
+        const string prefix = "data:application/octet-stream;base64,";
+        if (!uri.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new NotSupportedException("Only embedded base64 buffers are supported for .gltf in this demo loader.");
+        }
+
+        var base64 = uri.Substring(prefix.Length);
+        var binBytes = Convert.FromBase64String(base64);
+
+        return (doc, binBytes);
     }
 
+    private static List<List<Mesh>> LoadMeshesByIndex(JsonElement root, byte[] bin)
+    {
+        var meshesOut = new List<List<Mesh>>();
 
+        var meshes = root.GetProperty("meshes");
+        var accessors = root.GetProperty("accessors");
+        var bufferViews = root.GetProperty("bufferViews");
+
+        foreach (var meshEl in meshes.EnumerateArray())
+        {
+            if (!meshEl.TryGetProperty("primitives", out var primitives) || primitives.ValueKind != JsonValueKind.Array)
+            {
+                meshesOut.Add(new List<Mesh>());
+                continue;
+            }
+
+            var meshPrimitives = new List<Mesh>();
+            foreach (var prim in primitives.EnumerateArray())
+            {
+                var mesh = LoadPrimitive(prim, accessors, bufferViews, bin, root);
+                if (mesh != null)
+                {
+                    meshPrimitives.Add(mesh);
+                }
+            }
+
+            meshesOut.Add(meshPrimitives);
+        }
+
+        return meshesOut;
+    }
+
+    private static Scene BuildScene(JsonElement root, List<List<Mesh>> meshesByIndex)
+    {
+        if (!root.TryGetProperty("nodes", out var nodesEl) || nodesEl.ValueKind != JsonValueKind.Array)
+        {
+            throw new InvalidDataException("glTF has no nodes.");
+        }
+
+        var activeScene = 0;
+        if (root.TryGetProperty("scene", out var sceneEl))
+        {
+            activeScene = sceneEl.GetInt32();
+        }
+
+        var rootNodeIndices = new List<int>();
+        if (root.TryGetProperty("scenes", out var scenesEl) && scenesEl.ValueKind == JsonValueKind.Array && scenesEl.GetArrayLength() > activeScene)
+        {
+            var sceneObj = scenesEl[activeScene];
+            if (sceneObj.TryGetProperty("nodes", out var nodes) && nodes.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var nodeIndexEl in nodes.EnumerateArray())
+                {
+                    rootNodeIndices.Add(nodeIndexEl.GetInt32());
+                }
+            }
+        }
+
+        // Fallback if scenes array is missing or empty.
+        if (rootNodeIndices.Count == 0)
+        {
+            for (var i = 0; i < nodesEl.GetArrayLength(); i++)
+            {
+                rootNodeIndices.Add(i);
+            }
+        }
+
+        var roots = new List<SceneNode>(rootNodeIndices.Count);
+        foreach (var nodeIndex in rootNodeIndices)
+        {
+            roots.Add(BuildNode(nodeIndex, nodesEl, meshesByIndex));
+        }
+
+        return new Scene(roots);
+    }
+
+    private static SceneNode BuildNode(int nodeIndex, JsonElement nodesEl, List<List<Mesh>> meshesByIndex)
+    {
+        var nodeEl = nodesEl[nodeIndex];
+
+        var localTransform = ReadNodeTransform(nodeEl);
+
+        var meshes = Array.Empty<Mesh>();
+        if (nodeEl.TryGetProperty("mesh", out var meshIndexEl))
+        {
+            var meshIndex = meshIndexEl.GetInt32();
+            if (meshIndex >= 0 && meshIndex < meshesByIndex.Count)
+            {
+                meshes = meshesByIndex[meshIndex].ToArray();
+            }
+        }
+
+        var children = new List<SceneNode>();
+        if (nodeEl.TryGetProperty("children", out var childrenEl) && childrenEl.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var childIndexEl in childrenEl.EnumerateArray())
+            {
+                children.Add(BuildNode(childIndexEl.GetInt32(), nodesEl, meshesByIndex));
+            }
+        }
+
+        var name = nodeEl.TryGetProperty("name", out var nameEl) ? nameEl.GetString() : null;
+
+        return new SceneNode(localTransform, meshes, children, name);
+    }
+
+    private static float[] ReadNodeTransform(JsonElement nodeEl)
+    {
+        // glTF 2.0 spec: node transformations can be provided as either:
+        // 1. A 4x4 matrix (column-major, same layout as GPU matrices)
+        // 2. Separate translation, rotation (quaternion), and scale (TRS)
+        // If a matrix is present, it takes precedence and TRS is ignored.
+        if (nodeEl.TryGetProperty("matrix", out var mEl) && mEl.ValueKind == JsonValueKind.Array && mEl.GetArrayLength() == 16)
+        {
+            // Read column-major matrix directly from glTF JSON.
+            var m = new float[16];
+            for (var i = 0; i < 16; i++)
+            {
+                m[i] = (float)mEl[i].GetDouble();
+            }
+            return m;
+        }
+
+        // Default identity values if TRS components are missing.
+        var translation = Vector3.Zero;
+        if (nodeEl.TryGetProperty("translation", out var tEl) && tEl.ValueKind == JsonValueKind.Array && tEl.GetArrayLength() == 3)
+        {
+            translation = new Vector3(
+                (float)tEl[0].GetDouble(),
+                (float)tEl[1].GetDouble(),
+                (float)tEl[2].GetDouble());
+        }
+
+        var scale = new Vector3(1f, 1f, 1f);
+        if (nodeEl.TryGetProperty("scale", out var sEl) && sEl.ValueKind == JsonValueKind.Array && sEl.GetArrayLength() == 3)
+        {
+            scale = new Vector3(
+                (float)sEl[0].GetDouble(),
+                (float)sEl[1].GetDouble(),
+                (float)sEl[2].GetDouble());
+        }
+
+        // glTF rotation is a unit quaternion (x, y, z, w).
+        var rotation = Quaternion.Identity;
+        if (nodeEl.TryGetProperty("rotation", out var rEl) && rEl.ValueKind == JsonValueKind.Array && rEl.GetArrayLength() == 4)
+        {
+            rotation = new Quaternion(
+                (float)rEl[0].GetDouble(),
+                (float)rEl[1].GetDouble(),
+                (float)rEl[2].GetDouble(),
+                (float)rEl[3].GetDouble());
+        }
+
+        // Compose TRS into a single 4x4 column-major matrix.
+        return Matrix.Trs(translation, rotation, scale);
+    }
+
+    private static bool IsGlb(byte[] data)
+    {
+        return data.Length >= 4 &&
+               data[0] == (byte)'g' &&
+               data[1] == (byte)'l' &&
+               data[2] == (byte)'T' &&
+               data[3] == (byte)'F';
+    }
 
     private static Mesh LoadPrimitive(JsonElement prim, JsonElement accessors, JsonElement bufferViews, byte[] bin, JsonElement root)
     {

@@ -70,6 +70,47 @@ public static class Matrix
     }
 
     /// <summary>
+    /// Builds a column-major TRS matrix (T * R * S) using OpenGL/WebGL layout.
+    /// Quaternion is interpreted as (x, y, z, w) in glTF convention.
+    /// </summary>
+    public static float[] Trs(in Vector3 translation, in Quaternion rotation, in Vector3 scale)
+    {
+        // Normalize to avoid accumulating scale into rotation.
+        var q = rotation.Normalized();
+
+        var xx = q.X * q.X; var yy = q.Y * q.Y; var zz = q.Z * q.Z;
+        var xy = q.X * q.Y; var xz = q.X * q.Z; var yz = q.Y * q.Z;
+        var wx = q.W * q.X; var wy = q.W * q.Y; var wz = q.W * q.Z;
+
+        // Rotation matrix in row-major form (standard quaternion formula):
+        // [ 1-2(yy+zz)  2(xy-wz)   2(xz+wy) ]
+        // [ 2(xy+wz)    1-2(xx+zz) 2(yz-wx) ]
+        // [ 2(xz-wy)    2(yz+wx)   1-2(xx+yy) ]
+        //
+        // Converted to column-major for GPU upload:
+        var m00 = 1f - 2f * (yy + zz);
+        var m10 = 2f * (xy + wz);
+        var m20 = 2f * (xz - wy);
+
+        var m01 = 2f * (xy - wz);
+        var m11 = 1f - 2f * (xx + zz);
+        var m21 = 2f * (yz + wx);
+
+        var m02 = 2f * (xz + wy);
+        var m12 = 2f * (yz - wx);
+        var m22 = 1f - 2f * (xx + yy);
+
+        // Apply scale to each basis column and append translation in the last column.
+        return
+        [
+            m00 * scale.X, m10 * scale.X, m20 * scale.X, 0f,
+            m01 * scale.Y, m11 * scale.Y, m21 * scale.Y, 0f,
+            m02 * scale.Z, m12 * scale.Z, m22 * scale.Z, 0f,
+            translation.X, translation.Y, translation.Z, 1f
+        ];
+    }
+
+    /// <summary>
     /// Compute the 3x3 normal matrix (inverse-transpose of the upper-left 3x3 of the model matrix).
     /// Returns a float[9] in column-major order suitable for GLSL mat3 uniform upload.
     /// </summary>

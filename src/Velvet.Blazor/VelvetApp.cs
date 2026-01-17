@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
+using Velvet.Core.Engine;
 using Velvet.Core.Rendering;
 using Velvet.WebGL;
 
@@ -20,7 +21,7 @@ public sealed class VelvetApp
     private readonly IMeshUploader _meshUploader;
     private readonly int _rendererId;
 
-    private readonly List<Mesh> _meshes = new();
+    private readonly List<MeshInstance> _instances = new();
 
     private ShaderProgram? _program;
 
@@ -61,19 +62,23 @@ public sealed class VelvetApp
         => _program ?? throw new InvalidOperationException("Shader program not configured. Provide a programFactory to CreateAsync(...). ");
 
     /// <summary>
-    /// Registers a mesh with the application. Upload occurs on <see cref="StartAsync"/>.
+    /// Registers a scene with the application. Upload occurs on <see cref="StartAsync"/>.
     /// </summary>
-    public void Add(Mesh mesh)
+    public void Add(Scene scene)
     {
-        ArgumentNullException.ThrowIfNull(mesh);
+        ArgumentNullException.ThrowIfNull(scene);
         ThrowIfRunning();
-        _meshes.Add(mesh);
+
+        foreach (var instance in scene.MeshInstances)
+        {
+            _instances.Add(instance);
+        }
     }
 
     public Task StartAsync(Func<float, Task>? onFrame = null)
     {
         if (_program is null) throw new InvalidOperationException("Shader program not configured. Provide a programFactory to CreateAsync(...).");
-        if (_meshes.Count == 0) throw new InvalidOperationException("No meshes added. Call Add(mesh) before StartAsync().");
+        if (_instances.Count == 0) throw new InvalidOperationException("No meshes added. Call Add(scene) before StartAsync().");
         if (_loopTask is not null) return Task.CompletedTask;
 
         _loopCts = new CancellationTokenSource();
@@ -84,7 +89,7 @@ public sealed class VelvetApp
     public Task StartAsync(Func<float, Task>? onFrame, Func<Mesh, Task>? beforeDrawMesh)
     {
         if (_program is null) throw new InvalidOperationException("Shader program not configured. Provide a programFactory to CreateAsync(...).");
-        if (_meshes.Count == 0) throw new InvalidOperationException("No meshes added. Call Add(mesh) before StartAsync().");
+        if (_instances.Count == 0) throw new InvalidOperationException("No meshes added. Call Add(scene) before StartAsync().");
         if (_loopTask is not null) return Task.CompletedTask;
 
         _loopCts = new CancellationTokenSource();
@@ -134,9 +139,9 @@ public sealed class VelvetApp
         var program = _program ?? throw new InvalidOperationException("Shader program not configured.");
 
         // Ensure meshes are uploaded before we start drawing.
-        foreach (var mesh in _meshes)
+        foreach (var instance in _instances)
         {
-            await mesh.UploadAsync(_meshUploader, cancellationToken).ConfigureAwait(false);
+            await instance.Mesh.UploadAsync(_meshUploader, cancellationToken).ConfigureAwait(false);
         }
 
         using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(16));
@@ -157,14 +162,18 @@ public sealed class VelvetApp
 
             await _bridge.ClearAsync(_rendererId, 0.08f, 0.08f, 0.10f, 1.0f).ConfigureAwait(false);
 
-            foreach (var mesh in _meshes)
+            foreach (var instance in _instances)
             {
+                var mesh = instance.Mesh;
                 var meshId = mesh.Resources.VertexBufferId.Value;
 
                 if (beforeDrawMesh is not null)
                 {
                     await beforeDrawMesh(mesh).ConfigureAwait(false);
                 }
+
+                await program.SetUniformMatrix4fvAsync("uModel", instance.ModelMatrix).ConfigureAwait(false);
+                await program.SetUniformMatrix3fvAsync("uNormalMatrix", instance.NormalMatrix).ConfigureAwait(false);
 
                 await program.SetMaterialAsync(mesh.Material ?? Material.Default).ConfigureAwait(false);
 

@@ -8,6 +8,8 @@ using Velvet.Core.Rendering;
 using Velvet.Core.Rendering.Lighting;
 using Velvet.Demo.Blazor.Debug;
 using Velvet.WebGL;
+using BlazorApp = Velvet.Blazor.VelvetApp;
+using EngineScene = Velvet.Core.Engine.Scene;
 
 namespace Velvet.Demo.Blazor.Pages;
 
@@ -18,8 +20,8 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
 
     private ElementReference canvasRef;
 
-    private VelvetApp? app;
-    private List<Mesh> model = new();
+    private BlazorApp? app;
+    private EngineScene? scene;
     private Camera? camera;
     private DirectionalLightState? directional;
     private PointLightState? point;
@@ -32,7 +34,7 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
     {
         if (!firstRender) return;
 
-        app = await VelvetApp.CreateAsync(canvasRef, JS, ShaderProgram.CreateDefaultAsync);
+        app = await BlazorApp.CreateAsync(canvasRef, JS, ShaderProgram.CreateDefaultAsync);
 
         camera = new Camera(
             position: new Vector3(0, 20f, 2.6f),
@@ -72,21 +74,23 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
 
         // Load a single demo model from wwwroot.
         var bytes = await Http.GetByteArrayAsync("models/DragonAttenuation.glb");
-        model = GltfLoader.LoadMeshes(bytes);
-        // model = GltfLoader.LoadSingleMesh(bytes);
-        //app.Add(model);
-        foreach (var mesh in model)
-        {
-            app.Add(mesh);
-        }
+        scene = GltfLoader.LoadScene(bytes);
+        app.Add(scene);
 
 
         debugInterop = new VelvetDebugInterop(
             getCamera: () => camera,
             getDirectional: () => directional,
             getPoint: () => point,
-            // getMaterial: () => model.Material ?? Material.Default,
-            getMaterial: () => model.Count > 0 ? model[0].Material ?? Material.Default : Material.Default,
+            getMaterial: () =>
+            {
+                if (scene is null) return Material.Default;
+                foreach (var inst in scene.MeshInstances)
+                {
+                    return inst.Mesh.Material ?? Material.Default;
+                }
+                return Material.Default;
+            },
             setCameraPosition: v => camera.Position = v,
             setCameraTarget: v => camera.Target = v,
             setCameraPerspective: (fovYRadians, nearPlane, farPlane) => camera.SetPerspective(fovYRadians, camera.AspectRatio, nearPlane, farPlane),
