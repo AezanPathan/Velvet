@@ -31,6 +31,35 @@ public sealed class Scene
 	/// </summary>
 	public IReadOnlyList<MeshInstance> MeshInstances => _meshInstances;
 
+	/// <summary>
+	/// Computes the world-space axis-aligned bounding box of the entire scene.
+	/// Recursively traverses the scene graph, accumulating world matrices and transforming vertex positions.
+	/// Returns a bounding box that encloses all geometry in all meshes of all nodes.
+	/// </summary>
+	public BoundingBox ComputeBounds()
+	{
+		BoundingBox? bounds = null;
+
+		foreach (var root in _roots)
+		{
+			var rootBounds = root.ComputeLocalBounds(Matrix.Identity());
+			if (rootBounds.HasValue)
+			{
+				if (bounds == null)
+				{
+					bounds = rootBounds;
+				}
+				else
+				{
+					bounds.Value.Expand(rootBounds.Value);
+				}
+			}
+		}
+
+		// Return an empty bounding box at origin if the scene has no geometry.
+		return bounds ?? new BoundingBox(Vector3.Zero, Vector3.Zero);
+	}
+
 	private static List<MeshInstance> BuildInstances(IEnumerable<SceneNode> roots)
 	{
 		var instances = new List<MeshInstance>();

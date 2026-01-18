@@ -200,6 +200,47 @@ public sealed class Camera
 		AspectRatio = width / height;
 	}
 
+	/// <summary>
+	/// Frames a bounding box in the camera view by positioning the camera so the entire bounds are visible.
+	/// Sets target to the center of the bounds and moves the camera backward along the forward axis.
+	/// Also adjusts near and far planes to fit the bounds comfortably.
+	/// </summary>
+	/// <param name="bounds">The bounding box to frame.</param>
+	/// <param name="frameMultiplier">Optional multiplier (default 1.2) to add padding around the model.
+	/// Values > 1 move camera farther away; should typically be 1.0–1.5.</param>
+	public void Frame(BoundingBox bounds, float frameMultiplier = 1.2f)
+	{
+		if (frameMultiplier <= 0f)
+			throw new ArgumentOutOfRangeException(nameof(frameMultiplier), "Frame multiplier must be > 0.");
+
+		// Set target to the center of the bounding box.
+		Target = bounds.Center;
+
+		// Compute the distance required to fit the bounding box radius within the FOV.
+		// Using the formula: distance = radius / tan(fov/2)
+		var halfFovY = _fovYRadians * 0.5f;
+		var tanHalfFov = MathF.Tan(halfFovY);
+		var distance = bounds.Radius / tanHalfFov;
+
+		// Apply the frame multiplier to add padding around the model.
+		distance *= frameMultiplier;
+
+		// Position the camera along the forward direction (away from target).
+		// forward is computed from current position and target, but we're changing target,
+		// so we use an initial forward direction (default is negative Z).
+		// We compute position as: target - (forward * distance)
+		var forward = (_target - _position).Normalized();
+		Position = _target - (forward * distance);
+
+		// Adjust near and far planes to comfortably contain the bounds.
+		// Near plane: small value, but at least 1% of the distance to avoid clipping.
+		// Far plane: sufficiently far to see the entire model.
+		var nearPlane = MathF.Max(0.01f, distance * 0.01f);
+		var farPlane = distance * 10f;
+
+		SetPerspective(_fovYRadians, _aspectRatio, nearPlane, farPlane);
+	}
+
 	// --- Matrices ---
 
 	/// <summary>

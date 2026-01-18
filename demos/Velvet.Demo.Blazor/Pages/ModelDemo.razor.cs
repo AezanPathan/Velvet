@@ -1,5 +1,6 @@
 using System.Net.Http;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using Velvet.Blazor;
 using Velvet.Core.Assets.Gltf;
@@ -23,9 +24,15 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
     private BlazorApp? app;
     private EngineScene? scene;
     private Camera? camera;
+    private OrbitController? orbitController;
     private DirectionalLightState? directional;
     private PointLightState? point;
     private SpotLight? spot;
+
+    // Mouse input tracking
+    private bool isMouseDown = false;
+    private int lastMouseX = 0;
+    private int lastMouseY = 0;
 
     private DotNetObjectReference<VelvetDebugInterop>? debugRef;
     private VelvetDebugInterop? debugInterop;
@@ -76,6 +83,19 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
         var bytes = await Http.GetByteArrayAsync("models/DragonAttenuation.glb");
         scene = GltfLoader.LoadScene(bytes);
         app.Add(scene);
+
+        // Auto-frame the camera to fit the loaded model.
+        var bounds = scene.ComputeBounds();
+        camera.Frame(bounds, frameMultiplier: 1.3f);
+
+        // Initialize orbit controller around the model's center.
+        orbitController = new OrbitController(
+            target: bounds.Center,
+            yaw: 0f,
+            pitch: 0.3f,  // Slight upward angle
+            distance: (bounds.Center - camera.Position).Length,
+            minDistance: bounds.Radius * 0.5f,
+            maxDistance: bounds.Radius * 10f);
 
 
         debugInterop = new VelvetDebugInterop(
@@ -131,9 +151,61 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
         await TryInitDebugUiAsync();
     }
 
+    private void OnCanvasMouseDown(MouseEventArgs e)
+    {
+        isMouseDown = true;
+        lastMouseX = (int)e.ClientX;
+        lastMouseY = (int)e.ClientY;
+    }
+
+    private void OnCanvasMouseMove(MouseEventArgs e)
+    {
+        if (!isMouseDown || orbitController is null) return;
+
+        var deltaX = (int)e.ClientX - lastMouseX;
+        var deltaY = (int)e.ClientY - lastMouseY;
+
+        // Convert pixel movement to radians.
+        // Sensitivity: ~0.005 radians per pixel (~0.3° per pixel)
+        var yawDelta = deltaX * 0.005f;
+        var pitchDelta = deltaY * 0.005f;
+
+        orbitController.ApplyYaw(yawDelta);
+        orbitController.ApplyPitch(-pitchDelta);  // Invert Y for intuitive up/down
+
+        lastMouseX = (int)e.ClientX;
+        lastMouseY = (int)e.ClientY;
+    }
+
+    private void OnCanvasMouseUp(MouseEventArgs e)
+    {
+        isMouseDown = false;
+    }
+
+    private void OnCanvasMouseLeave(MouseEventArgs e)
+    {
+        isMouseDown = false;
+    }
+
+    private void OnCanvasWheel(WheelEventArgs e)
+    {
+        if (orbitController is null) return;
+
+        // Wheel delta is typically ±120 per notch.
+        // Convert to zoom multiplier: 0.9 zooms in, 1.1 zooms out.
+        var zoomMultiplier = 1.0f - (float)e.DeltaY * 0.001f;
+        orbitController.ApplyZoomMultiplier(zoomMultiplier);
+    }
+
     private async Task OnFrameAsync(float dt)
     {
         if (app is null || camera is null || directional is null || point is null || spot is null) return;
+
+        // Update camera from orbit controller if available.
+        if (orbitController is not null)
+        {
+            orbitController.UpdateCamera(camera);
+        }
 
         // Single static model at origin.
         var modelMat = Matrix.Identity();
