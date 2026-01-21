@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using Velvet.Core.Engine;
+using Velvet.Core.Math;
 using Velvet.Core.Rendering;
 using Velvet.WebGL;
 
@@ -24,6 +25,7 @@ public sealed class VelvetApp
     private readonly List<MeshInstance> _instances = new();
 
     private ShaderProgram? _program;
+    private Camera? _camera;
 
     private CancellationTokenSource? _loopCts;
     private Task? _loopTask;
@@ -60,6 +62,19 @@ public sealed class VelvetApp
 
     public ShaderProgram Program
         => _program ?? throw new InvalidOperationException("Shader program not configured. Provide a programFactory to CreateAsync(...). ");
+
+    /// <summary>
+    /// Camera used for View and Projection matrices in the render loop.
+    /// </summary>
+    public Camera? Camera
+    {
+        get => _camera;
+        set
+        {
+            ThrowIfRunning();
+            _camera = value;
+        }
+    }
 
     /// <summary>
     /// Registers a scene with the application. Upload occurs on <see cref="StartAsync"/>.
@@ -137,6 +152,7 @@ public sealed class VelvetApp
     private async Task RunLoopAsync(Func<float, Task>? onFrame, Func<Mesh, Task>? beforeDrawMesh, CancellationToken cancellationToken)
     {
         var program = _program ?? throw new InvalidOperationException("Shader program not configured.");
+        var camera = _camera ?? throw new InvalidOperationException("Camera not configured. Assign a Camera before starting.");
 
         // Ensure meshes are uploaded before we start drawing.
         foreach (var instance in _instances)
@@ -162,6 +178,10 @@ public sealed class VelvetApp
 
             await _bridge.ClearAsync(_rendererId, 0.08f, 0.08f, 0.10f, 1.0f).ConfigureAwait(false);
 
+            // Set per-frame matrices (View and Projection are constant for all meshes in this frame)
+            await program.SetUniformMatrix4fvAsync("uView", camera.ViewMatrix).ConfigureAwait(false);
+            await program.SetUniformMatrix4fvAsync("uProjection", camera.ProjectionMatrix).ConfigureAwait(false);
+
             foreach (var instance in _instances)
             {
                 var mesh = instance.Mesh;
@@ -172,6 +192,7 @@ public sealed class VelvetApp
                     await beforeDrawMesh(mesh).ConfigureAwait(false);
                 }
 
+                // Set per-mesh Model matrix and Normal matrix
                 await program.SetUniformMatrix4fvAsync("uModel", instance.ModelMatrix).ConfigureAwait(false);
                 await program.SetUniformMatrix3fvAsync("uNormalMatrix", instance.NormalMatrix).ConfigureAwait(false);
 

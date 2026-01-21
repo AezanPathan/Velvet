@@ -1,11 +1,22 @@
-#version 100
-attribute vec3 position;
-attribute vec3 color;
-varying vec3 vColor;
+#version 300 es
+precision mediump float;
+
+layout(location = 0) in vec3 aPosition;
+layout(location = 1) in vec3 aColor;
+layout(location = 2) in vec3 aNormal;
 
 uniform mat4 uModel;
+uniform mat4 uView;
+uniform mat4 uProjection;
+uniform mat3 uNormalMatrix;
+
+out vec3 vColor;
+out vec3 vNormal;
+out vec3 vWorldPos;
 
 void main() {
-    vColor = color;
-    gl_Position = uModel * vec4(position, 1.0);
+    vColor = aColor;
+    vNormal = normalize(uNormalMatrix * aNormal);
+    vWorldPos = (uModel * vec4(aPosition, 1.0)).xyz;
+    gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
 }

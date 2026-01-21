@@ -81,12 +81,15 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
 
         // Load a single demo model from wwwroot.
         var bytes = await Http.GetByteArrayAsync("models/DragonAttenuation.glb");
-        scene = GltfLoader.LoadScene(bytes);
+        scene = await GltfLoader.LoadScene(bytes);
         app.Add(scene);
 
         // Auto-frame the camera to fit the loaded model.
         var bounds = scene.ComputeBounds();
         camera.Frame(bounds, frameMultiplier: 1.3f);
+
+        // Assign camera to the application
+        app.Camera = camera;
 
         // Initialize orbit controller around the model's center.
         orbitController = new OrbitController(

@@ -49,6 +49,9 @@ public partial class CubeDemo : ComponentBase, IAsyncDisposable
             nearPlane: 0.1f,
             farPlane: 100.0f);
 
+        // Assign camera to the application
+        app.Camera = camera;
+
         // Rotating cube uses the engine default material (intent: geometry without explicit appearance).
         cube = new Mesh(new CubeGeometry());
 

@@ -17,30 +17,36 @@ namespace Velvet.Core.Assets.Gltf;
 /// </summary>
 public static class GltfLoader
 {
-    public static Scene LoadScene(byte[] data)
+    public static async Task<Scene> LoadScene(byte[] data)
     {
         ArgumentNullException.ThrowIfNull(data);
+
+        // Yield immediately so browser regains control
+        await Task.Yield();
 
         var gltf = LoadGltfDocument(data);
         using (gltf.Doc)
         {
+            // Yield between heavy steps
+            await Task.Yield();
+
             var meshesByIndex = LoadMeshesByIndex(gltf.Doc.RootElement, gltf.Bin);
+            await Task.Yield();
             return BuildScene(gltf.Doc.RootElement, meshesByIndex);
         }
     }
 
-    public static List<Mesh> LoadMeshes(byte[] data)
+    public static async Task<List<Mesh>>  LoadMeshes(byte[] data)
     {
-        var scene = LoadScene(data);
+        var scene = await LoadScene(data);
         var unique = new HashSet<Mesh>();
         var meshes = new List<Mesh>();
 
         foreach (var instance in scene.MeshInstances)
         {
             if (unique.Add(instance.Mesh))
-            {
                 meshes.Add(instance.Mesh);
-            }
+            
         }
 
         return meshes;
@@ -453,57 +459,57 @@ public static class GltfLoader
 
 
     private static uint[] ReadAccessorIndicesU32(JsonElement accessors, JsonElement bufferViews, byte[] bin, int accessorIndex)
+    {
+        var acc = accessors[accessorIndex];
+        var type = acc.GetProperty("type").GetString();
+        if (!string.Equals(type, "SCALAR", StringComparison.Ordinal)) throw new NotSupportedException("Only SCALAR accessors are supported for indices.");
+
+        var count = acc.GetProperty("count").GetInt32();
+        var viewIndex = acc.GetProperty("bufferView").GetInt32();
+        var view = bufferViews[viewIndex];
+
+        var viewOffset = view.TryGetProperty("byteOffset", out var vo) ? vo.GetInt32() : 0;
+        var accOffset = acc.TryGetProperty("byteOffset", out var ao) ? ao.GetInt32() : 0;
+        var byteOffset = viewOffset + accOffset;
+
+        var componentType = acc.GetProperty("componentType").GetInt32();
+        return componentType switch
         {
-            var acc = accessors[accessorIndex];
-            var type = acc.GetProperty("type").GetString();
-            if (!string.Equals(type, "SCALAR", StringComparison.Ordinal)) throw new NotSupportedException("Only SCALAR accessors are supported for indices.");
+            5121 => ReadByteIndicesU32(bin, byteOffset, count),        // UNSIGNED_BYTE
+            5123 => ReadUShortIndicesU32(bin, byteOffset, count),      // UNSIGNED_SHORT
+            5125 => ReadUIntIndices(bin, byteOffset, count),           // UNSIGNED_INT
+            _ => throw new NotSupportedException($"Unsupported index componentType: {componentType}")
+        };
+    }
 
-            var count = acc.GetProperty("count").GetInt32();
-            var viewIndex = acc.GetProperty("bufferView").GetInt32();
-            var view = bufferViews[viewIndex];
-
-            var viewOffset = view.TryGetProperty("byteOffset", out var vo) ? vo.GetInt32() : 0;
-            var accOffset = acc.TryGetProperty("byteOffset", out var ao) ? ao.GetInt32() : 0;
-            var byteOffset = viewOffset + accOffset;
-
-            var componentType = acc.GetProperty("componentType").GetInt32();
-            return componentType switch
-            {
-                5121 => ReadByteIndicesU32(bin, byteOffset, count),        // UNSIGNED_BYTE
-                5123 => ReadUShortIndicesU32(bin, byteOffset, count),      // UNSIGNED_SHORT
-                5125 => ReadUIntIndices(bin, byteOffset, count),           // UNSIGNED_INT
-                _ => throw new NotSupportedException($"Unsupported index componentType: {componentType}")
-            };
-        }
-
-        private static uint[] ReadByteIndicesU32(byte[] bin, int byteOffset, int count)
+    private static uint[] ReadByteIndicesU32(byte[] bin, int byteOffset, int count)
+    {
+        var indices = new uint[count];
+        for (var i = 0; i < count; i++)
         {
-            var indices = new uint[count];
-            for (var i = 0; i < count; i++)
-            {
-                indices[i] = bin[byteOffset + i];
-            }
-            return indices;
+            indices[i] = bin[byteOffset + i];
         }
+        return indices;
+    }
 
-        private static uint[] ReadUShortIndicesU32(byte[] bin, int byteOffset, int count)
+    private static uint[] ReadUShortIndicesU32(byte[] bin, int byteOffset, int count)
+    {
+        var indices = new uint[count];
+        for (var i = 0; i < count; i++)
         {
-            var indices = new uint[count];
-            for (var i = 0; i < count; i++)
-            {
-                indices[i] = BinaryPrimitives.ReadUInt16LittleEndian(bin.AsSpan(byteOffset + (i * 2), 2));
-            }
-            return indices;
+            indices[i] = BinaryPrimitives.ReadUInt16LittleEndian(bin.AsSpan(byteOffset + (i * 2), 2));
         }
+        return indices;
+    }
 
-        private static uint[] ReadUIntIndices(byte[] bin, int byteOffset, int count)
+    private static uint[] ReadUIntIndices(byte[] bin, int byteOffset, int count)
+    {
+        var indices = new uint[count];
+        for (var i = 0; i < count; i++)
         {
-            var indices = new uint[count];
-            for (var i = 0; i < count; i++)
-            {
-                indices[i] = BinaryPrimitives.ReadUInt32LittleEndian(bin.AsSpan(byteOffset + (i * 4), 4));
-            }
-            return indices;
+            indices[i] = BinaryPrimitives.ReadUInt32LittleEndian(bin.AsSpan(byteOffset + (i * 4), 4));
         }
+        return indices;
+    }
 
 }
