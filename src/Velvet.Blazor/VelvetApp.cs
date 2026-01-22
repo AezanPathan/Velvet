@@ -23,6 +23,7 @@ public sealed class VelvetApp
     private readonly int _rendererId;
 
     private readonly List<MeshInstance> _instances = new();
+    private List<RenderBatch>? _batches;
 
     private ShaderProgram? _program;
     private Camera? _camera;
@@ -96,6 +97,9 @@ public sealed class VelvetApp
         if (_instances.Count == 0) throw new InvalidOperationException("No meshes added. Call Add(scene) before StartAsync().");
         if (_loopTask is not null) return Task.CompletedTask;
 
+        // Build batches from instances
+        _batches = RenderBatcher.BuildBatches(_instances, _program);
+
         _loopCts = new CancellationTokenSource();
         _loopTask = RunLoopAsync(onFrame, beforeDrawMesh: null, _loopCts.Token);
         return Task.CompletedTask;
@@ -106,6 +110,9 @@ public sealed class VelvetApp
         if (_program is null) throw new InvalidOperationException("Shader program not configured. Provide a programFactory to CreateAsync(...).");
         if (_instances.Count == 0) throw new InvalidOperationException("No meshes added. Call Add(scene) before StartAsync().");
         if (_loopTask is not null) return Task.CompletedTask;
+
+        // Build batches from instances
+        _batches = RenderBatcher.BuildBatches(_instances, _program);
 
         _loopCts = new CancellationTokenSource();
         _loopTask = RunLoopAsync(onFrame, beforeDrawMesh, _loopCts.Token);
@@ -153,6 +160,7 @@ public sealed class VelvetApp
     {
         var program = _program ?? throw new InvalidOperationException("Shader program not configured.");
         var camera = _camera ?? throw new InvalidOperationException("Camera not configured. Assign a Camera before starting.");
+        var batches = _batches ?? throw new InvalidOperationException("Batches not built.");
 
         // Ensure meshes are uploaded before we start drawing.
         foreach (var instance in _instances)
@@ -178,27 +186,33 @@ public sealed class VelvetApp
 
             await _bridge.ClearAsync(_rendererId, 0.08f, 0.08f, 0.10f, 1.0f).ConfigureAwait(false);
 
-            // Set per-frame matrices (View and Projection are constant for all meshes in this frame)
+            // Set per-frame matrices once (View and Projection are constant for all meshes in this frame)
             await program.SetUniformMatrix4fvAsync("uView", camera.ViewMatrix).ConfigureAwait(false);
             await program.SetUniformMatrix4fvAsync("uProjection", camera.ProjectionMatrix).ConfigureAwait(false);
 
-            foreach (var instance in _instances)
+            // Render each batch
+            foreach (var batch in batches)
             {
-                var mesh = instance.Mesh;
-                var meshId = mesh.Resources.VertexBufferId.Value;
+                // Set batch state once (Material is shared across all instances in this batch)
+                await program.SetMaterialAsync(batch.Key.Material).ConfigureAwait(false);
 
-                if (beforeDrawMesh is not null)
+                // Draw all instances in the batch
+                foreach (var instance in batch.Instances)
                 {
-                    await beforeDrawMesh(mesh).ConfigureAwait(false);
+                    var mesh = instance.Mesh;
+                    var meshId = mesh.Resources.VertexBufferId.Value;
+
+                    if (beforeDrawMesh is not null)
+                    {
+                        await beforeDrawMesh(mesh).ConfigureAwait(false);
+                    }
+
+                    // Set per-mesh Model matrix and Normal matrix
+                    await program.SetUniformMatrix4fvAsync("uModel", instance.ModelMatrix).ConfigureAwait(false);
+                    await program.SetUniformMatrix3fvAsync("uNormalMatrix", instance.NormalMatrix).ConfigureAwait(false);
+
+                    await program.DrawMeshAsync(meshId, _rendererId).ConfigureAwait(false);
                 }
-
-                // Set per-mesh Model matrix and Normal matrix
-                await program.SetUniformMatrix4fvAsync("uModel", instance.ModelMatrix).ConfigureAwait(false);
-                await program.SetUniformMatrix3fvAsync("uNormalMatrix", instance.NormalMatrix).ConfigureAwait(false);
-
-                await program.SetMaterialAsync(mesh.Material ?? Material.Default).ConfigureAwait(false);
-
-                await program.DrawMeshAsync(meshId, _rendererId).ConfigureAwait(false);
             }
         }
     }

@@ -82,6 +82,7 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
         // Load a single demo model from wwwroot.
         var bytes = await Http.GetByteArrayAsync("models/DragonAttenuation.glb");
         scene = await GltfLoader.LoadScene(bytes);
+        //scene = await GltfLoader.LoadFromUrlAsync("models/DragonAttenuation.glb");
         app.Add(scene);
 
         // Auto-frame the camera to fit the loaded model.
