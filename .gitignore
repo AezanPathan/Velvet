@@ -73,3 +73,6 @@ coverage/
 *~
 *.swp
 *.swm
+
+# Md files
+mds/

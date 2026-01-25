@@ -80,8 +80,9 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
             quadratic: 0.032f);
 
         // Load a single demo model from wwwroot.
-        var bytes = await Http.GetByteArrayAsync("models/DragonAttenuation.glb");
-        scene = await GltfLoader.LoadScene(bytes);
+       // var bytes = await Http.GetByteArrayAsync("models/DragonAttenuation.glb");
+        var bytes = await Http.GetByteArrayAsync("models/Fox.glb");
+        scene = await GltfLoader.LoadScene(bytes, "models");
         //scene = await GltfLoader.LoadFromUrlAsync("models/DragonAttenuation.glb");
         app.Add(scene);
 
@@ -171,11 +172,11 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
 
         // Convert pixel movement to radians.
         // Sensitivity: ~0.005 radians per pixel (~0.3° per pixel)
-        var yawDelta = deltaX * 0.005f;
+        var yawDelta = -deltaX * 0.005f;
         var pitchDelta = deltaY * 0.005f;
 
         orbitController.ApplyYaw(yawDelta);
-        orbitController.ApplyPitch(-pitchDelta);  // Invert Y for intuitive up/down
+        orbitController.ApplyPitch(pitchDelta);
 
         lastMouseX = (int)e.ClientX;
         lastMouseY = (int)e.ClientY;
@@ -196,8 +197,8 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
         if (orbitController is null) return;
 
         // Wheel delta is typically ±120 per notch.
-        // Convert to zoom multiplier: 0.9 zooms in, 1.1 zooms out.
-        var zoomMultiplier = 1.0f - (float)e.DeltaY * 0.001f;
+        // Scroll up (negative DeltaY) zooms in, scroll down (positive DeltaY) zooms out.
+        var zoomMultiplier = 1.0f + (float)e.DeltaY * 0.001f;
         orbitController.ApplyZoomMultiplier(zoomMultiplier);
     }
 

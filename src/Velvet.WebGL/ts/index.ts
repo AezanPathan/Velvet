@@ -16,6 +16,10 @@ import "./api/types";
     setUniformMatrix3fv: API.setUniformMatrix3fv,
     setUniform3f: API.setUniform3f,
     setUniform1f: API.setUniform1f,
+    setUniform1i: API.setUniform1i,
+    setUniform1b: API.setUniform1b,
+    createTextureFromUrl: API.createTextureFromUrl,
+    bindTextureById: API.bindTextureById,
     clear: API.clear,
     resize: API.resize
 };

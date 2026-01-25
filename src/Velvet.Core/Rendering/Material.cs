@@ -29,6 +29,12 @@ public sealed class Material
     /// </summary>
     public bool Unlit { get; set; }
 
+    /// <summary>
+    /// Optional base color texture URI (relative or data: URL).
+    /// If provided, the renderer will load and sample this texture.
+    /// </summary>
+    public string? BaseColorTextureUri { get; set; }
+
     #endregion
 
     #region  Ctor

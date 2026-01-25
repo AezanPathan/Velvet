@@ -17,7 +17,7 @@ namespace Velvet.Core.Assets.Gltf;
 /// </summary>
 public static class GltfLoader
 {
-    public static async Task<Scene> LoadScene(byte[] data)
+    public static async Task<Scene> LoadScene(byte[] data, string? baseUrl = null)
     {
         ArgumentNullException.ThrowIfNull(data);
 
@@ -30,13 +30,13 @@ public static class GltfLoader
             // Yield between heavy steps
             await Task.Yield();
 
-            var meshesByIndex = LoadMeshesByIndex(gltf.Doc.RootElement, gltf.Bin);
+            var meshesByIndex = LoadMeshesByIndex(gltf.Doc.RootElement, gltf.Bin, baseUrl);
             await Task.Yield();
             return BuildScene(gltf.Doc.RootElement, meshesByIndex);
         }
     }
 
-    public static async Task<List<Mesh>>  LoadMeshes(byte[] data)
+    public static async Task<List<Mesh>> LoadMeshes(byte[] data)
     {
         var scene = await LoadScene(data);
         var unique = new HashSet<Mesh>();
@@ -46,7 +46,7 @@ public static class GltfLoader
         {
             if (unique.Add(instance.Mesh))
                 meshes.Add(instance.Mesh);
-            
+
         }
 
         return meshes;
@@ -128,7 +128,7 @@ public static class GltfLoader
         return (doc, binBytes);
     }
 
-    private static List<List<Mesh>> LoadMeshesByIndex(JsonElement root, byte[] bin)
+    private static List<List<Mesh>> LoadMeshesByIndex(JsonElement root, byte[] bin, string? baseUrl = null)
     {
         var meshesOut = new List<List<Mesh>>();
 
@@ -147,7 +147,7 @@ public static class GltfLoader
             var meshPrimitives = new List<Mesh>();
             foreach (var prim in primitives.EnumerateArray())
             {
-                var mesh = LoadPrimitive(prim, accessors, bufferViews, bin, root);
+                var mesh = LoadPrimitive(prim, accessors, bufferViews, bin, root, baseUrl);
                 if (mesh != null)
                 {
                     meshPrimitives.Add(mesh);
@@ -294,20 +294,15 @@ public static class GltfLoader
                data[3] == (byte)'F';
     }
 
-    private static Mesh LoadPrimitive(JsonElement prim, JsonElement accessors, JsonElement bufferViews, byte[] bin, JsonElement root)
+    private static Mesh LoadPrimitive(JsonElement prim, JsonElement accessors, JsonElement bufferViews, byte[] bin, JsonElement root, string? baseUrl = null)
     {
-        //var attrs = prim.GetProperty("attributes");
-
         if (!prim.TryGetProperty("attributes", out var attrs))
         {
             // Likely KHR_draco_mesh_compression or unsupported primitive
             return null!;
         }
 
-
-
         int posAcc = attrs.GetProperty("POSITION").GetInt32();
-        ///int? norAcc = attrs.TryGetProperty("NORMAL", out var n) ? n.GetInt32() : null;
 
         int? norAcc = null;
         if (attrs.TryGetProperty("NORMAL", out var normalEl))
@@ -315,22 +310,23 @@ public static class GltfLoader
             norAcc = normalEl.GetInt32();
         }
 
-
         float[] positions = ReadAccessorFloatVec3(accessors, bufferViews, bin, posAcc);
-        // float[] normals = norAcc.HasValue
-        //     ? ReadAccessorFloatVec3(accessors, bufferViews, bin, norAcc.Value)
-        //     : new float[positions.Length];
         float[] normals;
 
+        // Texture UV coordinates
+        int? uvAcc = null;
+        if (attrs.TryGetProperty("TEXCOORD_0", out var uvEl))
+            uvAcc = uvEl.GetInt32();
+
+        float[] uvs = uvAcc.HasValue
+                  ? ReadAccessorFloatVec2(accessors, bufferViews, bin, uvAcc.Value)
+                  : new float[(positions.Length / 3) * 2];
+
         if (norAcc.HasValue)
-        {
             normals = ReadAccessorFloatVec3(accessors, bufferViews, bin, norAcc.Value);
-        }
         else
-        {
             // Fallback normals (valid & REQUIRED)
             normals = new float[positions.Length];
-        }
 
         uint[]? indices = null;
         if (prim.TryGetProperty("indices", out var idx))
@@ -342,31 +338,34 @@ public static class GltfLoader
                 idx.GetInt32());
         }
 
-
+        // Pack vertices: POSITION(3) + NORMAL(3) + UV(2) = 8 floats per vertex
         int vertexCount = positions.Length / 3;
-        float[] vertices = new float[vertexCount * 9];
+        float[] vertices = new float[vertexCount * 8];
 
         for (int i = 0; i < vertexCount; i++)
         {
             int p = i * 3;
-            int v = i * 9;
+            int v = i * 8;
+            int uv = i * 2;
 
+            // Position
             vertices[v + 0] = positions[p + 0];
             vertices[v + 1] = positions[p + 1];
             vertices[v + 2] = positions[p + 2];
 
-            vertices[v + 3] = 1f;
-            vertices[v + 4] = 1f;
-            vertices[v + 5] = 1f;
+            // Normal
+            vertices[v + 3] = normals[p + 0];
+            vertices[v + 4] = normals[p + 1];
+            vertices[v + 5] = normals[p + 2];
 
-            vertices[v + 6] = normals[p + 0];
-            vertices[v + 7] = normals[p + 1];
-            vertices[v + 8] = normals[p + 2];
+            // UV
+            vertices[v + 6] = uvs[uv + 0];
+            vertices[v + 7] = uvs[uv + 1];
         }
 
-        var geo = new LoadedGeometry(vertices, indices, VertexLayout.PositionColorNormal);
+        var geo = new LoadedGeometry(vertices, indices, VertexLayout.PositionNormalUV);
         var mesh = new Mesh(geo);
-        mesh.Material = TryReadMaterial(root);
+        mesh.Material = TryReadMaterial(root, bin, baseUrl);
 
         return mesh;
     }
@@ -405,7 +404,7 @@ public static class GltfLoader
         return result;
     }
 
-    private static Material? TryReadMaterial(JsonElement root)
+    private static Material? TryReadMaterial(JsonElement root, byte[] bin, string? baseUrl = null)
     {
         if (!root.TryGetProperty("materials", out var materials) || materials.GetArrayLength() < 1)
         {
@@ -436,11 +435,35 @@ public static class GltfLoader
             }
         }
 
-        return new Material(
+        var material = new Material(
             albedoColor: color,
             ambientStrength: 0.05f,
             diffuseStrength: 1.0f,
             unlit: unlit);
+
+        // Extract baseColorTexture URI if present and resolve relative to baseUrl
+        var textureUri = TryReadBaseColorImage(root, m, bin);
+        System.Diagnostics.Debug.WriteLine($"[GltfLoader] TryReadBaseColorImage returned: '{textureUri}'");
+        System.Diagnostics.Debug.WriteLine($"[GltfLoader] baseUrl parameter: '{baseUrl}'");
+        if (textureUri != null)
+        {
+            // If a baseUrl is provided, resolve relative texture URIs
+            if (!string.IsNullOrWhiteSpace(baseUrl) && !textureUri.StartsWith("data:") && !textureUri.StartsWith("/"))
+            {
+                // Ensure baseUrl ends with /
+                if (!baseUrl.EndsWith("/"))
+                    baseUrl += "/";
+                textureUri = baseUrl + textureUri;
+            }
+            material.BaseColorTextureUri = textureUri;
+            System.Diagnostics.Debug.WriteLine($"[GltfLoader] Material.BaseColorTextureUri set to: '{material.BaseColorTextureUri}'");
+        }
+        else
+        {
+            System.Diagnostics.Debug.WriteLine($"[GltfLoader] No texture URI found in glTF");
+        }
+
+        return material;
     }
 
     private static byte[] StripUtf8Bom(byte[] bytes)
@@ -511,5 +534,142 @@ public static class GltfLoader
         }
         return indices;
     }
+
+
+    private static float[] ReadAccessorFloatVec2(JsonElement accessors, JsonElement bufferViews, byte[] bin, int accessorIndex)
+    {
+        var acc = accessors[accessorIndex];
+
+        if (acc.GetProperty("componentType").GetInt32() != 5126)
+            throw new NotSupportedException("Only FLOAT UVs supported.");
+
+        if (acc.GetProperty("type").GetString() != "VEC2")
+            throw new NotSupportedException("Only VEC2 UVs supported.");
+
+        int count = acc.GetProperty("count").GetInt32();
+        int viewIndex = acc.GetProperty("bufferView").GetInt32();
+        var view = bufferViews[viewIndex];
+
+        int viewOffset = view.TryGetProperty("byteOffset", out var vo) ? vo.GetInt32() : 0;
+        int accOffset = acc.TryGetProperty("byteOffset", out var ao) ? ao.GetInt32() : 0;
+        int byteOffset = viewOffset + accOffset;
+
+        int stride = view.TryGetProperty("byteStride", out var bs) ? bs.GetInt32() : 8;
+
+        var result = new float[count * 2];
+        for (int i = 0; i < count; i++)
+        {
+            int baseByte = byteOffset + i * stride;
+            result[i * 2 + 0] = BitConverter.ToSingle(bin, baseByte);
+            result[i * 2 + 1] = BitConverter.ToSingle(bin, baseByte + 4);
+        }
+
+        return result;
+    }
+
+    private static string? TryReadBaseColorImage(JsonElement root, JsonElement material, byte[] bin)
+    {
+        if (!material.TryGetProperty("pbrMetallicRoughness", out var pbr))
+        {
+            System.Diagnostics.Debug.WriteLine("[TryReadBaseColorImage] No pbrMetallicRoughness");
+            return null;
+        }
+
+        if (!pbr.TryGetProperty("baseColorTexture", out var tex))
+        {
+            System.Diagnostics.Debug.WriteLine("[TryReadBaseColorImage] No baseColorTexture");
+            return null;
+        }
+
+        if (!tex.TryGetProperty("index", out var indexEl))
+        {
+            System.Diagnostics.Debug.WriteLine("[TryReadBaseColorImage] No texture index");
+            return null;
+        }
+
+        int textureIndex = indexEl.GetInt32();
+        System.Diagnostics.Debug.WriteLine($"[TryReadBaseColorImage] textureIndex = {textureIndex}");
+
+        if (!root.TryGetProperty("textures", out var texturesEl) || texturesEl.ValueKind != JsonValueKind.Array)
+        {
+            System.Diagnostics.Debug.WriteLine("[TryReadBaseColorImage] No textures array");
+            return null;
+        }
+
+        if (textureIndex < 0 || textureIndex >= texturesEl.GetArrayLength())
+        {
+            System.Diagnostics.Debug.WriteLine($"[TryReadBaseColorImage] textureIndex {textureIndex} out of bounds (count={texturesEl.GetArrayLength()})");
+            return null;
+        }
+
+        var texture = texturesEl[textureIndex];
+        if (!texture.TryGetProperty("source", out var sourceEl))
+        {
+            System.Diagnostics.Debug.WriteLine("[TryReadBaseColorImage] No source in texture");
+            return null;
+        }
+
+        int imageIndex = sourceEl.GetInt32();
+        System.Diagnostics.Debug.WriteLine($"[TryReadBaseColorImage] imageIndex = {imageIndex}");
+
+        if (!root.TryGetProperty("images", out var imagesEl) || imagesEl.ValueKind != JsonValueKind.Array)
+        {
+            System.Diagnostics.Debug.WriteLine("[TryReadBaseColorImage] No images array");
+            return null;
+        }
+
+        if (imageIndex < 0 || imageIndex >= imagesEl.GetArrayLength())
+        {
+            System.Diagnostics.Debug.WriteLine($"[TryReadBaseColorImage] imageIndex {imageIndex} out of bounds (count={imagesEl.GetArrayLength()})");
+            return null;
+        }
+
+        var image = imagesEl[imageIndex];
+
+        // Case 1: External or data URI
+        if (image.TryGetProperty("uri", out var uriEl))
+        {
+            var resultUri = uriEl.GetString();
+            System.Diagnostics.Debug.WriteLine($"[TryReadBaseColorImage] SUCCESS - uri = '{resultUri}'");
+            return resultUri;
+        }
+
+        // Case 2: Embedded image in GLB via bufferView + mimeType
+        if (image.TryGetProperty("bufferView", out var bvEl))
+        {
+            var viewIndex = bvEl.GetInt32();
+            if (!root.TryGetProperty("bufferViews", out var bufferViews) || bufferViews.ValueKind != JsonValueKind.Array)
+            {
+                System.Diagnostics.Debug.WriteLine("[TryReadBaseColorImage] bufferView present but no bufferViews array");
+                return null;
+            }
+            if (viewIndex < 0 || viewIndex >= bufferViews.GetArrayLength())
+            {
+                System.Diagnostics.Debug.WriteLine($"[TryReadBaseColorImage] bufferView index {viewIndex} out of bounds");
+                return null;
+            }
+
+            var view = bufferViews[viewIndex];
+            var byteOffset = view.TryGetProperty("byteOffset", out var bo) ? bo.GetInt32() : 0;
+            var byteLength = view.TryGetProperty("byteLength", out var bl) ? bl.GetInt32() : 0;
+            if (byteLength <= 0)
+            {
+                System.Diagnostics.Debug.WriteLine("[TryReadBaseColorImage] Invalid byteLength for image bufferView");
+                return null;
+            }
+
+            var mimeType = image.TryGetProperty("mimeType", out var mtEl) ? (mtEl.GetString() ?? "image/png") : "image/png";
+            var bytes = new byte[byteLength];
+            Buffer.BlockCopy(bin, byteOffset, bytes, 0, byteLength);
+            var base64 = Convert.ToBase64String(bytes);
+            var dataUrl = $"data:{mimeType};base64,{base64}";
+            System.Diagnostics.Debug.WriteLine($"[TryReadBaseColorImage] Built data URL from bufferView (length={byteLength}, mime='{mimeType}')");
+            return dataUrl;
+        }
+
+        System.Diagnostics.Debug.WriteLine("[TryReadBaseColorImage] Image has neither uri nor bufferView");
+        return null;
+    }
+
 
 }

@@ -44,13 +44,42 @@ public sealed class VertexLayout
                 new VertexElement(VertexElementSemantic.Color, OffsetFloats: 3, ComponentCount: 3),
                 new VertexElement(VertexElementSemantic.Normal, OffsetFloats: 6, ComponentCount: 3),
             });
+
+        /// <summary>
+        /// Layout: interleaved position (x,y,z) + color (r,g,b) + normal (nx,ny,nz) + uv (u,v) per vertex.
+        /// Format: <c>[x, y, z, r, g, b, nx, ny, nz, u, v]</c>
+        /// </summary>
+        public static VertexLayout PositionColorNormalUV { get; } = new(
+            strideFloats: 11,
+            elements: new[]
+            {
+                new VertexElement(VertexElementSemantic.Position, OffsetFloats: 0, ComponentCount: 3),
+                new VertexElement(VertexElementSemantic.Color, OffsetFloats: 3, ComponentCount: 3),
+                new VertexElement(VertexElementSemantic.Normal, OffsetFloats: 6, ComponentCount: 3),
+                new VertexElement(VertexElementSemantic.UV, OffsetFloats: 9, ComponentCount: 2),
+            });
+
+        /// <summary>
+        /// Canonical layout for textured models: position (x,y,z) + normal (nx,ny,nz) + uv (u,v) per vertex.
+        /// Format: <c>[x, y, z, nx, ny, nz, u, v]</c>
+        /// Stride: 8 floats (32 bytes per vertex)
+        /// </summary>
+        public static VertexLayout PositionNormalUV { get; } = new(
+            strideFloats: 8,
+            elements: new[]
+            {
+                new VertexElement(VertexElementSemantic.Position, OffsetFloats: 0, ComponentCount: 3),
+                new VertexElement(VertexElementSemantic.Normal, OffsetFloats: 3, ComponentCount: 3),
+                new VertexElement(VertexElementSemantic.UV, OffsetFloats: 6, ComponentCount: 2),
+            });
 }
 
 public enum VertexElementSemantic
 {
     Position,
     Color,
-        Normal,
+    Normal,
+    UV,
 }
 
 public readonly record struct VertexElement(

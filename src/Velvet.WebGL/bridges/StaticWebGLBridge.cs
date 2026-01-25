@@ -96,6 +96,18 @@ public sealed class StaticWebGLBridge : IWebGLBridge
     public Task SetUniformMatrix3fvAsync(int programId, string name, float[] matrix)
         => _js.InvokeVoidAsync("Velvet.setUniformMatrix3fv", programId, name, matrix).AsTask();
 
+    public Task SetUniform1iAsync(int programId, string name, int value)
+        => _js.InvokeVoidAsync("Velvet.setUniform1i", programId, name, value).AsTask();
+
+    public Task SetUniform1bAsync(int programId, string name, bool value)
+        => _js.InvokeVoidAsync("Velvet.setUniform1b", programId, name, value).AsTask();
+
+    public Task<int> CreateTextureFromUrlAsync(string url)
+        => _js.InvokeAsync<int>("Velvet.createTextureFromUrl", url).AsTask();
+
+    public Task BindTextureAsync(int programId, string samplerName, int textureId, int textureUnit)
+        => _js.InvokeVoidAsync("Velvet.bindTextureById", programId, samplerName, textureId, textureUnit).AsTask();
+
     /// <inheritdoc />
     public Task ResizeAsync(int width, int height)
         => _js.InvokeVoidAsync("Velvet.resize", width, height).AsTask();

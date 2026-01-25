@@ -76,6 +76,19 @@ namespace Velvet.WebGL
         Task SetUniform1fAsync(int programId, string name, float value);
         Task SetUniformMatrix3fvAsync(int programId, string name, float[] matrix);
 
+        Task SetUniform1iAsync(int programId, string name, int value);
+        Task SetUniform1bAsync(int programId, string name, bool value);
+
+        /// <summary>
+        /// Create a texture from a URL on the JS side and return a texture ID.
+        /// </summary>
+        Task<int> CreateTextureFromUrlAsync(string url);
+
+        /// <summary>
+        /// Bind a texture by ID to the given sampler uniform on a program.
+        /// </summary>
+        Task BindTextureAsync(int programId, string samplerName, int textureId, int textureUnit);
+
         #endregion
 
         #region Rendering / state

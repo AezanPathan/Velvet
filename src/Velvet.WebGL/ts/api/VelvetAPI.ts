@@ -9,7 +9,8 @@ import {
   ProgramManager,
   BufferManager,
   MeshManager,
-  RendererManager
+    RendererManager,
+    TextureManager
 } from "../core/resource/Managers";
 
 /**
@@ -185,6 +186,42 @@ export function setUniform1f(programId: number, name: string, value: number): vo
 }
 
 /**
+ * Set a uniform sampler (texture unit) on a program.
+ */
+export function setUniform1i(programId: number, name: string, value: number): void {
+    if (!context) throw new Error("Velvet not initialized");
+
+    const program = ProgramManager.get(programId) as any;
+    const location = program.getUniformLocation(name);
+
+    if (location) {
+        program.use();
+        context.gl.uniform1i(location, value);
+    }
+}
+
+/**
+ * Set a uniform boolean on a program.
+ */
+export function setUniform1b(programId: number, name: string, value: boolean): void {
+    if (!context) throw new Error("Velvet not initialized");
+
+    const program = ProgramManager.get(programId) as any;
+    const location = program.getUniformLocation(name);
+
+    if (location) {
+        program.use();
+        context.gl.uniform1i(location, value ? 1 : 0);
+        console.log(`[DEBUG] setUniform1b: ${name} = ${value}`);
+        if (name === "uHasTexture") {
+            console.warn(`*** CRITICAL: setUniform1b("uHasTexture", ${value}) SET ON GPU ***`);
+        }
+    } else {
+        console.warn(`[DEBUG] setUniform1b: uniform "${name}" not found in program ${programId}`);
+    }
+}
+
+/**
  * Create a mesh from raw vertex/index data.
  * 
  * For non-indexed geometry, pass only vertices.
@@ -213,9 +250,13 @@ export function createMesh(
         BufferManager.add(ib);
         count = indexData.length;
     } else {
-        // Infer stride: either position(3)+color(3) = 6 floats per vertex, or
-        // position+color+normal = 9 floats per vertex. Prefer 9 if divisible.
-        if (vertexData.length % 9 === 0) {
+        // Infer stride: canonical layout is position(3)+normal(3)+uv(2) = 8 floats per vertex (32 bytes)
+        // Fallback to old 11-float layout if needed for backward compatibility
+        if (vertexData.length % 8 === 0) {
+            count = vertexData.length / 8;
+        } else if (vertexData.length % 11 === 0) {
+            count = vertexData.length / 11;
+        } else if (vertexData.length % 9 === 0) {
             count = vertexData.length / 9;
         } else {
             count = vertexData.length / 6;
@@ -226,7 +267,22 @@ export function createMesh(
     
     // Set default attributes for position (location 0) and color (location 1)
     // Configure attributes depending on inferred stride
-    if (vertexData.length % 9 === 0) {
+    if (vertexData.length % 8 === 0) {
+        // Canonical layout: position(3) + normal(3) + uv(2) -> stride 32 bytes
+        mesh.setAttributes([
+            { location: 0, size: 3, type: gl.FLOAT, stride: 32, offset: 0 },    // aPosition
+            { location: 1, size: 3, type: gl.FLOAT, stride: 32, offset: 12 },   // aNormal
+            { location: 2, size: 2, type: gl.FLOAT, stride: 32, offset: 24 }    // aUV
+        ]);
+    } else if (vertexData.length % 11 === 0) {
+        // Backward compatibility: position(3) + color(3) + normal(3) + uv(2) -> stride 44 bytes
+        mesh.setAttributes([
+            { location: 0, size: 3, type: gl.FLOAT, stride: 44, offset: 0 },   // aPosition
+            { location: 1, size: 3, type: gl.FLOAT, stride: 44, offset: 12 },  // aColor
+            { location: 2, size: 3, type: gl.FLOAT, stride: 44, offset: 24 },  // aNormal
+            { location: 3, size: 2, type: gl.FLOAT, stride: 44, offset: 36 }   // aUV
+        ]);
+    } else if (vertexData.length % 9 === 0) {
         // position(3) + color(3) + normal(3) -> stride 36 bytes
         mesh.setAttributes([
             { location: 0, size: 3, type: gl.FLOAT, stride: 36, offset: 0 },   // aPosition
@@ -242,6 +298,157 @@ export function createMesh(
     mesh.setCount(count);
 
     return MeshManager.add(mesh);
+}
+
+/**
+ * Load a texture from a URL and create a WebGL texture object.
+ * Returns a WebGLTexture that can be bound to a texture unit.
+ * 
+ * @param imageUrl - URL to the image (can be data: URL or relative path)
+ * @returns WebGLTexture object (or null if loading fails)
+ */
+export async function loadTexture(imageUrl: string): Promise<WebGLTexture | null> {
+    if (!context) throw new Error("Velvet not initialized");
+
+    try {
+        // Fetch the image
+        const response = await fetch(imageUrl);
+        if (!response.ok) {
+            console.error(`Failed to load texture: ${imageUrl} (${response.statusText})`);
+            return null;
+        }
+
+        // Convert to bitmap
+        const blob = await response.blob();
+        const imageBitmap = await createImageBitmap(blob);
+
+        // Create WebGL texture
+        const gl = context.gl;
+        const texture = gl.createTexture();
+        if (!texture) {
+            console.error("Failed to create WebGL texture");
+            return null;
+        }
+
+        // Bind and upload
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, imageBitmap.width, imageBitmap.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, imageBitmap);
+
+        // Set texture parameters
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+        // Generate mipmaps
+        gl.generateMipmap(gl.TEXTURE_2D);
+
+        // Unbind
+        gl.bindTexture(gl.TEXTURE_2D, null);
+
+        return texture;
+    } catch (error) {
+        console.error(`Error loading texture from ${imageUrl}:`, error);
+        return null;
+    }
+}
+
+/**
+ * Create a WebGLTexture from a URL using HTMLImageElement.
+ * Returns a texture ID managed by TextureManager.
+ */
+export function     createTextureFromUrl(url: string): Promise<number> {
+    return new Promise((resolve, reject) => {
+        if (!context) {
+            reject(new Error("Velvet not initialized"));
+            return;
+        }
+
+        const gl = context.gl;
+        const texture = gl.createTexture();
+        if (!texture) {
+            reject(new Error("createTextureFromUrl: gl.createTexture failed"));
+            return;
+        }
+
+        // Initialize with 1x1 pixel so the texture is valid before the image loads
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+            try {
+                gl.bindTexture(gl.TEXTURE_2D, texture);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+                gl.generateMipmap(gl.TEXTURE_2D);
+                gl.bindTexture(gl.TEXTURE_2D, null);
+                const textureId = TextureManager.add(texture);
+                console.log(`[Velvet] Texture loaded successfully: ${url}, id=${textureId}`);
+                resolve(textureId);
+            } catch (e) {
+                reject(e);
+            }
+        };
+        img.onerror = () => {
+            reject(new Error(`createTextureFromUrl: failed to load image ${url}`));
+        };
+        img.src = url;
+    });
+}
+
+/**
+ * Bind a texture by ID to a sampler uniform.
+ */
+export function bindTextureById(programId: number, samplerName: string, textureId: number, textureUnit: number): void {
+    if (!context) throw new Error("Velvet not initialized");
+
+    const gl = context.gl;
+    const texture = TextureManager.get(textureId);
+    const program = ProgramManager.get(programId) as any;
+    const location = program.getUniformLocation(samplerName);
+    if (!location) throw new Error(`bindTextureById: uniform ${samplerName} not found`);
+
+    console.log(`[DEBUG] bindTextureById: programId=${programId}, sampler=${samplerName}, textureId=${textureId}, unit=${textureUnit}`);
+    
+    program.use();
+    gl.activeTexture(gl.TEXTURE0 + textureUnit);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.uniform1i(location, textureUnit);
+    
+    console.log(`[DEBUG] bindTextureById: COMPLETE - texture bound to unit ${textureUnit}`);
+}
+
+/**
+ * Bind a texture to a texture unit and set the sampler uniform.
+ * 
+ * @param texture - WebGLTexture object from loadTexture()
+ * @param textureUnit - Texture unit (0-31, typically 0)
+ * @param programId - Program ID to set the sampler uniform on
+ * @param samplerName - Name of the sampler uniform (e.g., "uBaseColor")
+ */
+export function bindTexture(texture: WebGLTexture, textureUnit: number, programId: number, samplerName: string): void {
+    if (!context) throw new Error("Velvet not initialized");
+
+    const gl = context.gl;
+
+    // Activate texture unit
+    gl.activeTexture(gl.TEXTURE0 + textureUnit);
+
+    // Bind texture to the active unit
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+
+    // Set sampler uniform
+    const program = ProgramManager.get(programId) as any;
+    program.use();
+    const location = program.getUniformLocation(samplerName);
+    if (location) {
+        gl.uniform1i(location, textureUnit);
+    }
 }
 
 /**

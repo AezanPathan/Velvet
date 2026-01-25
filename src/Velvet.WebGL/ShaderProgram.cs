@@ -11,6 +11,7 @@ public sealed class ShaderProgram
 {
     private readonly IWebGLBridge _bridge;
     private readonly int _programId;
+    private readonly System.Collections.Generic.Dictionary<string, int> _textureCache = new();
 
     private ShaderProgram(IWebGLBridge bridge, int programId)
     {
@@ -50,16 +51,32 @@ public sealed class ShaderProgram
     public Task SetUniform1fAsync(string name, float value)
         => _bridge.SetUniform1fAsync(_programId, name, value);
 
-    public Task SetMaterialAsync(Material material)
+    public async Task SetMaterialAsync(Material material)
     {
         ArgumentNullException.ThrowIfNull(material);
 
         var c = material.AlbedoColor;
-        return Task.WhenAll(
-            SetUniform3fAsync("uMaterialColor", c.X, c.Y, c.Z),
-            SetUniform1fAsync("uMaterialAmbient", material.AmbientStrength),
-            SetUniform1fAsync("uMaterialDiffuse", material.DiffuseStrength),
-            SetUniform1fAsync("uMaterialUnlit", material.Unlit ? 1.0f : 0.0f));
+        await SetUniform3fAsync("uMaterialColor", c.X, c.Y, c.Z).ConfigureAwait(false);
+        await SetUniform1fAsync("uMaterialAmbient", material.AmbientStrength).ConfigureAwait(false);
+        await SetUniform1fAsync("uMaterialDiffuse", material.DiffuseStrength).ConfigureAwait(false);
+        await SetUniform1fAsync("uMaterialUnlit", material.Unlit ? 1.0f : 0.0f).ConfigureAwait(false);
+
+        // Minimal texture support: baseColor texture
+        var hasTex = !string.IsNullOrWhiteSpace(material.BaseColorTextureUri);
+        System.Diagnostics.Debug.WriteLine($"[Material] BaseColorTextureUri = '{material.BaseColorTextureUri}', hasTex = {hasTex}");
+        
+        await _bridge.SetUniform1bAsync(_programId, "uHasTexture", hasTex).ConfigureAwait(false);
+        if (hasTex)
+        {
+            var uri = material.BaseColorTextureUri!;
+            if (!_textureCache.TryGetValue(uri, out var texId))
+            {
+                texId = await _bridge.CreateTextureFromUrlAsync(uri).ConfigureAwait(false);
+                _textureCache[uri] = texId;
+            }
+            // Bind to texture unit 0 and set sampler
+            await _bridge.BindTextureAsync(_programId, "uBaseColorTex", texId, 0).ConfigureAwait(false);
+        }
     }
 
     public Task DrawMeshAsync(int meshId, int rendererId)
@@ -69,29 +86,29 @@ public sealed class ShaderProgram
         "precision mediump float;\n" +
         "\n" +
         "layout(location = 0) in vec3 aPosition;\n" +
-        "layout(location = 1) in vec3 aColor;\n" +
-        "layout(location = 2) in vec3 aNormal;\n" +
+        "layout(location = 1) in vec3 aNormal;\n" +
+        "layout(location = 2) in vec2 aUV;\n" +
         "\n" +
         "uniform mat4 uModel;\n" +
         "uniform mat4 uView;\n" +
         "uniform mat4 uProjection;\n" +
         "uniform mat3 uNormalMatrix;\n" +
         "\n" +
-        "out vec3 vColor;\n" +
         "out vec3 vNormal;\n" +
         "out vec3 vWorldPos;\n" +
+        "out vec2 vUV;\n" +
         "\n" +
         "void main() {\n" +
-        "    vColor = aColor;\n" +
         "    vNormal = normalize(uNormalMatrix * aNormal);\n" +
         "    vWorldPos = (uModel * vec4(aPosition, 1.0)).xyz;\n" +
+        "    vUV = aUV;\n" +
         "    gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);\n" +
         "}\n";
 
     private const string DefaultFragmentShader = "#version 300 es\n" +
-        "precision mediump float;\n" +
+        "precision highp float;\n" +
         "\n" +
-        "in vec3 vColor;\n" +
+        "in vec2 vUV;\n" +
         "in vec3 vNormal;\n" +
         "in vec3 vWorldPos;\n" +
         "out vec4 outColor;\n" +
@@ -100,6 +117,8 @@ public sealed class ShaderProgram
         "uniform float uMaterialAmbient;\n" +
         "uniform float uMaterialDiffuse;\n" +
         "uniform float uMaterialUnlit;\n" +
+        "uniform sampler2D uBaseColorTex;\n" +
+        "uniform bool uHasTexture;\n" +
         "\n" +
         "uniform vec3 uLightDirection;\n" +
         "uniform vec3 uLightColor;\n" +
@@ -123,39 +142,45 @@ public sealed class ShaderProgram
         "uniform float uSpotLightQuadratic;\n" +
         "\n" +
         "void main() {\n" +
-        "    if (uMaterialUnlit > 0.5) {\n" +
-        "        outColor = vec4(uMaterialColor, 1.0);\n" +
+        "    // STEP 3: Verify uHasTexture is set correctly\n" +
+        "    if (!uHasTexture) {\n" +
+        "        outColor = vec4(1.0, 0.0, 0.0, 1.0); // RED if uHasTexture is false\n" +
         "        return;\n" +
         "    }\n" +
+        "    // STEP 1: Force unlit texture output for debugging\n" +
+        "    vec4 tex = texture(uBaseColorTex, vUV);\n" +
+        "    outColor = tex;\n" +
+        "    return;\n" +
         "\n" +
+        "    // OLD LIGHTING CODE (commented out):\n" +
+        "    vec3 baseColor = uHasTexture ? texture(uBaseColorTex, vUV).rgb : uMaterialColor;\n" +
+        "    if (uMaterialUnlit > 0.5) {\n" +
+        "        outColor = vec4(baseColor, 1.0);\n" +
+        "        return;\n" +
+        "    }\n" +
         "    vec3 N = normalize(vNormal);\n" +
         "    vec3 L = normalize(-uLightDirection);\n" +
-        "    float diff = max(dot(N, L), 0.0);\n" +
-        "    vec3 diffuse = uMaterialColor * uLightColor * diff * uLightIntensity * uMaterialDiffuse;\n" +
-        "\n" +
+        "    float diff = max(dot(N, L), 0.2);\n" +
+        "    vec3 diffuse = baseColor * uLightColor * diff * uLightIntensity * uMaterialDiffuse;\n" +
         "    vec3 toPoint = uPointLightPosition - vWorldPos;\n" +
         "    float dist = length(toPoint);\n" +
         "    vec3 Lp = (dist > 0.0001) ? (toPoint / dist) : vec3(0.0, 0.0, 0.0);\n" +
-        "    float diffP = max(dot(N, Lp), 0.0);\n" +
+        "    float diffP = max(dot(N, Lp), 0.2);\n" +
         "    float attenuation = 1.0 / (uPointLightConstant + uPointLightLinear * dist + uPointLightQuadratic * dist * dist);\n" +
-        "    vec3 pointDiffuse = uMaterialColor * uPointLightColor * diffP * uPointLightIntensity * attenuation * uMaterialDiffuse;\n" +
-        "\n" +
+        "    vec3 pointDiffuse = baseColor * uPointLightColor * diffP * uPointLightIntensity * attenuation * uMaterialDiffuse;\n" +
         "    vec3 toSpot = uSpotLightPosition - vWorldPos;\n" +
         "    float distS = length(toSpot);\n" +
         "    vec3 Ls = (distS > 0.0001) ? (toSpot / distS) : vec3(0.0, 0.0, 0.0);\n" +
-        "    float diffS = max(dot(N, Ls), 0.0);\n" +
+        "    float diffS = max(dot(N, Ls), 0.2);\n" +
         "    float attenuationS = 1.0 / (uSpotLightConstant + uSpotLightLinear * distS + uSpotLightQuadratic * distS * distS);\n" +
-        "\n" +
         "    vec3 spotDir = normalize(uSpotLightDirection);\n" +
         "    vec3 fromLight = (distS > 0.0001) ? normalize(vWorldPos - uSpotLightPosition) : vec3(0.0, 0.0, 0.0);\n" +
         "    float theta = dot(fromLight, spotDir);\n" +
         "    float innerCos = cos(uSpotLightCutoff);\n" +
         "    float outerCos = cos(uSpotLightOuterCutoff);\n" +
         "    float cone = smoothstep(outerCos, innerCos, theta);\n" +
-        "\n" +
-        "    vec3 spotDiffuse = uMaterialColor * uSpotLightColor * diffS * uSpotLightIntensity * attenuationS * cone * uMaterialDiffuse;\n" +
-        "\n" +
-        "    vec3 ambient = uMaterialAmbient * uMaterialColor;\n" +
+        "    vec3 spotDiffuse = baseColor * uSpotLightColor * diffS * uSpotLightIntensity * attenuationS * cone * uMaterialDiffuse;\n" +
+        "    vec3 ambient = uMaterialAmbient * baseColor;\n" +
         "    outColor = vec4(ambient + diffuse + pointDiffuse + spotDiffuse, 1.0);\n" +
         "}\n";
 }
