@@ -8,6 +8,7 @@ using Microsoft.JSInterop;
 using Velvet.Core.Engine;
 using Velvet.Core.Math;
 using Velvet.Core.Rendering;
+using Velvet.Core.Rendering.Lighting;
 using Velvet.WebGL;
 
 namespace Velvet.Blazor;
@@ -27,6 +28,13 @@ public sealed class VelvetApp
 
     private ShaderProgram? _program;
     private Camera? _camera;
+    private DirectionalLight? _directionalLight;
+    private PointLight? _pointLight;
+    private SpotLight? _spotLight;
+
+    // For demo: ability to enable/disable lights
+    private bool _directionalEnabled = true;
+    private bool _pointEnabled = true;
 
     private CancellationTokenSource? _loopCts;
     private Task? _loopTask;
@@ -74,6 +82,45 @@ public sealed class VelvetApp
         {
             ThrowIfRunning();
             _camera = value;
+        }
+    }
+
+    /// <summary>
+    /// Directional light for the scene.
+    /// </summary>
+    public DirectionalLight? DirectionalLight
+    {
+        get => _directionalLight;
+        set
+        {
+            ThrowIfRunning();
+            _directionalLight = value;
+        }
+    }
+
+    /// <summary>
+    /// Point light for the scene.
+    /// </summary>
+    public PointLight? PointLight
+    {
+        get => _pointLight;
+        set
+        {
+            ThrowIfRunning();
+            _pointLight = value;
+        }
+    }
+
+    /// <summary>
+    /// Spot light for the scene.
+    /// </summary>
+    public SpotLight? SpotLight
+    {
+        get => _spotLight;
+        set
+        {
+            ThrowIfRunning();
+            _spotLight = value;
         }
     }
 
@@ -190,6 +237,40 @@ public sealed class VelvetApp
             await program.SetUniformMatrix4fvAsync("uView", camera.ViewMatrix).ConfigureAwait(false);
             await program.SetUniformMatrix4fvAsync("uProjection", camera.ProjectionMatrix).ConfigureAwait(false);
 
+            // Set per-frame lights
+            if (_directionalLight is not null)
+            {
+                var dir = _directionalLight.Direction;
+                var intensity = _directionalEnabled ? _directionalLight.Intensity : 0f;
+                await program.SetUniform3fAsync("uLightDirection", dir.X, dir.Y, dir.Z).ConfigureAwait(false);
+                await program.SetUniform3fAsync("uLightColor", _directionalLight.Color.X, _directionalLight.Color.Y, _directionalLight.Color.Z).ConfigureAwait(false);
+                await program.SetUniform1fAsync("uLightIntensity", intensity).ConfigureAwait(false);
+            }
+
+            if (_pointLight is not null)
+            {
+                var intensity = _pointEnabled ? _pointLight.Intensity : 0f;
+                await program.SetUniform3fAsync("uPointLightPosition", _pointLight.Position.X, _pointLight.Position.Y, _pointLight.Position.Z).ConfigureAwait(false);
+                await program.SetUniform3fAsync("uPointLightColor", _pointLight.Color.X, _pointLight.Color.Y, _pointLight.Color.Z).ConfigureAwait(false);
+                await program.SetUniform1fAsync("uPointLightIntensity", intensity).ConfigureAwait(false);
+                await program.SetUniform1fAsync("uPointLightConstant", _pointLight.Constant).ConfigureAwait(false);
+                await program.SetUniform1fAsync("uPointLightLinear", _pointLight.Linear).ConfigureAwait(false);
+                await program.SetUniform1fAsync("uPointLightQuadratic", _pointLight.Quadratic).ConfigureAwait(false);
+            }
+
+            if (_spotLight is not null)
+            {
+                await program.SetUniform3fAsync("uSpotLightPosition", _spotLight.Position.X, _spotLight.Position.Y, _spotLight.Position.Z).ConfigureAwait(false);
+                await program.SetUniform3fAsync("uSpotLightDirection", _spotLight.Direction.X, _spotLight.Direction.Y, _spotLight.Direction.Z).ConfigureAwait(false);
+                await program.SetUniform3fAsync("uSpotLightColor", _spotLight.Color.X, _spotLight.Color.Y, _spotLight.Color.Z).ConfigureAwait(false);
+                await program.SetUniform1fAsync("uSpotLightIntensity", _spotLight.Intensity).ConfigureAwait(false);
+                await program.SetUniform1fAsync("uSpotLightCutoff", _spotLight.Cutoff).ConfigureAwait(false);
+                await program.SetUniform1fAsync("uSpotLightOuterCutoff", _spotLight.OuterCutoff).ConfigureAwait(false);
+                await program.SetUniform1fAsync("uSpotLightConstant", _spotLight.Constant).ConfigureAwait(false);
+                await program.SetUniform1fAsync("uSpotLightLinear", _spotLight.Linear).ConfigureAwait(false);
+                await program.SetUniform1fAsync("uSpotLightQuadratic", _spotLight.Quadratic).ConfigureAwait(false);
+            }
+
             // Render each batch
             foreach (var batch in batches)
             {
@@ -223,5 +304,23 @@ public sealed class VelvetApp
         {
             throw new InvalidOperationException("Cannot modify VelvetApp while running. Call StopAsync() first.");
         }
+    }
+
+    /// <summary>
+    /// Enable or disable the directional light.
+    /// Can be called while the app is running.
+    /// </summary>
+    public void SetDirectionalEnabled(bool enabled)
+    {
+        _directionalEnabled = enabled;
+    }
+
+    /// <summary>
+    /// Enable or disable the point light.
+    /// Can be called while the app is running.
+    /// </summary>
+    public void SetPointEnabled(bool enabled)
+    {
+        _pointEnabled = enabled;
     }
 }

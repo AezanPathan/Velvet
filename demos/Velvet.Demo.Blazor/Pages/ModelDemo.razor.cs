@@ -4,13 +4,16 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using Velvet.Blazor;
 using Velvet.Core.Assets.Gltf;
+using Velvet.Core.Geometry;
 using Velvet.Core.Math;
 using Velvet.Core.Rendering;
 using Velvet.Core.Rendering.Lighting;
+using Velvet.Core.Engine;
 using Velvet.Demo.Blazor.Debug;
 using Velvet.WebGL;
 using BlazorApp = Velvet.Blazor.VelvetApp;
 using EngineScene = Velvet.Core.Engine.Scene;
+using EngineNode = Velvet.Core.Engine.SceneNode;
 
 namespace Velvet.Demo.Blazor.Pages;
 
@@ -25,9 +28,14 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
     private EngineScene? scene;
     private Camera? camera;
     private OrbitController? orbitController;
-    private DirectionalLightState? directional;
-    private PointLightState? point;
+    private DirectionalLight? directional;
+    private PointLight? point;
     private SpotLight? spot;
+    private Mesh? cube;
+
+    // Mock states for debug UI compatibility
+    private DirectionalLightState? directionalState;
+    private PointLightState? pointState;
 
     // Mouse input tracking
     private bool isMouseDown = false;
@@ -52,14 +60,12 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
             nearPlane: 0.1f,
             farPlane: 100.0f);
 
-        directional = new DirectionalLightState(
-            enabled: true,
+        directional = new DirectionalLight(
             direction: new Vector3(0.4f, -1.0f, -0.25f),
             color: new Vector3(1, 1, 1),
             intensity: 1.1f);
 
-        point = new PointLightState(
-            enabled: true,
+        point = new PointLight(
             position: new Vector3(1.5f, 1.1f, 1.6f),
             color: new Vector3(1.0f, 0.95f, 0.9f),
             intensity: 2.0f,
@@ -79,12 +85,34 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
             linear: 0.09f,
             quadratic: 0.032f);
 
+        // Create state objects for debug UI
+        directionalState = new DirectionalLightState(
+            enabled: true,
+            direction: directional.Direction,
+            color: directional.Color,
+            intensity: directional.Intensity);
+
+        pointState = new PointLightState(
+            enabled: true,
+            position: point.Position,
+            color: point.Color,
+            intensity: point.Intensity,
+            constant: point.Constant,
+            linear: point.Linear,
+            quadratic: point.Quadratic);
+
         // Load a single demo model from wwwroot.
        // var bytes = await Http.GetByteArrayAsync("models/DragonAttenuation.glb");
         var bytes = await Http.GetByteArrayAsync("models/Fox.glb");
         scene = await GltfLoader.LoadScene(bytes, "models");
         //scene = await GltfLoader.LoadFromUrlAsync("models/DragonAttenuation.glb");
+        
+        // Create a cube geometry and add it to the scene
+        cube = new Mesh(new CubeGeometry());
+        var cubeNode = new EngineNode(Matrix.Identity(), new[] { cube }, Array.Empty<EngineNode>());
+        var cubeScene = new EngineScene(new[] { cubeNode });
         app.Add(scene);
+        app.Add(cubeScene);
 
         // Auto-frame the camera to fit the loaded model.
         var bounds = scene.ComputeBounds();
@@ -92,6 +120,13 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
 
         // Assign camera to the application
         app.Camera = camera;
+
+        // Assign lights to the application
+        app.DirectionalLight = directional;
+        app.PointLight = point;
+        app.SpotLight = spot;
+        app.SetDirectionalEnabled(true);
+        app.SetPointEnabled(true);
 
         // Initialize orbit controller around the model's center.
         orbitController = new OrbitController(
@@ -105,8 +140,8 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
 
         debugInterop = new VelvetDebugInterop(
             getCamera: () => camera,
-            getDirectional: () => directional,
-            getPoint: () => point,
+            getDirectional: () => directionalState,
+            getPoint: () => pointState,
             getMaterial: () =>
             {
                 if (scene is null) return Material.Default;
@@ -119,19 +154,62 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
             setCameraPosition: v => camera.Position = v,
             setCameraTarget: v => camera.Target = v,
             setCameraPerspective: (fovYRadians, nearPlane, farPlane) => camera.SetPerspective(fovYRadians, camera.AspectRatio, nearPlane, farPlane),
-            setDirectionalEnabled: enabled => directional.Enabled = enabled,
-            setDirectionalDirection: v => directional.Direction = v,
-            setDirectionalColor: v => directional.Color = v,
-            setDirectionalIntensity: intensity => directional.Intensity = intensity,
-            setPointEnabled: enabled => point.Enabled = enabled,
-            setPointPosition: v => point.Position = v,
-            setPointColor: v => point.Color = v,
-            setPointIntensity: intensity => point.Intensity = intensity,
+            setDirectionalEnabled: enabled =>
+            {
+                directionalState!.Enabled = enabled;
+                app?.SetDirectionalEnabled(enabled);
+            },
+            setDirectionalDirection: v =>
+            {
+                directionalState!.Direction = v;
+                if (directional is not null) directional.Direction = v;
+            },
+            setDirectionalColor: v =>
+            {
+                directionalState!.Color = v;
+                if (directional is not null) directional.Color = v;
+            },
+            setDirectionalIntensity: intensity =>
+            {
+                directionalState!.Intensity = intensity;
+                if (directional is not null) directional.Intensity = intensity;
+            },
+            setPointEnabled: enabled =>
+            {
+                pointState!.Enabled = enabled;
+                app?.SetPointEnabled(enabled);
+            },
+            setPointPosition: v =>
+            {
+                pointState!.Position = v;
+                if (point is not null) point.Position = v;
+            },
+            setPointColor: v =>
+            {
+                pointState!.Color = v;
+                if (point is not null) point.Color = v;
+            },
+            setPointIntensity: intensity =>
+            {
+                pointState!.Intensity = intensity;
+                if (point is not null) point.Intensity = intensity;
+            },
             setPointAttenuation: (constant, linear, quadratic) =>
             {
-                point.Constant = constant <= 0f ? 0.0001f : constant;
-                point.Linear = linear < 0f ? 0f : linear;
-                point.Quadratic = quadratic < 0f ? 0f : quadratic;
+                constant = constant <= 0f ? 0.0001f : constant;
+                linear = linear < 0f ? 0f : linear;
+                quadratic = quadratic < 0f ? 0f : quadratic;
+                
+                pointState!.Constant = constant;
+                pointState.Linear = linear;
+                pointState.Quadratic = quadratic;
+                
+                if (point is not null)
+                {
+                    point.Constant = constant;
+                    point.Linear = linear;
+                    point.Quadratic = quadratic;
+                }
             },
             // Material controls intentionally omitted from this demo; keep interop no-op.
             setMaterialColor: _ => { },
@@ -204,47 +282,14 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
 
     private async Task OnFrameAsync(float dt)
     {
-        if (app is null || camera is null || directional is null || point is null || spot is null) return;
+        if (app is null || camera is null || orbitController is null) return;
 
         // Update camera from orbit controller if available.
-        if (orbitController is not null)
-        {
-            orbitController.UpdateCamera(camera);
-        }
+        orbitController.UpdateCamera(camera);
 
-        // Single static model at origin.
-        var modelMat = Matrix.Identity();
-        await app.Program.SetUniformMatrix4fvAsync("uModel", modelMat);
-        await app.Program.SetUniformMatrix3fvAsync("uNormalMatrix", Matrix.NormalMatrix(modelMat));
-
-        await app.Program.SetUniformMatrix4fvAsync("uView", camera.ViewMatrix);
-        await app.Program.SetUniformMatrix4fvAsync("uProjection", camera.ProjectionMatrix);
-
-        // Directional light
-        var dir = directional.Direction;
-        if (dir.LengthSquared > 0f) dir = dir.Normalized();
-        await app.Program.SetUniform3fAsync("uLightDirection", dir.X, dir.Y, dir.Z);
-        await app.Program.SetUniform3fAsync("uLightColor", directional.Color.X, directional.Color.Y, directional.Color.Z);
-        await app.Program.SetUniform1fAsync("uLightIntensity", directional.Enabled ? directional.Intensity : 0f);
-
-        // Point light
-        await app.Program.SetUniform3fAsync("uPointLightPosition", point.Position.X, point.Position.Y, point.Position.Z);
-        await app.Program.SetUniform3fAsync("uPointLightColor", point.Color.X, point.Color.Y, point.Color.Z);
-        await app.Program.SetUniform1fAsync("uPointLightIntensity", point.Enabled ? point.Intensity : 0f);
-        await app.Program.SetUniform1fAsync("uPointLightConstant", point.Constant);
-        await app.Program.SetUniform1fAsync("uPointLightLinear", point.Linear);
-        await app.Program.SetUniform1fAsync("uPointLightQuadratic", point.Quadratic);
-
-        // Spot light (disabled, but keep uniforms valid)
-        await app.Program.SetUniform3fAsync("uSpotLightPosition", spot.Position.X, spot.Position.Y, spot.Position.Z);
-        await app.Program.SetUniform3fAsync("uSpotLightDirection", spot.Direction.X, spot.Direction.Y, spot.Direction.Z);
-        await app.Program.SetUniform3fAsync("uSpotLightColor", spot.Color.X, spot.Color.Y, spot.Color.Z);
-        await app.Program.SetUniform1fAsync("uSpotLightIntensity", spot.Intensity);
-        await app.Program.SetUniform1fAsync("uSpotLightCutoff", spot.Cutoff);
-        await app.Program.SetUniform1fAsync("uSpotLightOuterCutoff", spot.OuterCutoff);
-        await app.Program.SetUniform1fAsync("uSpotLightConstant", spot.Constant);
-        await app.Program.SetUniform1fAsync("uSpotLightLinear", spot.Linear);
-        await app.Program.SetUniform1fAsync("uSpotLightQuadratic", spot.Quadratic);
+        // All uniform setting is now done in the renderer's RunLoopAsync method
+        // This method is just for custom per-frame logic
+        await Task.CompletedTask;
     }
 
     private async Task TryInitDebugUiAsync()

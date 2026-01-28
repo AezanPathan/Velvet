@@ -142,17 +142,6 @@ public sealed class ShaderProgram
         "uniform float uSpotLightQuadratic;\n" +
         "\n" +
         "void main() {\n" +
-        "    // STEP 3: Verify uHasTexture is set correctly\n" +
-        "    if (!uHasTexture) {\n" +
-        "        outColor = vec4(1.0, 0.0, 0.0, 1.0); // RED if uHasTexture is false\n" +
-        "        return;\n" +
-        "    }\n" +
-        "    // STEP 1: Force unlit texture output for debugging\n" +
-        "    vec4 tex = texture(uBaseColorTex, vUV);\n" +
-        "    outColor = tex;\n" +
-        "    return;\n" +
-        "\n" +
-        "    // OLD LIGHTING CODE (commented out):\n" +
         "    vec3 baseColor = uHasTexture ? texture(uBaseColorTex, vUV).rgb : uMaterialColor;\n" +
         "    if (uMaterialUnlit > 0.5) {\n" +
         "        outColor = vec4(baseColor, 1.0);\n" +
