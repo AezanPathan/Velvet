@@ -1,8 +1,10 @@
 using System.Net.Http;
+using System.Linq;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using Velvet.Blazor;
+using Velvet.Core.Animation;
 using Velvet.Core.Assets.Gltf;
 using Velvet.Core.Geometry;
 using Velvet.Core.Math;
@@ -32,6 +34,8 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
     private PointLight? point;
     private SpotLight? spot;
     private Mesh? cube;
+    private Animator? animator;
+    private List<AnimationClip>? animationClips;
 
     // Mock states for debug UI compatibility
     private DirectionalLightState? directionalState;
@@ -49,7 +53,8 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
     {
         if (!firstRender) return;
 
-        app = await BlazorApp.CreateAsync(canvasRef, JS, ShaderProgram.CreateDefaultAsync);
+        // Use skinned shader by default so we can handle both skinned and non-skinned meshes
+        app = await BlazorApp.CreateAsync(canvasRef, JS, ShaderProgram.CreateSkinnedAsync);
 
         camera = new Camera(
             position: new Vector3(0, 20f, 2.6f),
@@ -104,8 +109,34 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
         // Load a single demo model from wwwroot.
        // var bytes = await Http.GetByteArrayAsync("models/DragonAttenuation.glb");
         var bytes = await Http.GetByteArrayAsync("models/Fox.glb");
-        scene = await GltfLoader.LoadScene(bytes, "models");
+        var loadResult = await GltfLoader.LoadSceneWithAnimations(bytes, "models");
+        scene = loadResult.Scene;
+        animationClips = loadResult.Animations;
+
+        animator = new Animator(scene);
+        if (animationClips.Count > 0)
+        {
+            animator.PlayClip(animationClips[0]);
+        }
         //scene = await GltfLoader.LoadFromUrlAsync("models/DragonAttenuation.glb");
+
+        // Detect if any meshes are skinned
+        var skinnedMeshCount = 0;
+        var totalBones = 0;
+        foreach (var instance in scene.MeshInstances)
+        {
+            if (instance.Skin != null)
+            {
+                skinnedMeshCount++;
+                totalBones += instance.Skin.JointCount;
+                System.Diagnostics.Debug.WriteLine($"[Skinning] Detected skinned mesh with {instance.Skin.JointCount} bones");
+            }
+        }
+        
+        if (skinnedMeshCount > 0)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Skinning] Found {skinnedMeshCount} skinned meshes with {totalBones} total bones");
+        }
         
         // Create a cube geometry and add it to the scene
         cube = new Mesh(new CubeGeometry());
@@ -287,10 +318,18 @@ public partial class ModelDemo : ComponentBase, IAsyncDisposable
         // Update camera from orbit controller if available.
         orbitController.UpdateCamera(camera);
 
-        // All uniform setting is now done in the renderer's RunLoopAsync method
-        // This method is just for custom per-frame logic
+        if (scene is not null && animator is not null)
+        {
+            // Explicit animation update (no implicit time in renderer)
+            animator.Update(dt);
+
+            // Render uses current animated transforms and pure skinning
+            app.Render(scene);
+        }
+
         await Task.CompletedTask;
     }
+
 
     private async Task TryInitDebugUiAsync()
     {

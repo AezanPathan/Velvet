@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Velvet.Core.Rendering;
 
@@ -6,17 +7,21 @@ namespace Velvet.WebGL;
 
 /// <summary>
 /// A minimal shader program wrapper that hides program IDs and delegates work to an <see cref="IWebGLBridge"/>.
+/// 
+/// Supports both standard and skinned rendering pipelines.
 /// </summary>
 public sealed class ShaderProgram
 {
     private readonly IWebGLBridge _bridge;
     private readonly int _programId;
-    private readonly System.Collections.Generic.Dictionary<string, int> _textureCache = new();
+    private readonly Dictionary<string, int> _textureCache = new();
+    private bool _hasBonesSupport = false;
 
-    private ShaderProgram(IWebGLBridge bridge, int programId)
+    private ShaderProgram(IWebGLBridge bridge, int programId, bool hasBonesSupport = false)
     {
         _bridge = bridge ?? throw new ArgumentNullException(nameof(bridge));
         _programId = programId;
+        _hasBonesSupport = hasBonesSupport;
     }
 
     public static async Task<ShaderProgram> CreateFromSourcesAsync(IWebGLBridge bridge, string vertexSource, string fragmentSource)
@@ -33,11 +38,16 @@ public sealed class ShaderProgram
         await bridge.AttachShaderAsync(programId, fsId).ConfigureAwait(false);
         await bridge.LinkProgramAsync(programId).ConfigureAwait(false);
 
-        return new ShaderProgram(bridge, programId);
+        // Detect if shader supports bones by checking for uBoneMatrices uniform
+        bool hasBonesSupport = vertexSource.Contains("uBoneMatrices");
+        return new ShaderProgram(bridge, programId, hasBonesSupport);
     }
 
     public static Task<ShaderProgram> CreateDefaultAsync(IWebGLBridge bridge)
-        => CreateFromSourcesAsync(bridge, DefaultVertexShader, DefaultFragmentShader);
+        => CreateFromSourcesAsync(bridge, ShaderSources.StandardVertexShader, ShaderSources.StandardFragmentShader);
+
+    public static Task<ShaderProgram> CreateSkinnedAsync(IWebGLBridge bridge)
+        => CreateFromSourcesAsync(bridge, ShaderSources.SkinnedVertexShader, ShaderSources.StandardFragmentShader);
 
     public Task SetUniformMatrix4fvAsync(string name, float[] matrix)
         => _bridge.SetUniformMatrix4fvAsync(_programId, name, matrix);
@@ -50,6 +60,40 @@ public sealed class ShaderProgram
 
     public Task SetUniform1fAsync(string name, float value)
         => _bridge.SetUniform1fAsync(_programId, name, value);
+
+    /// <summary>
+    /// Sets an array of bone matrices for GPU skinning.
+    /// This should be called each frame for skinned meshes.
+    /// </summary>
+    public async Task SetBoneMatricesAsync(float[] boneMatrices, int boneCount)
+    {
+        if (!_hasBonesSupport)
+        {
+            return; // Shader doesn't support skinning
+        }
+
+        ArgumentNullException.ThrowIfNull(boneMatrices);
+        if (boneCount < 0 || boneCount > 64)
+        {
+            throw new ArgumentException("Bone count must be between 0 and 64.", nameof(boneCount));
+        }
+
+        if (boneMatrices.Length < boneCount * 16)
+        {
+            throw new ArgumentException($"Bone matrices array must contain at least {boneCount * 16} floats.", nameof(boneMatrices));
+        }
+
+        // Set individual bone matrices
+        for (int i = 0; i < boneCount; i++)
+        {
+            var matrix = new float[16];
+            Array.Copy(boneMatrices, i * 16, matrix, 0, 16);
+            await SetUniformMatrix4fvAsync($"uBoneMatrices[{i}]", matrix).ConfigureAwait(false);
+        }
+
+        // Set bone count uniform
+        await _bridge.SetUniform1iAsync(_programId, "uBoneCount", boneCount).ConfigureAwait(false);
+    }
 
     public async Task SetMaterialAsync(Material material)
     {
@@ -81,96 +125,4 @@ public sealed class ShaderProgram
 
     public Task DrawMeshAsync(int meshId, int rendererId)
         => _bridge.DrawMeshAsync(meshId, _programId, rendererId);
-
-    private const string DefaultVertexShader = "#version 300 es\n" +
-        "precision mediump float;\n" +
-        "\n" +
-        "layout(location = 0) in vec3 aPosition;\n" +
-        "layout(location = 1) in vec3 aNormal;\n" +
-        "layout(location = 2) in vec2 aUV;\n" +
-        "\n" +
-        "uniform mat4 uModel;\n" +
-        "uniform mat4 uView;\n" +
-        "uniform mat4 uProjection;\n" +
-        "uniform mat3 uNormalMatrix;\n" +
-        "\n" +
-        "out vec3 vNormal;\n" +
-        "out vec3 vWorldPos;\n" +
-        "out vec2 vUV;\n" +
-        "\n" +
-        "void main() {\n" +
-        "    vNormal = normalize(uNormalMatrix * aNormal);\n" +
-        "    vWorldPos = (uModel * vec4(aPosition, 1.0)).xyz;\n" +
-        "    vUV = aUV;\n" +
-        "    gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);\n" +
-        "}\n";
-
-    private const string DefaultFragmentShader = "#version 300 es\n" +
-        "precision highp float;\n" +
-        "\n" +
-        "in vec2 vUV;\n" +
-        "in vec3 vNormal;\n" +
-        "in vec3 vWorldPos;\n" +
-        "out vec4 outColor;\n" +
-        "\n" +
-        "uniform vec3 uMaterialColor;\n" +
-        "uniform float uMaterialAmbient;\n" +
-        "uniform float uMaterialDiffuse;\n" +
-        "uniform float uMaterialUnlit;\n" +
-        "uniform sampler2D uBaseColorTex;\n" +
-        "uniform bool uHasTexture;\n" +
-        "\n" +
-        "uniform vec3 uLightDirection;\n" +
-        "uniform vec3 uLightColor;\n" +
-        "uniform float uLightIntensity;\n" +
-        "\n" +
-        "uniform vec3 uPointLightPosition;\n" +
-        "uniform vec3 uPointLightColor;\n" +
-        "uniform float uPointLightIntensity;\n" +
-        "uniform float uPointLightConstant;\n" +
-        "uniform float uPointLightLinear;\n" +
-        "uniform float uPointLightQuadratic;\n" +
-        "\n" +
-        "uniform vec3 uSpotLightPosition;\n" +
-        "uniform vec3 uSpotLightDirection;\n" +
-        "uniform vec3 uSpotLightColor;\n" +
-        "uniform float uSpotLightIntensity;\n" +
-        "uniform float uSpotLightCutoff;\n" +
-        "uniform float uSpotLightOuterCutoff;\n" +
-        "uniform float uSpotLightConstant;\n" +
-        "uniform float uSpotLightLinear;\n" +
-        "uniform float uSpotLightQuadratic;\n" +
-        "\n" +
-        "void main() {\n" +
-        "    vec3 baseColor = uHasTexture ? texture(uBaseColorTex, vUV).rgb : uMaterialColor;\n" +
-        "    if (uMaterialUnlit > 0.5) {\n" +
-        "        outColor = vec4(baseColor, 1.0);\n" +
-        "        return;\n" +
-        "    }\n" +
-        "    vec3 N = normalize(vNormal);\n" +
-        "    vec3 L = normalize(-uLightDirection);\n" +
-        "    float diff = max(dot(N, L), 0.2);\n" +
-        "    vec3 diffuse = baseColor * uLightColor * diff * uLightIntensity * uMaterialDiffuse;\n" +
-        "    vec3 toPoint = uPointLightPosition - vWorldPos;\n" +
-        "    float dist = length(toPoint);\n" +
-        "    vec3 Lp = (dist > 0.0001) ? (toPoint / dist) : vec3(0.0, 0.0, 0.0);\n" +
-        "    float diffP = max(dot(N, Lp), 0.2);\n" +
-        "    float attenuation = 1.0 / (uPointLightConstant + uPointLightLinear * dist + uPointLightQuadratic * dist * dist);\n" +
-        "    vec3 pointDiffuse = baseColor * uPointLightColor * diffP * uPointLightIntensity * attenuation * uMaterialDiffuse;\n" +
-        "    vec3 toSpot = uSpotLightPosition - vWorldPos;\n" +
-        "    float distS = length(toSpot);\n" +
-        "    vec3 Ls = (distS > 0.0001) ? (toSpot / distS) : vec3(0.0, 0.0, 0.0);\n" +
-        "    float diffS = max(dot(N, Ls), 0.2);\n" +
-        "    float attenuationS = 1.0 / (uSpotLightConstant + uSpotLightLinear * distS + uSpotLightQuadratic * distS * distS);\n" +
-        "    vec3 spotDir = normalize(uSpotLightDirection);\n" +
-        "    vec3 fromLight = (distS > 0.0001) ? normalize(vWorldPos - uSpotLightPosition) : vec3(0.0, 0.0, 0.0);\n" +
-        "    float theta = dot(fromLight, spotDir);\n" +
-        "    float innerCos = cos(uSpotLightCutoff);\n" +
-        "    float outerCos = cos(uSpotLightOuterCutoff);\n" +
-        "    float cone = smoothstep(outerCos, innerCos, theta);\n" +
-        "    vec3 spotDiffuse = baseColor * uSpotLightColor * diffS * uSpotLightIntensity * attenuationS * cone * uMaterialDiffuse;\n" +
-        "    vec3 ambient = uMaterialAmbient * baseColor;\n" +
-        "    outColor = vec4(ambient + diffuse + pointDiffuse + spotDiffuse, 1.0);\n" +
-        "}\n";
 }
-

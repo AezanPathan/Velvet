@@ -16,9 +16,10 @@ import { IBuffer } from "../core/buffers/IBuffer";
 export interface VertexAttribute {
   location: number;
   size: number;      // number of components (1-4)
-  type: GLenum;      // gl.FLOAT, gl.UNSIGNED_INT, etc.
+  type: GLenum;      // gl.FLOAT, gl.UNSIGNED_INT, gl.UNSIGNED_BYTE, etc.
   stride: number;    // total size of a vertex in bytes
   offset: number;    // byte offset of this attribute
+  isInteger?: boolean; // true for integer attributes (use vertexAttribIPointer)
 }
 
 /**
@@ -103,14 +104,25 @@ export class GLMesh implements IMesh {
 
     for (const attr of this.attributes) {
       this.gl.enableVertexAttribArray(attr.location);
-      this.gl.vertexAttribPointer(
-        attr.location,
-        attr.size,
-        attr.type,
-        false,
-        attr.stride,
-        attr.offset
-      );
+      if (attr.isInteger) {
+        // Use vertexAttribIPointer for integer attributes (e.g., joint indices)
+        this.gl.vertexAttribIPointer(
+          attr.location,
+          attr.size,
+          attr.type,
+          attr.stride,
+          attr.offset
+        );
+      } else {
+        this.gl.vertexAttribPointer(
+          attr.location,
+          attr.size,
+          attr.type,
+          false,
+          attr.stride,
+          attr.offset
+        );
+      }
     }
 
     // Bind index buffer (ELEMENT_ARRAY_BUFFER binding is also stored in VAO)

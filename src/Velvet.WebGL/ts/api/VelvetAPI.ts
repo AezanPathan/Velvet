@@ -249,33 +249,25 @@ export function createMesh(
         ib.setData(indexData);
         BufferManager.add(ib);
         count = indexData.length;
-    } else {
-        // Infer stride: canonical layout is position(3)+normal(3)+uv(2) = 8 floats per vertex (32 bytes)
-        // Fallback to old 11-float layout if needed for backward compatibility
-        if (vertexData.length % 8 === 0) {
-            count = vertexData.length / 8;
-        } else if (vertexData.length % 11 === 0) {
-            count = vertexData.length / 11;
-        } else if (vertexData.length % 9 === 0) {
-            count = vertexData.length / 9;
-        } else {
-            count = vertexData.length / 6;
-        }
     }
 
     const mesh = new GLMesh(gl, MeshManager.generateId(), vb, ib) as any;
     
-    // Set default attributes for position (location 0) and color (location 1)
-    // Configure attributes depending on inferred stride
-    if (vertexData.length % 8 === 0) {
-        // Canonical layout: position(3) + normal(3) + uv(2) -> stride 32 bytes
+    // EXPLICIT vertex layout detection based on exact stride match
+    // Check each known stride in order (largest first to prioritize skinned layout)
+    if (vertexData.length % 16 === 0) {
+        // SKINNED layout: position(3) + normal(3) + uv(2) + joints(4) + weights(4) = 16 floats (64 bytes)
+        count = indices ? count : vertexData.length / 16;
         mesh.setAttributes([
-            { location: 0, size: 3, type: gl.FLOAT, stride: 32, offset: 0 },    // aPosition
-            { location: 1, size: 3, type: gl.FLOAT, stride: 32, offset: 12 },   // aNormal
-            { location: 2, size: 2, type: gl.FLOAT, stride: 32, offset: 24 }    // aUV
+            { location: 0, size: 3, type: gl.FLOAT, stride: 64, offset: 0 },              // aPosition
+            { location: 1, size: 3, type: gl.FLOAT, stride: 64, offset: 12 },             // aNormal
+            { location: 2, size: 2, type: gl.FLOAT, stride: 64, offset: 24 },             // aUV
+            { location: 3, size: 4, type: gl.FLOAT, stride: 64, offset: 32 },             // aJoints (4 floats containing byte values)
+            { location: 4, size: 4, type: gl.FLOAT, stride: 64, offset: 48 }              // aWeights
         ]);
     } else if (vertexData.length % 11 === 0) {
         // Backward compatibility: position(3) + color(3) + normal(3) + uv(2) -> stride 44 bytes
+        count = indices ? count : vertexData.length / 11;
         mesh.setAttributes([
             { location: 0, size: 3, type: gl.FLOAT, stride: 44, offset: 0 },   // aPosition
             { location: 1, size: 3, type: gl.FLOAT, stride: 44, offset: 12 },  // aColor
@@ -284,16 +276,29 @@ export function createMesh(
         ]);
     } else if (vertexData.length % 9 === 0) {
         // position(3) + color(3) + normal(3) -> stride 36 bytes
+        count = indices ? count : vertexData.length / 9;
         mesh.setAttributes([
             { location: 0, size: 3, type: gl.FLOAT, stride: 36, offset: 0 },   // aPosition
             { location: 1, size: 3, type: gl.FLOAT, stride: 36, offset: 12 },  // aColor
             { location: 2, size: 3, type: gl.FLOAT, stride: 36, offset: 24 }   // aNormal
         ]);
-    } else {
+    } else if (vertexData.length % 8 === 0) {
+        // Standard layout: position(3) + normal(3) + uv(2) = 8 floats (32 bytes)
+        count = indices ? count : vertexData.length / 8;
+        mesh.setAttributes([
+            { location: 0, size: 3, type: gl.FLOAT, stride: 32, offset: 0 },    // aPosition
+            { location: 1, size: 3, type: gl.FLOAT, stride: 32, offset: 12 },   // aNormal
+            { location: 2, size: 2, type: gl.FLOAT, stride: 32, offset: 24 }    // aUV
+        ]);
+    } else if (vertexData.length % 6 === 0) {
+        // Simple position + color: position(3) + color(3) -> stride 24 bytes
+        count = indices ? count : vertexData.length / 6;
         mesh.setAttributes([
             { location: 0, size: 3, type: gl.FLOAT, stride: 24, offset: 0 },  // aPosition (vec3)
             { location: 1, size: 3, type: gl.FLOAT, stride: 24, offset: 12 }  // aColor (vec3)
         ]);
+    } else {
+        throw new Error(`Unsupported vertex layout: ${vertexData.length} floats (expected stride 6, 8, 9, 11, or 16)`);
     }
     mesh.setCount(count);
 

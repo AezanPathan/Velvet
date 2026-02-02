@@ -2,8 +2,10 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
+using Velvet.Core.Animation;
 using Velvet.Core.Engine;
 using Velvet.Core.Geometry;
 using Velvet.Core.Math;
@@ -30,9 +32,38 @@ public static class GltfLoader
             // Yield between heavy steps
             await Task.Yield();
 
+            var accessors = gltf.Doc.RootElement.GetProperty("accessors");
+            var bufferViews = gltf.Doc.RootElement.GetProperty("bufferViews");
+            var skinsById = LoadSkins(gltf.Doc.RootElement, accessors, bufferViews, gltf.Bin);
             var meshesByIndex = LoadMeshesByIndex(gltf.Doc.RootElement, gltf.Bin, baseUrl);
             await Task.Yield();
-            return BuildScene(gltf.Doc.RootElement, meshesByIndex);
+            return BuildScene(gltf.Doc.RootElement, meshesByIndex, skinsById);
+        }
+    }
+
+    public static async Task<(Scene Scene, List<AnimationClip> Animations)> LoadSceneWithAnimations(byte[] data, string? baseUrl = null)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+
+        // Yield immediately so browser regains control
+        await Task.Yield();
+
+        var gltf = LoadGltfDocument(data);
+        using (gltf.Doc)
+        {
+            // Yield between heavy steps
+            await Task.Yield();
+
+            var accessors = gltf.Doc.RootElement.GetProperty("accessors");
+            var bufferViews = gltf.Doc.RootElement.GetProperty("bufferViews");
+            var skinsById = LoadSkins(gltf.Doc.RootElement, accessors, bufferViews, gltf.Bin);
+            var meshesByIndex = LoadMeshesByIndex(gltf.Doc.RootElement, gltf.Bin, baseUrl);
+            await Task.Yield();
+
+            var scene = BuildScene(gltf.Doc.RootElement, meshesByIndex, skinsById);
+            var animations = LoadAnimations(gltf.Doc.RootElement, gltf.Bin);
+
+            return (scene, animations);
         }
     }
 
@@ -136,11 +167,13 @@ public static class GltfLoader
         var accessors = root.GetProperty("accessors");
         var bufferViews = root.GetProperty("bufferViews");
 
+        int meshIdx = 0;
         foreach (var meshEl in meshes.EnumerateArray())
         {
             if (!meshEl.TryGetProperty("primitives", out var primitives) || primitives.ValueKind != JsonValueKind.Array)
             {
                 meshesOut.Add(new List<Mesh>());
+                meshIdx++;
                 continue;
             }
 
@@ -155,12 +188,13 @@ public static class GltfLoader
             }
 
             meshesOut.Add(meshPrimitives);
+            meshIdx++;
         }
 
         return meshesOut;
     }
 
-    private static Scene BuildScene(JsonElement root, List<List<Mesh>> meshesByIndex)
+    private static Scene BuildScene(JsonElement root, List<List<Mesh>> meshesByIndex, Dictionary<int, Skin> skinsById)
     {
         if (!root.TryGetProperty("nodes", out var nodesEl) || nodesEl.ValueKind != JsonValueKind.Array)
         {
@@ -198,13 +232,13 @@ public static class GltfLoader
         var roots = new List<SceneNode>(rootNodeIndices.Count);
         foreach (var nodeIndex in rootNodeIndices)
         {
-            roots.Add(BuildNode(nodeIndex, nodesEl, meshesByIndex));
+            roots.Add(BuildNode(nodeIndex, nodesEl, meshesByIndex, skinsById));
         }
 
         return new Scene(roots);
     }
 
-    private static SceneNode BuildNode(int nodeIndex, JsonElement nodesEl, List<List<Mesh>> meshesByIndex)
+    private static SceneNode BuildNode(int nodeIndex, JsonElement nodesEl, List<List<Mesh>> meshesByIndex, Dictionary<int, Skin> skinsById)
     {
         var nodeEl = nodesEl[nodeIndex];
 
@@ -225,13 +259,311 @@ public static class GltfLoader
         {
             foreach (var childIndexEl in childrenEl.EnumerateArray())
             {
-                children.Add(BuildNode(childIndexEl.GetInt32(), nodesEl, meshesByIndex));
+                children.Add(BuildNode(childIndexEl.GetInt32(), nodesEl, meshesByIndex, skinsById));
             }
         }
 
         var name = nodeEl.TryGetProperty("name", out var nameEl) ? nameEl.GetString() : null;
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            name = $"Node_{nodeIndex}";
+        }
 
-        return new SceneNode(localTransform, meshes, children, name);
+        Skin? skin = null;
+        if (nodeEl.TryGetProperty("skin", out var skinIndexEl))
+        {
+            var skinIndex = skinIndexEl.GetInt32();
+            if (skinsById.TryGetValue(skinIndex, out var foundSkin))
+            {
+                skin = foundSkin;
+                System.Diagnostics.Debug.WriteLine($"[LOADER] Attached skin {skinIndex} to node {nodeIndex} ({name})");
+            }
+        }
+
+        return new SceneNode(localTransform, meshes, children, name, skin, nodeIndex);
+    }
+
+    private static List<AnimationClip> LoadAnimations(JsonElement root, byte[] bin)
+    {
+        var clips = new List<AnimationClip>();
+
+        if (!root.TryGetProperty("animations", out var animationsEl) || animationsEl.ValueKind != JsonValueKind.Array)
+        {
+            return clips;
+        }
+
+        if (!root.TryGetProperty("nodes", out var nodesEl) || nodesEl.ValueKind != JsonValueKind.Array)
+        {
+            return clips;
+        }
+
+        var accessors = root.GetProperty("accessors");
+        var bufferViews = root.GetProperty("bufferViews");
+
+        var animationIndex = 0;
+        foreach (var animationEl in animationsEl.EnumerateArray())
+        {
+            var clipName = animationEl.TryGetProperty("name", out var nameEl) ? nameEl.GetString() : null;
+            if (string.IsNullOrWhiteSpace(clipName))
+            {
+                clipName = $"Animation_{animationIndex}";
+            }
+
+            var channels = new List<AnimationChannel>();
+
+            if (!animationEl.TryGetProperty("channels", out var channelsEl) || channelsEl.ValueKind != JsonValueKind.Array)
+            {
+                clips.Add(new AnimationClip(clipName!, channels));
+                animationIndex++;
+                continue;
+            }
+
+            if (!animationEl.TryGetProperty("samplers", out var samplersEl) || samplersEl.ValueKind != JsonValueKind.Array)
+            {
+                clips.Add(new AnimationClip(clipName!, channels));
+                animationIndex++;
+                continue;
+            }
+
+            foreach (var channelEl in channelsEl.EnumerateArray())
+            {
+                if (!channelEl.TryGetProperty("sampler", out var samplerIndexEl))
+                {
+                    continue;
+                }
+
+                var samplerIndex = samplerIndexEl.GetInt32();
+                if (samplerIndex < 0 || samplerIndex >= samplersEl.GetArrayLength())
+                {
+                    continue;
+                }
+
+                if (!channelEl.TryGetProperty("target", out var targetEl) || targetEl.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                if (!targetEl.TryGetProperty("node", out var nodeIndexEl))
+                {
+                    continue;
+                }
+
+                var nodeIndex = nodeIndexEl.GetInt32();
+                var nodeName = GetNodeName(nodesEl, nodeIndex);
+
+                if (!targetEl.TryGetProperty("path", out var pathEl))
+                {
+                    continue;
+                }
+
+                var path = ParseAnimationPath(pathEl.GetString());
+                if (path == AnimationPath.Weights)
+                {
+                    // Morph target weights are not supported in this node-based animation system.
+                    continue;
+                }
+
+                var samplerEl = samplersEl[samplerIndex];
+                var interpolation = ParseInterpolationMode(samplerEl);
+
+                if (!samplerEl.TryGetProperty("input", out var inputEl) || !samplerEl.TryGetProperty("output", out var outputEl))
+                {
+                    continue;
+                }
+
+                var inputAccessor = inputEl.GetInt32();
+                var outputAccessor = outputEl.GetInt32();
+
+                var times = ReadAccessorFloatScalar(accessors, bufferViews, bin, inputAccessor, out var timeCount);
+                if (timeCount == 0)
+                {
+                    continue;
+                }
+
+                var expectedComponents = GetComponentCountForPath(path);
+                var outputValues = ReadAccessorFloatArray(accessors, bufferViews, bin, outputAccessor, expectedComponents, out var outputCount);
+
+                var expectedOutputCount = interpolation == InterpolationMode.CubicSpline ? timeCount * 3 : timeCount;
+                if (outputCount != expectedOutputCount)
+                {
+                    throw new InvalidDataException($"Animation sampler output count mismatch. Expected {expectedOutputCount}, got {outputCount}.");
+                }
+
+                var keyframes = new List<AnimationKeyframe>(timeCount);
+                for (int i = 0; i < timeCount; i++)
+                {
+                    var values = ExtractKeyframeValues(outputValues, i, expectedComponents, interpolation);
+                    keyframes.Add(new AnimationKeyframe(times[i], values));
+                }
+
+                var sampler = new AnimationSampler(keyframes, interpolation);
+                channels.Add(new AnimationChannel(sampler, nodeName, path));
+            }
+
+            clips.Add(new AnimationClip(clipName!, channels));
+            animationIndex++;
+        }
+
+        return clips;
+    }
+
+    private static string GetNodeName(JsonElement nodesEl, int nodeIndex)
+    {
+        if (nodeIndex < 0 || nodeIndex >= nodesEl.GetArrayLength())
+        {
+            return $"Node_{nodeIndex}";
+        }
+
+        var nodeEl = nodesEl[nodeIndex];
+        var name = nodeEl.TryGetProperty("name", out var nameEl) ? nameEl.GetString() : null;
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            name = $"Node_{nodeIndex}";
+        }
+
+        return name!;
+    }
+
+    private static AnimationPath ParseAnimationPath(string? path)
+    {
+        return path switch
+        {
+            "translation" => AnimationPath.Translation,
+            "rotation" => AnimationPath.Rotation,
+            "scale" => AnimationPath.Scale,
+            "weights" => AnimationPath.Weights,
+            _ => throw new NotSupportedException($"Unsupported animation path: {path}")
+        };
+    }
+
+    private static InterpolationMode ParseInterpolationMode(JsonElement samplerEl)
+    {
+        if (samplerEl.TryGetProperty("interpolation", out var interpEl))
+        {
+            var interp = interpEl.GetString();
+            return interp switch
+            {
+                "STEP" => InterpolationMode.Step,
+                "LINEAR" => InterpolationMode.Linear,
+                "CUBICSPLINE" => InterpolationMode.CubicSpline,
+                _ => throw new NotSupportedException($"Unsupported interpolation mode: {interp}")
+            };
+        }
+
+        return InterpolationMode.Linear;
+    }
+
+    private static int GetComponentCountForPath(AnimationPath path)
+    {
+        return path switch
+        {
+            AnimationPath.Translation => 3,
+            AnimationPath.Rotation => 4,
+            AnimationPath.Scale => 3,
+            AnimationPath.Weights => 1,
+            _ => throw new NotSupportedException($"Unsupported animation path: {path}")
+        };
+    }
+
+    private static float[] ReadAccessorFloatScalar(JsonElement accessors, JsonElement bufferViews, byte[] bin, int accessorIndex, out int count)
+    {
+        var acc = accessors[accessorIndex];
+
+        var componentType = acc.GetProperty("componentType").GetInt32();
+        if (componentType != 5126)
+        {
+            throw new NotSupportedException("Only FLOAT accessors are supported for animation times.");
+        }
+
+        var type = acc.GetProperty("type").GetString();
+        if (!string.Equals(type, "SCALAR", StringComparison.Ordinal))
+        {
+            throw new NotSupportedException("Only SCALAR accessors are supported for animation times.");
+        }
+
+        count = acc.GetProperty("count").GetInt32();
+
+        var viewIndex = acc.GetProperty("bufferView").GetInt32();
+        var view = bufferViews[viewIndex];
+
+        var viewOffset = view.TryGetProperty("byteOffset", out var vo) ? vo.GetInt32() : 0;
+        var accOffset = acc.TryGetProperty("byteOffset", out var ao) ? ao.GetInt32() : 0;
+        var byteOffset = viewOffset + accOffset;
+
+        var stride = view.TryGetProperty("byteStride", out var bs) ? bs.GetInt32() : 4;
+
+        var result = new float[count];
+        for (var i = 0; i < count; i++)
+        {
+            result[i] = BitConverter.ToSingle(bin, byteOffset + (i * stride));
+        }
+
+        return result;
+    }
+
+    private static float[] ReadAccessorFloatArray(JsonElement accessors, JsonElement bufferViews, byte[] bin, int accessorIndex, int componentCount, out int count)
+    {
+        var acc = accessors[accessorIndex];
+
+        var componentType = acc.GetProperty("componentType").GetInt32();
+        if (componentType != 5126)
+        {
+            throw new NotSupportedException("Only FLOAT accessors are supported for animation outputs.");
+        }
+
+        var type = acc.GetProperty("type").GetString();
+        var expectedType = componentCount switch
+        {
+            1 => "SCALAR",
+            2 => "VEC2",
+            3 => "VEC3",
+            4 => "VEC4",
+            _ => throw new NotSupportedException($"Unsupported component count: {componentCount}")
+        };
+
+        if (!string.Equals(type, expectedType, StringComparison.Ordinal))
+        {
+            throw new NotSupportedException($"Expected accessor type {expectedType} but got {type}.");
+        }
+
+        count = acc.GetProperty("count").GetInt32();
+
+        var viewIndex = acc.GetProperty("bufferView").GetInt32();
+        var view = bufferViews[viewIndex];
+
+        var viewOffset = view.TryGetProperty("byteOffset", out var vo) ? vo.GetInt32() : 0;
+        var accOffset = acc.TryGetProperty("byteOffset", out var ao) ? ao.GetInt32() : 0;
+        var byteOffset = viewOffset + accOffset;
+
+        var stride = view.TryGetProperty("byteStride", out var bs) ? bs.GetInt32() : componentCount * 4;
+
+        var result = new float[count * componentCount];
+        for (var i = 0; i < count; i++)
+        {
+            var baseByte = byteOffset + (i * stride);
+            for (var c = 0; c < componentCount; c++)
+            {
+                result[i * componentCount + c] = BitConverter.ToSingle(bin, baseByte + (c * 4));
+            }
+        }
+
+        return result;
+    }
+
+    private static float[] ExtractKeyframeValues(float[] outputValues, int keyframeIndex, int componentCount, InterpolationMode interpolation)
+    {
+        var multiplier = interpolation == InterpolationMode.CubicSpline ? 3 : 1;
+        var valuesPerKeyframe = componentCount * multiplier;
+        var startIndex = keyframeIndex * valuesPerKeyframe;
+
+        if (startIndex + valuesPerKeyframe > outputValues.Length)
+        {
+            throw new InvalidDataException("Animation output values are out of range for keyframe extraction.");
+        }
+
+        var values = new float[valuesPerKeyframe];
+        Array.Copy(outputValues, startIndex, values, 0, valuesPerKeyframe);
+        return values;
     }
 
     private static float[] ReadNodeTransform(JsonElement nodeEl)
@@ -338,32 +670,112 @@ public static class GltfLoader
                 idx.GetInt32());
         }
 
-        // Pack vertices: POSITION(3) + NORMAL(3) + UV(2) = 8 floats per vertex
+        // Check for skinning data (JOINTS_0 and WEIGHTS_0)
+        byte[]? joints = null;
+        float[]? weights = null;
         int vertexCount = positions.Length / 3;
-        float[] vertices = new float[vertexCount * 8];
+        bool hasSkinning = false;
 
-        for (int i = 0; i < vertexCount; i++)
+        if (attrs.TryGetProperty("JOINTS_0", out var jointsEl) && attrs.TryGetProperty("WEIGHTS_0", out var weightsEl))
         {
-            int p = i * 3;
-            int v = i * 8;
-            int uv = i * 2;
-
-            // Position
-            vertices[v + 0] = positions[p + 0];
-            vertices[v + 1] = positions[p + 1];
-            vertices[v + 2] = positions[p + 2];
-
-            // Normal
-            vertices[v + 3] = normals[p + 0];
-            vertices[v + 4] = normals[p + 1];
-            vertices[v + 5] = normals[p + 2];
-
-            // UV
-            vertices[v + 6] = uvs[uv + 0];
-            vertices[v + 7] = uvs[uv + 1];
+            joints = ReadAccessorJointsU8(accessors, bufferViews, bin, jointsEl.GetInt32(), vertexCount);
+            weights = ReadAccessorFloatVec4(accessors, bufferViews, bin, weightsEl.GetInt32());
+            hasSkinning = true;
         }
 
-        var geo = new LoadedGeometry(vertices, indices, VertexLayout.PositionNormalUV);
+        // Determine vertex layout and pack vertices
+        float[] vertices;
+        var vertexLayout = VertexLayout.PositionNormalUV;
+
+        if (hasSkinning && joints != null && weights != null)
+        {
+            // Normalize weights (JOINTS_0 validation happens at runtime with the attached skin)
+            for (int i = 0; i < vertexCount; i++)
+            {
+                int j = i * 4;
+                float weightSum = weights[j + 0] + weights[j + 1] + weights[j + 2] + weights[j + 3];
+                if (System.Math.Abs(weightSum - 1.0f) > 0.01f)
+                {
+                    if (weightSum > 0.0001f)
+                    {
+                        weights[j + 0] /= weightSum;
+                        weights[j + 1] /= weightSum;
+                        weights[j + 2] /= weightSum;
+                        weights[j + 3] /= weightSum;
+                    }
+                    else
+                    {
+                        weights[j + 0] = 1.0f;
+                    }
+                }
+            }
+            
+            // Pack vertices: POSITION(3) + NORMAL(3) + UV(2) + JOINTS(4 as floats) + WEIGHTS(4) = 16 floats per vertex
+            vertexLayout = VertexLayout.PositionNormalUVSkinnedJointsWeights;
+            vertices = new float[vertexCount * 16];
+
+            for (int i = 0; i < vertexCount; i++)
+            {
+                int p = i * 3;
+                int v = i * 16;
+                int uv = i * 2;
+                int j = i * 4;
+
+                // Position
+                vertices[v + 0] = positions[p + 0];
+                vertices[v + 1] = positions[p + 1];
+                vertices[v + 2] = positions[p + 2];
+
+                // Normal
+                vertices[v + 3] = normals[p + 0];
+                vertices[v + 4] = normals[p + 1];
+                vertices[v + 5] = normals[p + 2];
+
+                // UV
+                vertices[v + 6] = uvs[uv + 0];
+                vertices[v + 7] = uvs[uv + 1];
+
+                // Joints (stored as floats but represent uint8 indices, will be unpacked in shader)
+                vertices[v + 8] = (float)joints[j + 0];
+                vertices[v + 9] = (float)joints[j + 1];
+                vertices[v + 10] = (float)joints[j + 2];
+                vertices[v + 11] = (float)joints[j + 3];
+
+                // Weights
+                vertices[v + 12] = weights[j + 0];
+                vertices[v + 13] = weights[j + 1];
+                vertices[v + 14] = weights[j + 2];
+                vertices[v + 15] = weights[j + 3];
+            }
+        }
+        else
+        {
+            // Standard layout: POSITION(3) + NORMAL(3) + UV(2) = 8 floats per vertex
+            vertices = new float[vertexCount * 8];
+
+            for (int i = 0; i < vertexCount; i++)
+            {
+                int p = i * 3;
+                int v = i * 8;
+                int uv = i * 2;
+
+                // Position
+                vertices[v + 0] = positions[p + 0];
+                vertices[v + 1] = positions[p + 1];
+                vertices[v + 2] = positions[p + 2];
+
+                // Normal
+                vertices[v + 3] = normals[p + 0];
+                vertices[v + 4] = normals[p + 1];
+                vertices[v + 5] = normals[p + 2];
+
+                // UV
+                vertices[v + 6] = uvs[uv + 0];
+                vertices[v + 7] = uvs[uv + 1];
+            }
+        }
+
+        var geo = new LoadedGeometry(vertices, indices, vertexLayout);
         var mesh = new Mesh(geo);
         mesh.Material = TryReadMaterial(root, bin, baseUrl);
 
@@ -478,6 +890,238 @@ public static class GltfLoader
         }
 
         return bytes;
+    }
+
+    /// <summary>
+    /// Loads all skins from the glTF document.
+    /// Returns a dictionary mapping skin index to Skin object.
+    /// </summary>
+    private static Dictionary<int, Skin> LoadSkins(JsonElement root, JsonElement accessors, JsonElement bufferViews, byte[] bin)
+    {
+        var result = new Dictionary<int, Skin>();
+
+        if (!root.TryGetProperty("skins", out var skinsEl) || skinsEl.ValueKind != JsonValueKind.Array)
+        {
+            return result;
+        }
+
+        if (!root.TryGetProperty("nodes", out var nodesEl) || nodesEl.ValueKind != JsonValueKind.Array)
+        {
+            return result;
+        }
+
+        int skinIndex = 0;
+        foreach (var skinEl in skinsEl.EnumerateArray())
+        {
+            if (!skinEl.TryGetProperty("joints", out var jointsEl) || jointsEl.ValueKind != JsonValueKind.Array)
+            {
+                skinIndex++;
+                continue;
+            }
+
+            var jointNodeIndices = new List<int>();
+            foreach (var jointIndexEl in jointsEl.EnumerateArray())
+            {
+                jointNodeIndices.Add(jointIndexEl.GetInt32());
+            }
+
+            if (jointNodeIndices.Count == 0)
+            {
+                skinIndex++;
+                continue;
+            }
+
+            // Get joint names from node indices
+            var jointNames = new List<string>(jointNodeIndices.Count);
+            foreach (var nodeIndex in jointNodeIndices)
+            {
+                var name = GetNodeName(nodesEl, nodeIndex);
+                jointNames.Add(name);
+            }
+
+            // Load inverse bind matrices
+            float[] inverseBindMatrices = null!;
+            if (skinEl.TryGetProperty("inverseBindMatrices", out var ibmEl))
+            {
+                var accessorIndex = ibmEl.GetInt32();
+                inverseBindMatrices = ReadAccessorFloatMat4(accessors, bufferViews, bin, accessorIndex);
+            }
+            else
+            {
+                // No inverse bind matrices; default to identity matrices
+                inverseBindMatrices = new float[jointNodeIndices.Count * 16];
+                for (int i = 0; i < jointNodeIndices.Count; i++)
+                {
+                    var identity = Matrix.Identity();
+                    Array.Copy(identity, 0, inverseBindMatrices, i * 16, 16);
+                }
+            }
+
+            // Convert flat array to list of 4x4 matrices
+            var matrices = new List<float[]>(jointNodeIndices.Count);
+            for (int i = 0; i < jointNodeIndices.Count; i++)
+            {
+                var matrix = new float[16];
+                Array.Copy(inverseBindMatrices, i * 16, matrix, 0, 16);
+                matrices.Add(matrix);
+            }
+
+            var skin = new Skin(jointNodeIndices, jointNames, matrices);
+            result[skinIndex] = skin;
+            System.Diagnostics.Debug.WriteLine($"[LOADER] Loaded skin {skinIndex} with {skin.JointCount} joints: {string.Join(", ", jointNames)}");
+            System.Diagnostics.Debug.WriteLine($"[LOADER]   Joint node indices: {string.Join(", ", jointNodeIndices)}");
+            skinIndex++;
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Reads a MAT4 accessor and returns flattened 4x4 matrices.
+    /// Each matrix is 16 floats in column-major order.
+    /// </summary>
+    private static float[] ReadAccessorFloatMat4(JsonElement accessors, JsonElement bufferViews, byte[] bin, int accessorIndex)
+    {
+        var acc = accessors[accessorIndex];
+
+        var componentType = acc.GetProperty("componentType").GetInt32();
+        if (componentType != 5126)
+            throw new NotSupportedException("Only FLOAT accessors are supported for inverse bind matrices.");
+
+        var type = acc.GetProperty("type").GetString();
+        if (!string.Equals(type, "MAT4", StringComparison.Ordinal))
+            throw new NotSupportedException("Only MAT4 accessors are supported for inverse bind matrices.");
+
+        var count = acc.GetProperty("count").GetInt32();
+        var viewIndex = acc.GetProperty("bufferView").GetInt32();
+        var view = bufferViews[viewIndex];
+
+        var viewOffset = view.TryGetProperty("byteOffset", out var vo) ? vo.GetInt32() : 0;
+        var accOffset = acc.TryGetProperty("byteOffset", out var ao) ? ao.GetInt32() : 0;
+        var byteOffset = viewOffset + accOffset;
+
+        var stride = view.TryGetProperty("byteStride", out var bs) ? bs.GetInt32() : 64; // 16 floats * 4 bytes
+
+        var result = new float[count * 16];
+        for (int i = 0; i < count; i++)
+        {
+            int baseByte = byteOffset + i * stride;
+            for (int j = 0; j < 16; j++)
+            {
+                result[i * 16 + j] = BitConverter.ToSingle(bin, baseByte + j * 4);
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Reads JOINTS_0 accessor (uint8 joint indices).
+    /// Returns an array of 4 bytes per vertex.
+    /// </summary>
+    private static byte[] ReadAccessorJointsU8(JsonElement accessors, JsonElement bufferViews, byte[] bin, int accessorIndex, int expectedVertexCount)
+    {
+        var acc = accessors[accessorIndex];
+
+        var componentType = acc.GetProperty("componentType").GetInt32();
+        // Component type 5125 = unsigned int, 5123 = unsigned short, 5121 = unsigned byte
+        if (componentType != 5121 && componentType != 5123 && componentType != 5125)
+            throw new NotSupportedException($"Unsupported component type {componentType} for JOINTS_0.");
+
+        var type = acc.GetProperty("type").GetString();
+        if (!string.Equals(type, "VEC4", StringComparison.Ordinal))
+            throw new NotSupportedException("Only VEC4 accessors are supported for JOINTS_0.");
+
+        var count = acc.GetProperty("count").GetInt32();
+        if (count != expectedVertexCount)
+            throw new InvalidDataException($"Joint count ({count}) must match vertex count ({expectedVertexCount}).");
+
+        var viewIndex = acc.GetProperty("bufferView").GetInt32();
+        var view = bufferViews[viewIndex];
+
+        var viewOffset = view.TryGetProperty("byteOffset", out var vo) ? vo.GetInt32() : 0;
+        var accOffset = acc.TryGetProperty("byteOffset", out var ao) ? ao.GetInt32() : 0;
+        var byteOffset = viewOffset + accOffset;
+
+        var result = new byte[count * 4];
+        
+        if (componentType == 5121) // UNSIGNED_BYTE
+        {
+            var stride = view.TryGetProperty("byteStride", out var bs) ? bs.GetInt32() : 4;
+            for (int i = 0; i < count; i++)
+            {
+                int baseByte = byteOffset + i * stride;
+                result[i * 4 + 0] = bin[baseByte + 0];
+                result[i * 4 + 1] = bin[baseByte + 1];
+                result[i * 4 + 2] = bin[baseByte + 2];
+                result[i * 4 + 3] = bin[baseByte + 3];
+            }
+        }
+        else if (componentType == 5123) // UNSIGNED_SHORT
+        {
+            var stride = view.TryGetProperty("byteStride", out var bs) ? bs.GetInt32() : 8;
+            for (int i = 0; i < count; i++)
+            {
+                int baseByte = byteOffset + i * stride;
+                result[i * 4 + 0] = (byte)BinaryPrimitives.ReadUInt16LittleEndian(bin.AsSpan(baseByte, 2));
+                result[i * 4 + 1] = (byte)BinaryPrimitives.ReadUInt16LittleEndian(bin.AsSpan(baseByte + 2, 2));
+                result[i * 4 + 2] = (byte)BinaryPrimitives.ReadUInt16LittleEndian(bin.AsSpan(baseByte + 4, 2));
+                result[i * 4 + 3] = (byte)BinaryPrimitives.ReadUInt16LittleEndian(bin.AsSpan(baseByte + 6, 2));
+            }
+        }
+        else // UNSIGNED_INT
+        {
+            var stride = view.TryGetProperty("byteStride", out var bs) ? bs.GetInt32() : 16;
+            for (int i = 0; i < count; i++)
+            {
+                int baseByte = byteOffset + i * stride;
+                result[i * 4 + 0] = (byte)BinaryPrimitives.ReadUInt32LittleEndian(bin.AsSpan(baseByte, 4));
+                result[i * 4 + 1] = (byte)BinaryPrimitives.ReadUInt32LittleEndian(bin.AsSpan(baseByte + 4, 4));
+                result[i * 4 + 2] = (byte)BinaryPrimitives.ReadUInt32LittleEndian(bin.AsSpan(baseByte + 8, 4));
+                result[i * 4 + 3] = (byte)BinaryPrimitives.ReadUInt32LittleEndian(bin.AsSpan(baseByte + 12, 4));
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Reads WEIGHTS_0 accessor (float weights summing to 1.0).
+    /// Returns an array of 4 floats per vertex.
+    /// </summary>
+    private static float[] ReadAccessorFloatVec4(JsonElement accessors, JsonElement bufferViews, byte[] bin, int accessorIndex)
+    {
+        var acc = accessors[accessorIndex];
+
+        var componentType = acc.GetProperty("componentType").GetInt32();
+        if (componentType != 5126)
+            throw new NotSupportedException("Only FLOAT accessors are supported for WEIGHTS_0.");
+
+        var type = acc.GetProperty("type").GetString();
+        if (!string.Equals(type, "VEC4", StringComparison.Ordinal))
+            throw new NotSupportedException("Only VEC4 accessors are supported for WEIGHTS_0.");
+
+        var count = acc.GetProperty("count").GetInt32();
+        var viewIndex = acc.GetProperty("bufferView").GetInt32();
+        var view = bufferViews[viewIndex];
+
+        var viewOffset = view.TryGetProperty("byteOffset", out var vo) ? vo.GetInt32() : 0;
+        var accOffset = acc.TryGetProperty("byteOffset", out var ao) ? ao.GetInt32() : 0;
+        var byteOffset = viewOffset + accOffset;
+
+        var stride = view.TryGetProperty("byteStride", out var bs) ? bs.GetInt32() : 16; // 4 floats * 4 bytes
+
+        var result = new float[count * 4];
+        for (int i = 0; i < count; i++)
+        {
+            int baseByte = byteOffset + i * stride;
+            result[i * 4 + 0] = BitConverter.ToSingle(bin, baseByte + 0);
+            result[i * 4 + 1] = BitConverter.ToSingle(bin, baseByte + 4);
+            result[i * 4 + 2] = BitConverter.ToSingle(bin, baseByte + 8);
+            result[i * 4 + 3] = BitConverter.ToSingle(bin, baseByte + 12);
+        }
+
+        return result;
     }
 
 

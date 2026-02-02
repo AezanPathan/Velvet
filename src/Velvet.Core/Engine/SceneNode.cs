@@ -11,9 +11,9 @@ namespace Velvet.Core.Engine;
 /// </summary>
 public sealed class SceneNode
 {
-    private readonly float[] _localTransform;
+    private float[] _localTransform;
 
-    public SceneNode(float[] localTransform, IReadOnlyList<Mesh> meshes, IReadOnlyList<SceneNode> children, string? name = null)
+    public SceneNode(float[] localTransform, IReadOnlyList<Mesh> meshes, IReadOnlyList<SceneNode> children, string? name = null, Skin? skin = null, int nodeIndex = -1)
     {
         ArgumentNullException.ThrowIfNull(localTransform);
         ArgumentNullException.ThrowIfNull(meshes);
@@ -24,15 +24,32 @@ public sealed class SceneNode
         Meshes = meshes;
         Children = children;
         Name = name;
+        Skin = skin;
+        NodeIndex = nodeIndex;
     }
 
     public string? Name { get; }
 
     public IReadOnlyList<Mesh> Meshes { get; }
 
+    public Skin? Skin { get; }
+
+    public int NodeIndex { get; }
+
     public IReadOnlyList<SceneNode> Children { get; }
 
     public float[] LocalTransform => (float[])_localTransform.Clone();
+
+    internal void SetLocalTransform(float[] localTransform)
+    {
+        ArgumentNullException.ThrowIfNull(localTransform);
+        if (localTransform.Length != 16)
+        {
+            throw new ArgumentException("Local transform must be a 4x4 matrix.", nameof(localTransform));
+        }
+
+        _localTransform = (float[])localTransform.Clone();
+    }
 
     /// <summary>
     /// Recursively flatten this node and children into mesh instances using inherited transforms.
@@ -54,7 +71,7 @@ public sealed class SceneNode
 
         foreach (var mesh in Meshes)
         {
-            output.Add(new MeshInstance(mesh, world));
+            output.Add(new MeshInstance(mesh, world, Skin));
         }
 
         foreach (var child in Children)

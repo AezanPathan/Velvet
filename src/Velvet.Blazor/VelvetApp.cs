@@ -25,6 +25,7 @@ public sealed class VelvetApp
 
     private readonly List<MeshInstance> _instances = new();
     private List<RenderBatch>? _batches;
+    private readonly Dictionary<Skin, float[]> _boneMatrixCache = new();
 
     private ShaderProgram? _program;
     private Camera? _camera;
@@ -138,6 +139,35 @@ public sealed class VelvetApp
         }
     }
 
+    /// <summary>
+    /// Prepares a scene for rendering using its current node transforms.
+    /// This updates mesh instance matrices and computes bone matrices for skinned meshes.
+    /// Animation time is not advanced here; call Animator.Update(dt) explicitly before Render(...).
+    /// </summary>
+    public void Render(Scene scene)
+    {
+        ArgumentNullException.ThrowIfNull(scene);
+
+        // Update world/normal matrices based on the scene's current node transforms.
+        scene.UpdateMeshInstances(_ => null);
+
+        // Compute bone matrices from current node transforms (no time logic).
+        foreach (var instance in scene.MeshInstances)
+        {
+            var skin = instance.Skin;
+            if (skin is null)
+            {
+                continue;
+            }
+
+            if (!_boneMatrixCache.ContainsKey(skin))
+            {
+                var boneMatrices = BoneMatrixCalculator.ComputeBoneMatrices(skin, scene.Roots);
+                _boneMatrixCache[skin] = boneMatrices;
+            }
+        }
+    }
+
     public Task StartAsync(Func<float, Task>? onFrame = null)
     {
         if (_program is null) throw new InvalidOperationException("Shader program not configured. Provide a programFactory to CreateAsync(...).");
@@ -226,6 +256,9 @@ public sealed class VelvetApp
             var deltaSeconds = nowSeconds - lastSeconds;
             lastSeconds = nowSeconds;
 
+            // Prepare per-frame caches (e.g., skinning) before user frame logic runs.
+            _boneMatrixCache.Clear();
+
             if (onFrame is not null)
             {
                 await onFrame(deltaSeconds).ConfigureAwait(false);
@@ -283,9 +316,24 @@ public sealed class VelvetApp
                     var mesh = instance.Mesh;
                     var meshId = mesh.Resources.VertexBufferId.Value;
 
+                    // Ensure skin ownership is per-instance (node.skin), not shared on mesh.
+                    if (instance.Skin is not null)
+                    {
+                        mesh.Skin = instance.Skin;
+                    }
+                    else
+                    {
+                        mesh.Skin = null;
+                    }
+
                     if (beforeDrawMesh is not null)
                     {
                         await beforeDrawMesh(mesh).ConfigureAwait(false);
+                    }
+
+                    if (mesh.Skin is not null && _boneMatrixCache.TryGetValue(mesh.Skin, out var boneMatrices))
+                    {
+                        await program.SetBoneMatricesAsync(boneMatrices, mesh.Skin.JointCount).ConfigureAwait(false);
                     }
 
                     // Set per-mesh Model matrix and Normal matrix

@@ -8,22 +8,25 @@ namespace Velvet.Core.Rendering;
 /// </summary>
 public readonly struct MeshInstance
 {
-    public MeshInstance(Mesh mesh, float[] modelMatrix)
-        : this(mesh, modelMatrix, Matrix.NormalMatrix(modelMatrix))
+    public MeshInstance(Mesh mesh, float[] modelMatrix, Skin? skin = null)
+        : this(mesh, modelMatrix, Matrix.NormalMatrix(modelMatrix), skin)
     {
     }
 
-    public MeshInstance(Mesh mesh, float[] modelMatrix, float[] normalMatrix)
+    public MeshInstance(Mesh mesh, float[] modelMatrix, float[] normalMatrix, Skin? skin = null)
     {
         Mesh = mesh ?? throw new ArgumentNullException(nameof(mesh));
         ModelMatrix = (float[])(modelMatrix ?? throw new ArgumentNullException(nameof(modelMatrix))).Clone();
         NormalMatrix = (float[])(normalMatrix ?? throw new ArgumentNullException(nameof(normalMatrix))).Clone();
+        Skin = skin;
 
         if (ModelMatrix.Length != 16) throw new ArgumentException("Model matrix must be 4x4.", nameof(modelMatrix));
         if (NormalMatrix.Length != 9) throw new ArgumentException("Normal matrix must be 3x3.", nameof(normalMatrix));
     }
 
     public Mesh Mesh { get; }
+
+    public Skin? Skin { get; }
 
     public float[] ModelMatrix { get; }
 

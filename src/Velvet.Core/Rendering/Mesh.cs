@@ -27,6 +27,12 @@ public sealed class Mesh
     public Material? Material { get; set; }
 
     /// <summary>
+    /// Optional skin for skeletal deformation (skinning).
+    /// If set, the mesh has JOINTS_0 and WEIGHTS_0 vertex attributes.
+    /// </summary>
+    public Skin? Skin { get; set; }
+
+    /// <summary>
     /// Source geometry (data-only, reusable across hosts).
     /// </summary>
     public GeometryBase Geometry { get; }
