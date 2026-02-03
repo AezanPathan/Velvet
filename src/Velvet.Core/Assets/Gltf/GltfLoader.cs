@@ -654,12 +654,6 @@ public static class GltfLoader
                   ? ReadAccessorFloatVec2(accessors, bufferViews, bin, uvAcc.Value)
                   : new float[(positions.Length / 3) * 2];
 
-        if (norAcc.HasValue)
-            normals = ReadAccessorFloatVec3(accessors, bufferViews, bin, norAcc.Value);
-        else
-            // Fallback normals (valid & REQUIRED)
-            normals = new float[positions.Length];
-
         uint[]? indices = null;
         if (prim.TryGetProperty("indices", out var idx))
         {
@@ -668,6 +662,16 @@ public static class GltfLoader
                 bufferViews,
                 bin,
                 idx.GetInt32());
+        }
+
+        if (norAcc.HasValue)
+        {
+            normals = ReadAccessorFloatVec3(accessors, bufferViews, bin, norAcc.Value);
+        }
+        else
+        {
+            // Fallback normals: compute from geometry when normals are missing (e.g., Fox.glb)
+            normals = ComputeNormals(positions, indices);
         }
 
         // Check for skinning data (JOINTS_0 and WEIGHTS_0)
@@ -814,6 +818,94 @@ public static class GltfLoader
         }
 
         return result;
+    }
+
+    private static float[] ComputeNormals(float[] positions, uint[]? indices)
+    {
+        ArgumentNullException.ThrowIfNull(positions);
+
+        var vertexCount = positions.Length / 3;
+        var normals = new float[vertexCount * 3];
+
+        if (indices is { Length: >= 3 })
+        {
+            for (var i = 0; i + 2 < indices.Length; i += 3)
+            {
+                var i0 = (int)indices[i + 0];
+                var i1 = (int)indices[i + 1];
+                var i2 = (int)indices[i + 2];
+
+                if (i0 < 0 || i1 < 0 || i2 < 0 || i0 >= vertexCount || i1 >= vertexCount || i2 >= vertexCount)
+                {
+                    continue;
+                }
+
+                var p0 = i0 * 3;
+                var p1 = i1 * 3;
+                var p2 = i2 * 3;
+
+                var ux = positions[p1 + 0] - positions[p0 + 0];
+                var uy = positions[p1 + 1] - positions[p0 + 1];
+                var uz = positions[p1 + 2] - positions[p0 + 2];
+
+                var vx = positions[p2 + 0] - positions[p0 + 0];
+                var vy = positions[p2 + 1] - positions[p0 + 1];
+                var vz = positions[p2 + 2] - positions[p0 + 2];
+
+                var nx = uy * vz - uz * vy;
+                var ny = uz * vx - ux * vz;
+                var nz = ux * vy - uy * vx;
+
+                normals[p0 + 0] += nx; normals[p0 + 1] += ny; normals[p0 + 2] += nz;
+                normals[p1 + 0] += nx; normals[p1 + 1] += ny; normals[p1 + 2] += nz;
+                normals[p2 + 0] += nx; normals[p2 + 1] += ny; normals[p2 + 2] += nz;
+            }
+        }
+        else
+        {
+            // Non-indexed geometry: assume triangles in order.
+            for (var i = 0; i + 8 < positions.Length; i += 9)
+            {
+                var ux = positions[i + 3] - positions[i + 0];
+                var uy = positions[i + 4] - positions[i + 1];
+                var uz = positions[i + 5] - positions[i + 2];
+
+                var vx = positions[i + 6] - positions[i + 0];
+                var vy = positions[i + 7] - positions[i + 1];
+                var vz = positions[i + 8] - positions[i + 2];
+
+                var nx = uy * vz - uz * vy;
+                var ny = uz * vx - ux * vz;
+                var nz = ux * vy - uy * vx;
+
+                normals[i + 0] = nx; normals[i + 1] = ny; normals[i + 2] = nz;
+                normals[i + 3] = nx; normals[i + 4] = ny; normals[i + 5] = nz;
+                normals[i + 6] = nx; normals[i + 7] = ny; normals[i + 8] = nz;
+            }
+        }
+
+        // Normalize normals
+        for (var i = 0; i < normals.Length; i += 3)
+        {
+            var nx = normals[i + 0];
+            var ny = normals[i + 1];
+            var nz = normals[i + 2];
+            var len = System.MathF.Sqrt(nx * nx + ny * ny + nz * nz);
+            if (len > 0.000001f)
+            {
+                normals[i + 0] = nx / len;
+                normals[i + 1] = ny / len;
+                normals[i + 2] = nz / len;
+            }
+            else
+            {
+                normals[i + 0] = 0f;
+                normals[i + 1] = 1f;
+                normals[i + 2] = 0f;
+            }
+        }
+
+        return normals;
     }
 
     private static Material? TryReadMaterial(JsonElement root, byte[] bin, string? baseUrl = null)
