@@ -343,6 +343,7 @@ public sealed class VelvetApp
                     await program.DrawMeshAsync(meshId, _rendererId).ConfigureAwait(false);
                 }
             }
+
         }
     }
 

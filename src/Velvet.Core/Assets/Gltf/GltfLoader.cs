@@ -655,6 +655,7 @@ public static class GltfLoader
                   : new float[(positions.Length / 3) * 2];
 
         uint[]? indices = null;
+        int indexCount = 0;
         if (prim.TryGetProperty("indices", out var idx))
         {
             indices = ReadAccessorIndicesU32(
@@ -662,6 +663,7 @@ public static class GltfLoader
                 bufferViews,
                 bin,
                 idx.GetInt32());
+            indexCount = indices.Length;
         }
 
         if (norAcc.HasValue)
@@ -674,10 +676,12 @@ public static class GltfLoader
             normals = ComputeNormals(positions, indices);
         }
 
+        int vertexCount = positions.Length / 3;
+        System.Diagnostics.Debug.WriteLine($"[glTF] Loaded primitive: {vertexCount} vertices, {indexCount} indices");
+
         // Check for skinning data (JOINTS_0 and WEIGHTS_0)
         byte[]? joints = null;
         float[]? weights = null;
-        int vertexCount = positions.Length / 3;
         bool hasSkinning = false;
 
         if (attrs.TryGetProperty("JOINTS_0", out var jointsEl) && attrs.TryGetProperty("WEIGHTS_0", out var weightsEl))
@@ -805,8 +809,19 @@ public static class GltfLoader
         var accOffset = acc.TryGetProperty("byteOffset", out var ao) ? ao.GetInt32() : 0;
         var byteOffset = viewOffset + accOffset;
 
-        var stride = view.TryGetProperty("byteStride", out var bs) ? bs.GetInt32() : 12;
-        if (stride < 12) throw new InvalidDataException("Invalid byteStride for VEC3 float.");
+        const int elementSize = 12; // 3 floats * 4 bytes
+        var bufferStride = view.TryGetProperty("byteStride", out var bs) ? bs.GetInt32() : 0;
+        var stride = bufferStride > 0 ? bufferStride : elementSize;
+        
+        if (stride < elementSize) 
+            throw new InvalidDataException("Invalid byteStride for VEC3 float.");
+
+        Console.WriteLine($"[glTF] ReadAccessorFloatVec3:");
+        Console.WriteLine($"  accessor.count={count}");
+        Console.WriteLine($"  bufferView.byteStride={bufferStride}");
+        Console.WriteLine($"  elementSize={elementSize}");
+        Console.WriteLine($"  stride used={stride}");
+        Console.WriteLine($"  final byteOffset={byteOffset} (viewOffset={viewOffset} + accOffset={accOffset})");
 
         var result = new float[count * 3];
         for (var i = 0; i < count; i++)
@@ -815,6 +830,16 @@ public static class GltfLoader
             result[i * 3 + 0] = BitConverter.ToSingle(bin, baseByte + 0);
             result[i * 3 + 1] = BitConverter.ToSingle(bin, baseByte + 4);
             result[i * 3 + 2] = BitConverter.ToSingle(bin, baseByte + 8);
+        }
+
+        // Log first 3 vertices for diagnostics
+        if (count > 0)
+        {
+            Console.WriteLine($"  First 3 vertices:");
+            for (int i = 0; i < System.Math.Min(3, count); i++)
+            {
+                Console.WriteLine($"    [{i}] x={result[i * 3 + 0]:F4} y={result[i * 3 + 1]:F4} z={result[i * 3 + 2]:F4}");
+            }
         }
 
         return result;
@@ -1203,6 +1228,8 @@ public static class GltfLoader
 
         var stride = view.TryGetProperty("byteStride", out var bs) ? bs.GetInt32() : 16; // 4 floats * 4 bytes
 
+        System.Diagnostics.Debug.WriteLine($"[glTF] Reading {count} VEC4 weights, byteOffset={byteOffset}, stride={stride}");
+
         var result = new float[count * 4];
         for (int i = 0; i < count; i++)
         {
@@ -1232,41 +1259,63 @@ public static class GltfLoader
         var byteOffset = viewOffset + accOffset;
 
         var componentType = acc.GetProperty("componentType").GetInt32();
+
+        // CRITICAL: Respect byteStride if present (may be larger than element size for interleaved data)
+        int stride = componentType switch
+        {
+            5121 => 1,      // UNSIGNED_BYTE
+            5123 => 2,      // UNSIGNED_SHORT
+            5125 => 4,      // UNSIGNED_INT
+            _ => throw new NotSupportedException($"Unsupported index componentType: {componentType}")
+        };
+        
+        // If byteStride is specified and larger than element size, use it
+        if (view.TryGetProperty("byteStride", out var bs))
+        {
+            var bufferStride = bs.GetInt32();
+            if (bufferStride > stride)
+            {
+                stride = bufferStride;
+            }
+        }
+
+        System.Diagnostics.Debug.WriteLine($"[glTF] Reading {count} indices, componentType={componentType}, byteOffset={byteOffset}, stride={stride}");
+
         return componentType switch
         {
-            5121 => ReadByteIndicesU32(bin, byteOffset, count),        // UNSIGNED_BYTE
-            5123 => ReadUShortIndicesU32(bin, byteOffset, count),      // UNSIGNED_SHORT
-            5125 => ReadUIntIndices(bin, byteOffset, count),           // UNSIGNED_INT
+            5121 => ReadByteIndicesU32(bin, byteOffset, count, stride),        // UNSIGNED_BYTE
+            5123 => ReadUShortIndicesU32(bin, byteOffset, count, stride),      // UNSIGNED_SHORT
+            5125 => ReadUIntIndices(bin, byteOffset, count, stride),           // UNSIGNED_INT
             _ => throw new NotSupportedException($"Unsupported index componentType: {componentType}")
         };
     }
 
-    private static uint[] ReadByteIndicesU32(byte[] bin, int byteOffset, int count)
+    private static uint[] ReadByteIndicesU32(byte[] bin, int byteOffset, int count, int stride)
     {
         var indices = new uint[count];
         for (var i = 0; i < count; i++)
         {
-            indices[i] = bin[byteOffset + i];
+            indices[i] = bin[byteOffset + (i * stride)];
         }
         return indices;
     }
 
-    private static uint[] ReadUShortIndicesU32(byte[] bin, int byteOffset, int count)
+    private static uint[] ReadUShortIndicesU32(byte[] bin, int byteOffset, int count, int stride)
     {
         var indices = new uint[count];
         for (var i = 0; i < count; i++)
         {
-            indices[i] = BinaryPrimitives.ReadUInt16LittleEndian(bin.AsSpan(byteOffset + (i * 2), 2));
+            indices[i] = BinaryPrimitives.ReadUInt16LittleEndian(bin.AsSpan(byteOffset + (i * stride), 2));
         }
         return indices;
     }
 
-    private static uint[] ReadUIntIndices(byte[] bin, int byteOffset, int count)
+    private static uint[] ReadUIntIndices(byte[] bin, int byteOffset, int count, int stride)
     {
         var indices = new uint[count];
         for (var i = 0; i < count; i++)
         {
-            indices[i] = BinaryPrimitives.ReadUInt32LittleEndian(bin.AsSpan(byteOffset + (i * 4), 4));
+            indices[i] = BinaryPrimitives.ReadUInt32LittleEndian(bin.AsSpan(byteOffset + (i * stride), 4));
         }
         return indices;
     }
@@ -1291,6 +1340,8 @@ public static class GltfLoader
         int byteOffset = viewOffset + accOffset;
 
         int stride = view.TryGetProperty("byteStride", out var bs) ? bs.GetInt32() : 8;
+
+        System.Diagnostics.Debug.WriteLine($"[glTF] Reading {count} VEC2 UVs, byteOffset={byteOffset}, stride={stride}");
 
         var result = new float[count * 2];
         for (int i = 0; i < count; i++)

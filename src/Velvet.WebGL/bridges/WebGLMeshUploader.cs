@@ -26,7 +26,7 @@ public sealed class WebGLMeshUploader : IMeshUploader
 
         // Velvet's current JS API returns a single mesh ID representing the uploaded GPU mesh resource.
         // This ID is backend-defined and opaque. In the WebGL backend it encapsulates vertex/index buffers + VAO.
-        var meshId = await _bridge.CreateMeshAsync(geometry.Vertices, geometry.Indices).ConfigureAwait(false);
+        var meshId = await _bridge.CreateMeshAsync(geometry.Vertices, geometry.Indices, geometry.Layout.StrideFloats).ConfigureAwait(false);
 
         return new MeshGpuResources(
             VertexBufferId: new GpuBufferId(meshId),

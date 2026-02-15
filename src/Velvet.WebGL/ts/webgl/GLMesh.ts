@@ -49,6 +49,9 @@ export class GLMesh implements IMesh {
   /** Number of indices or vertices to draw */
   private count: number = 0;
 
+  /** Primitive type used for drawing (TRIANGLES by default) */
+  private primitiveType: GLenum;
+
   constructor(
     private gl: WebGL2RenderingContext,
     id: number,
@@ -58,6 +61,7 @@ export class GLMesh implements IMesh {
     this.id = id;
     this.vertexBuffer = vertexBuffer;
     this.indexBuffer = indexBuffer;
+    this.primitiveType = this.gl.TRIANGLES;
   }
 
   /**
@@ -78,6 +82,10 @@ export class GLMesh implements IMesh {
    */
   public setCount(count: number): void {
     this.count = count;
+  }
+
+  public setPrimitiveType(primitive: GLenum): void {
+    this.primitiveType = primitive;
   }
 
   private invalidateVao(): void {
@@ -151,10 +159,10 @@ export class GLMesh implements IMesh {
     if (this.count > 0) {
       // If using indices, must have index buffer
       if (this.indexBuffer) {
-        gl.drawElements(gl.TRIANGLES, this.count, gl.UNSIGNED_INT, 0);
+        gl.drawElements(this.primitiveType, this.count, gl.UNSIGNED_INT, 0);
       } else {
         // Non-indexed draw with vertex count
-        gl.drawArrays(gl.TRIANGLES, 0, this.count);
+        gl.drawArrays(this.primitiveType, 0, this.count);
       }
     }
 
@@ -173,6 +181,12 @@ export class GLMesh implements IMesh {
     if (this.indexBuffer) {
       this.indexBuffer.delete();
     }
+  }
+
+  public updateVertexData(data: Float32Array, count: number): void {
+    this.vertexBuffer.bind();
+    this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, data);
+    this.count = count;
   }
 }
 

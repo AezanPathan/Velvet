@@ -190,4 +190,40 @@ public static class ShaderSources
         "    \n" +
         "    outColor = vec4(result, 1.0);\n" +
         "}\n";
+
+    /// <summary>
+    /// Particle vertex shader.
+    /// Inputs: position (vec3), size (float), color (vec4)
+    /// Uniforms: view, projection matrices
+    /// </summary>
+    public const string ParticleVertexShader = "#version 300 es\n" +
+        "precision mediump float;\n" +
+        "\n" +
+        "layout(location = 0) in vec3 aPosition;\n" +
+        "layout(location = 1) in float aSize;\n" +
+        "layout(location = 2) in vec4 aColor;\n" +
+        "\n" +
+        "uniform mat4 uView;\n" +
+        "uniform mat4 uProjection;\n" +
+        "\n" +
+        "out vec4 vColor;\n" +
+        "\n" +
+        "void main() {\n" +
+        "    vColor = aColor;\n" +
+        "    gl_PointSize = aSize;\n" +
+        "    gl_Position = uProjection * uView * vec4(aPosition, 1.0);\n" +
+        "}\n";
+
+    /// <summary>
+    /// Particle fragment shader.
+    /// </summary>
+    public const string ParticleFragmentShader = "#version 300 es\n" +
+        "precision mediump float;\n" +
+        "\n" +
+        "in vec4 vColor;\n" +
+        "out vec4 outColor;\n" +
+        "\n" +
+        "void main() {\n" +
+        "    outColor = vColor;\n" +
+        "}\n";
 }

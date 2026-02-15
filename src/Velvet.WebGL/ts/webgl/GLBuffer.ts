@@ -40,13 +40,13 @@ export class GLBuffer implements IBuffer {
    *
    * @param data Float32Array or Uint32Array depending on vertex/index buffers
    */
-  public setData(data: Float32Array | Uint32Array): void {
+  public setData(data: Float32Array | Uint32Array, usage: GLenum = this.gl.STATIC_DRAW): void {
     if (!this.handle) {
       throw new Error(`GLBuffer.setData: buffer (id=${this.id}) is deleted`);
     }
 
     this.gl.bindBuffer(this.target, this.handle);
-    this.gl.bufferData(this.target, data, this.gl.STATIC_DRAW);
+    this.gl.bufferData(this.target, data, usage);
   }
 
   /**

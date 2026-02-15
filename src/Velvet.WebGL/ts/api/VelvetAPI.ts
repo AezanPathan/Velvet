@@ -229,7 +229,8 @@ export function setUniform1b(programId: number, name: string, value: boolean): v
  */
 export function createMesh(
     vertices: Float32Array,
-    indices?: Uint32Array
+    indices?: Uint32Array,
+    vertexStrideFloats?: number
 ): number {
     if (!context) throw new Error("Velvet not initialized");
 
@@ -253,9 +254,11 @@ export function createMesh(
 
     const mesh = new GLMesh(gl, MeshManager.generateId(), vb, ib) as any;
     
-    // EXPLICIT vertex layout detection based on exact stride match
-    // Check each known stride in order (largest first to prioritize skinned layout)
-    if (vertexData.length % 16 === 0) {
+    // Prefer explicit stride provided by .NET geometry layout to avoid ambiguous modulo detection.
+    // Fallback to legacy heuristic when stride is not provided.
+    const effectiveStride = vertexStrideFloats && vertexStrideFloats > 0 ? vertexStrideFloats : 0;
+
+    if (effectiveStride === 16 || (effectiveStride === 0 && vertexData.length % 16 === 0)) {
         // SKINNED layout: position(3) + normal(3) + uv(2) + joints(4) + weights(4) = 16 floats (64 bytes)
         count = indices ? count : vertexData.length / 16;
         mesh.setAttributes([
@@ -265,7 +268,7 @@ export function createMesh(
             { location: 3, size: 4, type: gl.FLOAT, stride: 64, offset: 32 },             // aJoints (4 floats containing byte values)
             { location: 4, size: 4, type: gl.FLOAT, stride: 64, offset: 48 }              // aWeights
         ]);
-    } else if (vertexData.length % 11 === 0) {
+    } else if (effectiveStride === 11 || (effectiveStride === 0 && vertexData.length % 11 === 0)) {
         // Backward compatibility: position(3) + color(3) + normal(3) + uv(2) -> stride 44 bytes
         count = indices ? count : vertexData.length / 11;
         mesh.setAttributes([
@@ -274,7 +277,7 @@ export function createMesh(
             { location: 2, size: 3, type: gl.FLOAT, stride: 44, offset: 24 },  // aNormal
             { location: 3, size: 2, type: gl.FLOAT, stride: 44, offset: 36 }   // aUV
         ]);
-    } else if (vertexData.length % 9 === 0) {
+    } else if (effectiveStride === 9 || (effectiveStride === 0 && vertexData.length % 9 === 0)) {
         // position(3) + color(3) + normal(3) -> stride 36 bytes
         count = indices ? count : vertexData.length / 9;
         mesh.setAttributes([
@@ -282,7 +285,7 @@ export function createMesh(
             { location: 1, size: 3, type: gl.FLOAT, stride: 36, offset: 12 },  // aColor
             { location: 2, size: 3, type: gl.FLOAT, stride: 36, offset: 24 }   // aNormal
         ]);
-    } else if (vertexData.length % 8 === 0) {
+    } else if (effectiveStride === 8 || (effectiveStride === 0 && vertexData.length % 8 === 0)) {
         // Standard layout: position(3) + normal(3) + uv(2) = 8 floats (32 bytes)
         count = indices ? count : vertexData.length / 8;
         mesh.setAttributes([
@@ -290,7 +293,7 @@ export function createMesh(
             { location: 1, size: 3, type: gl.FLOAT, stride: 32, offset: 12 },   // aNormal
             { location: 2, size: 2, type: gl.FLOAT, stride: 32, offset: 24 }    // aUV
         ]);
-    } else if (vertexData.length % 6 === 0) {
+    } else if (effectiveStride === 6 || (effectiveStride === 0 && vertexData.length % 6 === 0)) {
         // Simple position + color: position(3) + color(3) -> stride 24 bytes
         count = indices ? count : vertexData.length / 6;
         mesh.setAttributes([
@@ -303,6 +306,51 @@ export function createMesh(
     mesh.setCount(count);
 
     return MeshManager.add(mesh);
+}
+
+/**
+ * Create a particle mesh for point rendering.
+ * Allocates a fixed-size vertex buffer for the given capacity.
+ */
+export function createParticleMesh(capacity: number): number {
+    if (!context) throw new Error("Velvet not initialized");
+    if (capacity <= 0) throw new Error("createParticleMesh: capacity must be > 0");
+
+    const gl = context.gl;
+
+    const vertexData = new Float32Array(capacity * 8);
+    const vb = new GLBuffer(gl, BufferManager.generateId(), gl.ARRAY_BUFFER);
+    vb.setData(vertexData, gl.DYNAMIC_DRAW);
+    BufferManager.add(vb);
+
+    const mesh = new GLMesh(gl, MeshManager.generateId(), vb) as any;
+    mesh.setAttributes([
+        { location: 0, size: 3, type: gl.FLOAT, stride: 32, offset: 0 },   // aPosition
+        { location: 1, size: 1, type: gl.FLOAT, stride: 32, offset: 12 },  // aSize
+        { location: 2, size: 4, type: gl.FLOAT, stride: 32, offset: 16 }   // aColor
+    ]);
+    mesh.setPrimitiveType(gl.POINTS);
+    mesh.setCount(0);
+
+    return MeshManager.add(mesh);
+}
+
+/**
+ * Update vertex data for an existing mesh (used by particles).
+ */
+export function updateMeshVertices(meshId: number, vertices: Float32Array, vertexCount: number): void {
+    const mesh = MeshManager.get(meshId) as any;
+    const vertexData = ensureFloat32Array(vertices);
+    const count = Math.max(0, vertexCount | 0);
+
+    if (count === 0) {
+        mesh.setCount(0);
+        return;
+    }
+
+    const required = count * 8;
+    const data = vertexData.length > required ? vertexData.subarray(0, required) : vertexData;
+    mesh.updateVertexData(data, count);
 }
 
 /**
@@ -465,6 +513,14 @@ export function drawMesh(meshId: number, programId: number, rendererId: number):
     const renderer = RendererManager.get(rendererId);
 
     renderer.drawMesh(mesh, program);
+}
+
+/**
+ * Set blend mode on a renderer.
+ */
+export function setBlendMode(rendererId: number, mode: "off" | "alpha" | "additive"): void {
+    const renderer = RendererManager.get(rendererId) as any;
+    renderer.setBlendMode(mode);
 }
 
 /**

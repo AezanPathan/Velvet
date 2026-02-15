@@ -11,6 +11,8 @@ import "./api/types";
     attachShader: API.attachShader,
     linkProgram: API.linkProgram,
     createMesh: API.createMesh,
+    createParticleMesh: API.createParticleMesh,
+    updateMeshVertices: API.updateMeshVertices,
     drawMesh: API.drawMesh,
     setUniformMatrix4fv: API.setUniformMatrix4fv,
     setUniformMatrix3fv: API.setUniformMatrix3fv,
@@ -20,6 +22,7 @@ import "./api/types";
     setUniform1b: API.setUniform1b,
     createTextureFromUrl: API.createTextureFromUrl,
     bindTextureById: API.bindTextureById,
+    setBlendMode: API.setBlendMode,
     clear: API.clear,
     resize: API.resize
 };

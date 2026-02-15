@@ -73,7 +73,7 @@
 //         gl.drawElements(gl.TRIANGLES, this.mesh.indexCount, gl.UNSIGNED_SHORT, 0);
 //     }
 // }
-import { IRenderer } from "../core/renderer/IRenderer";
+import { BlendMode, IRenderer } from "../core/renderer/IRenderer";
 import { IMesh } from "../core/mesh/IMesh";
 import { IProgram } from "../core/program/IProgram";
 
@@ -122,6 +122,22 @@ export class GLRenderer implements IRenderer {
    */
   public resize(width: number, height: number): void {
     this.gl.viewport(0, 0, width, height);
+  }
+
+  public setBlendMode(mode: BlendMode): void {
+    const gl = this.gl;
+
+    if (mode === "off") {
+      gl.disable(gl.BLEND);
+      return;
+    }
+
+    gl.enable(gl.BLEND);
+    if (mode === "additive") {
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+    } else {
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    }
   }
 
   /**

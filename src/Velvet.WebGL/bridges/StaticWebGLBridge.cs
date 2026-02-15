@@ -68,8 +68,14 @@ public sealed class StaticWebGLBridge : IWebGLBridge
         => _js.InvokeVoidAsync("Velvet.linkProgram", programId).AsTask();
 
     /// <inheritdoc />
-    public Task<int> CreateMeshAsync(float[] vertices, uint[]? indices = null)
-        => _js.InvokeAsync<int>("Velvet.createMesh", vertices, indices).AsTask();
+    public Task<int> CreateMeshAsync(float[] vertices, uint[]? indices = null, int vertexStrideFloats = 0)
+        => _js.InvokeAsync<int>("Velvet.createMesh", vertices, indices, vertexStrideFloats).AsTask();
+
+    public Task<int> CreateParticleMeshAsync(int capacity)
+        => _js.InvokeAsync<int>("Velvet.createParticleMesh", capacity).AsTask();
+
+    public Task UpdateMeshVerticesAsync(int meshId, float[] vertices, int vertexCount)
+        => _js.InvokeVoidAsync("Velvet.updateMeshVertices", meshId, vertices, vertexCount).AsTask();
 
     #endregion
 
@@ -82,6 +88,9 @@ public sealed class StaticWebGLBridge : IWebGLBridge
     /// <inheritdoc />
     public Task ClearAsync(int rendererId, float r, float g, float b, float a)
         => _js.InvokeVoidAsync("Velvet.clear", rendererId, r, g, b, a).AsTask();
+
+    public Task SetBlendModeAsync(int rendererId, string mode)
+        => _js.InvokeVoidAsync("Velvet.setBlendMode", rendererId, mode).AsTask();
 
     /// <inheritdoc />
     public Task SetUniformMatrix4fvAsync(int programId, string name, float[] matrix)

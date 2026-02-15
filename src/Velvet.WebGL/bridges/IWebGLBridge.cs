@@ -70,7 +70,18 @@ namespace Velvet.WebGL
         /// Vertices should be an array of floats (e.g. interleaved attributes).
         /// Indices may be null for non-indexed geometry.
         /// </summary>
-        Task<int> CreateMeshAsync(float[] vertices, uint[]? indices = null);
+        Task<int> CreateMeshAsync(float[] vertices, uint[]? indices = null, int vertexStrideFloats = 0);
+
+        /// <summary>
+        /// Create a GPU mesh for particle rendering (points).
+        /// Allocates a fixed-size vertex buffer for the given capacity.
+        /// </summary>
+        Task<int> CreateParticleMeshAsync(int capacity);
+
+        /// <summary>
+        /// Update mesh vertex buffer data and vertex count.
+        /// </summary>
+        Task UpdateMeshVerticesAsync(int meshId, float[] vertices, int vertexCount);
 
         Task SetUniform3fAsync(int programId, string name, float x, float y, float z);
         Task SetUniform1fAsync(int programId, string name, float value);
@@ -103,6 +114,12 @@ namespace Velvet.WebGL
         /// Clear the framebuffer with the given color on the specified renderer.
         /// </summary>
         Task ClearAsync(int rendererId, float r, float g, float b, float a);
+
+        /// <summary>
+        /// Configure GPU blend mode for the specified renderer.
+        /// Supported values: "off", "alpha", "additive".
+        /// </summary>
+        Task SetBlendModeAsync(int rendererId, string mode);
 
         /// <summary>
         /// Set a mat4 uniform on the given program.
