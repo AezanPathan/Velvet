@@ -274,10 +274,13 @@ public sealed class VelvetApp
             if (_directionalLight is not null)
             {
                 var dir = _directionalLight.Direction;
-                var intensity = _directionalEnabled ? _directionalLight.Intensity : 0f;
-                await program.SetUniform3fAsync("uLightDirection", dir.X, dir.Y, dir.Z).ConfigureAwait(false);
-                await program.SetUniform3fAsync("uLightColor", _directionalLight.Color.X, _directionalLight.Color.Y, _directionalLight.Color.Z).ConfigureAwait(false);
-                await program.SetUniform1fAsync("uLightIntensity", intensity).ConfigureAwait(false);
+                var dirLenSq = dir.LengthSquared;
+                var normalizedDir = dirLenSq > 0.000001f ? dir.Normalized() : new Vector3(0f, -1f, 0f);
+                var directionalColor = _directionalEnabled
+                    ? _directionalLight.Color * _directionalLight.Intensity
+                    : Vector3.Zero;
+                await program.SetUniform3fAsync("uLightDirection", normalizedDir.X, normalizedDir.Y, normalizedDir.Z).ConfigureAwait(false);
+                await program.SetUniform3fAsync("uLightColor", directionalColor.X, directionalColor.Y, directionalColor.Z).ConfigureAwait(false);
             }
 
             if (_pointLight is not null)

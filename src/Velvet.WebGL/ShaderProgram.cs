@@ -103,9 +103,8 @@ public sealed class ShaderProgram
         ArgumentNullException.ThrowIfNull(material);
 
         var c = material.AlbedoColor;
-        await SetUniform3fAsync("uMaterialColor", c.X, c.Y, c.Z).ConfigureAwait(false);
-        await SetUniform1fAsync("uMaterialAmbient", material.AmbientStrength).ConfigureAwait(false);
-        await SetUniform1fAsync("uMaterialDiffuse", material.DiffuseStrength).ConfigureAwait(false);
+        await SetUniform3fAsync("uBaseColor", c.X, c.Y, c.Z).ConfigureAwait(false);
+        await SetUniform1fAsync("uAmbientStrength", material.AmbientStrength).ConfigureAwait(false);
         await SetUniform1fAsync("uMaterialUnlit", material.Unlit ? 1.0f : 0.0f).ConfigureAwait(false);
 
         // Minimal texture support: baseColor texture
