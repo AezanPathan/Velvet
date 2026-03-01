@@ -10,7 +10,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Velvet.Core\Velvet.Core.csproj" />
     <PackageReference Include="Microsoft.JSInterop" Version="10.0.0" />
-    <PackageReference Include="Microsoft.NET.Runtime.WebAssembly.Sdk" Version="10.0.0" />
+    <PackageReference Include="Microsoft.NET.Runtime.WebAssembly.Sdk" Version="10.0.1" />
   </ItemGroup>
 
 </Project>
