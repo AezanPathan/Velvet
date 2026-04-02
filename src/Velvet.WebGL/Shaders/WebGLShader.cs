@@ -8,86 +8,77 @@ namespace Velvet.WebGL.Shaders;
 
 /// <summary>
 /// WebGL implementation of the IShader interface.
-/// Compiles vertex and fragment shaders, links them into a program, and provides
-/// methods to set uniform values. Uniform locations are cached for performance.
+/// Uses an async queuing pattern to avoid blocking on WASM.
+/// Uniform calls are enqueued and flushed asynchronously before rendering.
 /// </summary>
 public sealed class WebGLShader : IShader
 {
-    private readonly IWebGLBridge _bridge;
-    private readonly int _programId;
-    private readonly Dictionary<string, int> _uniformLocationCache;
-
-    private WebGLShader(IWebGLBridge bridge, int programId)
-    {
-        _bridge = bridge ?? throw new ArgumentNullException(nameof(bridge));
-        _programId = programId;
-        _uniformLocationCache = new Dictionary<string, int>();
-    }
+    private readonly ShaderProgram _program;
+    private readonly List<Task> _pendingUniformWrites;
 
     /// <summary>
-    /// Creates and compiles a new WebGL shader from vertex and fragment shader sources.
+    /// Creates a new WebGLShader that wraps the given ShaderProgram.
     /// </summary>
-    /// <param name="bridge">The WebGL bridge for communicating with the GPU</param>
-    /// <param name="vertexSource">GLSL source code for the vertex shader</param>
-    /// <param name="fragmentSource">GLSL source code for the fragment shader</param>
-    /// <returns>A new WebGLShader instance</returns>
-    /// <exception cref="ArgumentNullException">Thrown when any parameter is null</exception>
-    public static async Task<WebGLShader> CreateAsync(IWebGLBridge bridge, string vertexSource, string fragmentSource)
+    /// <param name="program">The shader program to wrap</param>
+    /// <exception cref="ArgumentNullException">Thrown when program is null</exception>
+    public WebGLShader(ShaderProgram program)
     {
-        ArgumentNullException.ThrowIfNull(bridge);
-        ArgumentNullException.ThrowIfNull(vertexSource);
-        ArgumentNullException.ThrowIfNull(fragmentSource);
-
-        var vsId = await bridge.CreateShaderAsync(vertexSource, "vertex").ConfigureAwait(false);
-        var fsId = await bridge.CreateShaderAsync(fragmentSource, "fragment").ConfigureAwait(false);
-
-        var programId = await bridge.CreateProgramAsync().ConfigureAwait(false);
-        await bridge.AttachShaderAsync(programId, vsId).ConfigureAwait(false);
-        await bridge.AttachShaderAsync(programId, fsId).ConfigureAwait(false);
-        await bridge.LinkProgramAsync(programId).ConfigureAwait(false);
-
-        return new WebGLShader(bridge, programId);
+        _program = program ?? throw new ArgumentNullException(nameof(program));
+        _pendingUniformWrites = new List<Task>(capacity: 16);
     }
 
     /// <summary>
     /// Activates this shader program for rendering.
-    /// Note: WebGL bridge methods automatically use the program ID, so this is a no-op.
-    /// The program is implicitly activated when uniforms are set or draw calls are made.
+    /// In WebGL, program activation is implicit when uniforms are set or draws are made.
     /// </summary>
     public void Use()
     {
-        // WebGL bridge design: program is activated implicitly when uniforms are set
-        // or when DrawMeshAsync is called with this programId.
-        // No explicit "use program" call is needed at this layer.
+        // Implicit activation via ShaderProgram design; no-op here.
     }
 
     /// <summary>
-    /// Sets a float uniform value in the shader.
+    /// Enqueues a float uniform write. Call FlushAsync() to apply all pending writes.
     /// </summary>
     /// <param name="name">The name of the uniform variable</param>
     /// <param name="value">The float value to set</param>
     public void SetFloat(string name, float value)
     {
-        _bridge.SetUniform1fAsync(_programId, name, value).GetAwaiter().GetResult();
+        _pendingUniformWrites.Add(_program.SetUniform1fAsync(name, value));
     }
 
     /// <summary>
-    /// Sets a Vector3 uniform value in the shader.
+    /// Enqueues a Vector3 uniform write. Call FlushAsync() to apply all pending writes.
     /// </summary>
     /// <param name="name">The name of the uniform variable</param>
     /// <param name="value">The Vector3 value to set</param>
     public void SetVector3(string name, Vector3 value)
     {
-        _bridge.SetUniform3fAsync(_programId, name, value.X, value.Y, value.Z).GetAwaiter().GetResult();
+        _pendingUniformWrites.Add(_program.SetUniform3fAsync(name, value.X, value.Y, value.Z));
     }
 
     /// <summary>
-    /// Sets a Matrix4 uniform value in the shader.
+    /// Enqueues a Matrix4 uniform write. Call FlushAsync() to apply all pending writes.
     /// </summary>
     /// <param name="name">The name of the uniform variable</param>
     /// <param name="value">The Matrix4 value to set</param>
     public void SetMatrix4(string name, Matrix4 value)
     {
-        _bridge.SetUniformMatrix4fvAsync(_programId, name, value.Data).GetAwaiter().GetResult();
+        _pendingUniformWrites.Add(_program.SetUniformMatrix4fvAsync(name, value.Data));
+    }
+
+    /// <summary>
+    /// Awaits all pending uniform writes and clears the queue.
+    /// Must be called before rendering to ensure uniforms are applied.
+    /// </summary>
+    public async Task FlushAsync()
+    {
+        if (_pendingUniformWrites.Count == 0)
+        {
+            return;
+        }
+
+        var writes = _pendingUniformWrites.ToArray();
+        _pendingUniformWrites.Clear();
+        await Task.WhenAll(writes).ConfigureAwait(false);
     }
 }
