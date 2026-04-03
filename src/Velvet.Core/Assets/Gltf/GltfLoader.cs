@@ -785,7 +785,8 @@ public static class GltfLoader
 
         var geo = new LoadedGeometry(vertices, indices, vertexLayout);
         var mesh = new Mesh(geo);
-        mesh.Material = TryReadMaterial(root, bin, baseUrl);
+        var materialIndex = prim.TryGetProperty("material", out var materialEl) ? materialEl.GetInt32() : (int?)null;
+        mesh.Material = TryReadMaterial(root, bin, baseUrl, materialIndex);
 
         return mesh;
     }
@@ -933,14 +934,20 @@ public static class GltfLoader
         return normals;
     }
 
-    private static Material? TryReadMaterial(JsonElement root, byte[] bin, string? baseUrl = null)
+    private static Material? TryReadMaterial(JsonElement root, byte[] bin, string? baseUrl = null, int? materialIndex = null)
     {
         if (!root.TryGetProperty("materials", out var materials) || materials.GetArrayLength() < 1)
         {
             return null;
         }
 
-        var m = materials[0];
+        var index = materialIndex ?? 0;
+        if (index < 0 || index >= materials.GetArrayLength())
+        {
+            index = 0;
+        }
+
+        var m = materials[index];
 
         // Unlit extension (optional)
         var unlit = false;
