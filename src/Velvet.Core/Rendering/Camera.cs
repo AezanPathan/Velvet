@@ -201,6 +201,14 @@ public sealed class Camera
 	}
 
 	/// <summary>
+	/// Marks the projection matrix dirty so it is recalculated on next access.
+	/// </summary>
+	public void UpdateProjection()
+	{
+		_projectionDirty = true;
+	}
+
+	/// <summary>
 	/// Frames a bounding box in the camera view by positioning the camera so the entire bounds are visible.
 	/// Sets target to the center of the bounds and moves the camera backward along the forward axis.
 	/// Also adjusts near and far planes to fit the bounds comfortably.

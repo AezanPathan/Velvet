@@ -19,9 +19,11 @@ namespace Velvet.Blazor;
 /// </summary>
 public sealed class VelvetApp
 {
+    private readonly IJSRuntime _js;
     private readonly IWebGLBridge _bridge;
     private readonly IMeshUploader _meshUploader;
     private readonly int _rendererId;
+    private readonly ResizeController _resizeController = new();
 
     private readonly List<MeshInstance> _instances = new();
     private List<RenderBatch>? _batches;
@@ -33,6 +35,9 @@ public sealed class VelvetApp
     private PointLight? _pointLight;
     private SpotLight? _spotLight;
 
+    private DotNetObjectReference<VelvetApp>? _resizeCallbackRef;
+    private string? _resizeBindingId;
+
     // For demo: ability to enable/disable lights
     private bool _directionalEnabled = true;
     private bool _pointEnabled = true;
@@ -40,8 +45,9 @@ public sealed class VelvetApp
     private CancellationTokenSource? _loopCts;
     private Task? _loopTask;
 
-    private VelvetApp(IWebGLBridge bridge, int rendererId)
+    private VelvetApp(IJSRuntime js, IWebGLBridge bridge, int rendererId)
     {
+        _js = js;
         _bridge = bridge;
         _meshUploader = new WebGLMeshUploader(bridge);
         _rendererId = rendererId;
@@ -60,7 +66,13 @@ public sealed class VelvetApp
         var bridge = new BlazorWebGLBridge(js);
         var rendererId = await bridge.InitWithElementAsync(canvas).ConfigureAwait(false);
 
-        var app = new VelvetApp(bridge, rendererId);
+        var app = new VelvetApp(js, bridge, rendererId);
+        app._resizeCallbackRef = DotNetObjectReference.Create(app);
+        app._resizeBindingId = await js.InvokeAsync<string>(
+            "CanvasHelpers.bindResizeTracking",
+            canvas,
+            app._resizeCallbackRef,
+            nameof(OnResizeFromJs)).AsTask().ConfigureAwait(false);
 
         if (programFactory is not null)
         {
@@ -83,6 +95,7 @@ public sealed class VelvetApp
         {
             ThrowIfRunning();
             _camera = value;
+            _resizeController.ApplyViewportToCamera(_camera);
         }
     }
 
@@ -123,6 +136,14 @@ public sealed class VelvetApp
             ThrowIfRunning();
             _spotLight = value;
         }
+    }
+
+    /// <summary>
+    /// Queues a resize request to be applied at the start of the next render frame.
+    /// </summary>
+    public void RequestResize(int width, int height, float dpr)
+    {
+        _resizeController.RequestResize(width, height, dpr);
     }
 
     /// <summary>
@@ -213,6 +234,7 @@ public sealed class VelvetApp
 
         if (cts is null || task is null)
         {
+            await CleanupResizeInteropAsync().ConfigureAwait(false);
             return;
         }
 
@@ -230,7 +252,15 @@ public sealed class VelvetApp
         finally
         {
             cts.Dispose();
+            await CleanupResizeInteropAsync().ConfigureAwait(false);
         }
+    }
+
+    [JSInvokable]
+    public Task OnResizeFromJs(int width, int height, double dpr)
+    {
+        RequestResize(width, height, (float)dpr);
+        return Task.CompletedTask;
     }
 
     private async Task RunLoopAsync(Func<float, Task>? onFrame, Func<Mesh, Task>? beforeDrawMesh, CancellationToken cancellationToken)
@@ -252,6 +282,13 @@ public sealed class VelvetApp
 
         while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
         {
+            if (_resizeController.HasPendingResize)
+            {
+                await _resizeController
+                    .ApplyResizeAsync((pixelWidth, pixelHeight) => _bridge.ResizeAsync(pixelWidth, pixelHeight), _camera, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
             var nowSeconds = (float)stopwatch.Elapsed.TotalSeconds;
             var deltaSeconds = nowSeconds - lastSeconds;
             lastSeconds = nowSeconds;
@@ -356,6 +393,29 @@ public sealed class VelvetApp
         {
             throw new InvalidOperationException("Cannot modify VelvetApp while running. Call StopAsync() first.");
         }
+    }
+
+    private async Task CleanupResizeInteropAsync()
+    {
+        var bindingId = _resizeBindingId;
+        _resizeBindingId = null;
+
+        if (!string.IsNullOrWhiteSpace(bindingId))
+        {
+            try
+            {
+                await _js.InvokeVoidAsync("CanvasHelpers.unbindResizeTracking", bindingId).AsTask().ConfigureAwait(false);
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+        }
+
+        _resizeCallbackRef?.Dispose();
+        _resizeCallbackRef = null;
     }
 
     /// <summary>
