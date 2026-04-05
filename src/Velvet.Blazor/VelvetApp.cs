@@ -8,6 +8,7 @@ using Microsoft.JSInterop;
 using Velvet.Core.Engine;
 using Velvet.Core.Math;
 using Velvet.Core.Rendering;
+using Velvet.Core.Rendering.Input;
 using Velvet.Core.Rendering.Lighting;
 using Velvet.WebGL;
 
@@ -34,9 +35,11 @@ public sealed class VelvetApp
     private DirectionalLight? _directionalLight;
     private PointLight? _pointLight;
     private SpotLight? _spotLight;
+    private OrbitInputBinder? _orbitBinder;
 
     private DotNetObjectReference<VelvetApp>? _resizeCallbackRef;
     private string? _resizeBindingId;
+    private string? _orbitInputBindingId;
 
     // For demo: ability to enable/disable lights
     private bool _directionalEnabled = true;
@@ -73,6 +76,14 @@ public sealed class VelvetApp
             canvas,
             app._resizeCallbackRef,
             nameof(OnResizeFromJs)).AsTask().ConfigureAwait(false);
+        app._orbitInputBindingId = await js.InvokeAsync<string>(
+            "CanvasHelpers.bindOrbitInput",
+            canvas,
+            app._resizeCallbackRef,
+            nameof(OnOrbitMouseDownFromJs),
+            nameof(OnOrbitMouseMoveFromJs),
+            nameof(OnOrbitMouseUpFromJs),
+            nameof(OnOrbitWheelFromJs)).AsTask().ConfigureAwait(false);
 
         if (programFactory is not null)
         {
@@ -136,6 +147,19 @@ public sealed class VelvetApp
             ThrowIfRunning();
             _spotLight = value;
         }
+    }
+
+    public void SetController(OrbitController controller)
+    {
+        ArgumentNullException.ThrowIfNull(controller);
+        ThrowIfRunning();
+
+        if (_camera is null)
+        {
+            throw new InvalidOperationException("Camera must be set before controller.");
+        }
+
+        _orbitBinder = new OrbitInputBinder(controller, _camera);
     }
 
     /// <summary>
@@ -263,6 +287,34 @@ public sealed class VelvetApp
         return Task.CompletedTask;
     }
 
+    [JSInvokable]
+    public Task OnOrbitMouseDownFromJs(int x, int y)
+    {
+        _orbitBinder?.OnMouseDown(x, y);
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnOrbitMouseMoveFromJs(int x, int y)
+    {
+        _orbitBinder?.OnMouseMove(x, y);
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnOrbitMouseUpFromJs()
+    {
+        _orbitBinder?.OnMouseUp();
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnOrbitWheelFromJs(double delta)
+    {
+        _orbitBinder?.OnWheel((float)delta);
+        return Task.CompletedTask;
+    }
+
     private async Task RunLoopAsync(Func<float, Task>? onFrame, Func<Mesh, Task>? beforeDrawMesh, CancellationToken cancellationToken)
     {
         var program = _program ?? throw new InvalidOperationException("Shader program not configured.");
@@ -292,6 +344,8 @@ public sealed class VelvetApp
             var nowSeconds = (float)stopwatch.Elapsed.TotalSeconds;
             var deltaSeconds = nowSeconds - lastSeconds;
             lastSeconds = nowSeconds;
+
+            _orbitBinder?.Update();
 
             // Prepare per-frame caches (e.g., skinning) before user frame logic runs.
             _boneMatrixCache.Clear();
@@ -399,12 +453,28 @@ public sealed class VelvetApp
     {
         var bindingId = _resizeBindingId;
         _resizeBindingId = null;
+        var orbitBindingId = _orbitInputBindingId;
+        _orbitInputBindingId = null;
 
         if (!string.IsNullOrWhiteSpace(bindingId))
         {
             try
             {
                 await _js.InvokeVoidAsync("CanvasHelpers.unbindResizeTracking", bindingId).AsTask().ConfigureAwait(false);
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(orbitBindingId))
+        {
+            try
+            {
+                await _js.InvokeVoidAsync("CanvasHelpers.unbindOrbitInput", orbitBindingId).AsTask().ConfigureAwait(false);
             }
             catch (JSDisconnectedException)
             {
