@@ -52,6 +52,9 @@ public sealed class ShaderProgram
     public static Task<ShaderProgram> CreateParticlesAsync(IWebGLBridge bridge)
         => CreateFromSourcesAsync(bridge, ShaderSources.ParticleVertexShader, ShaderSources.ParticleFragmentShader);
 
+    public static Task<ShaderProgram> CreateSkyboxAsync(IWebGLBridge bridge)
+        => CreateFromSourcesAsync(bridge, ShaderSources.SkyboxVertexShader, ShaderSources.SkyboxFragmentShader);
+
     public Task SetUniformMatrix4fvAsync(string name, float[] matrix)
         => _bridge.SetUniformMatrix4fvAsync(_programId, name, matrix);
 

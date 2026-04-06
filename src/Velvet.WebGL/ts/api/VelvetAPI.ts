@@ -300,8 +300,14 @@ export function createMesh(
             { location: 0, size: 3, type: gl.FLOAT, stride: 24, offset: 0 },  // aPosition (vec3)
             { location: 1, size: 3, type: gl.FLOAT, stride: 24, offset: 12 }  // aColor (vec3)
         ]);
+    } else if (effectiveStride === 3 || (effectiveStride === 0 && vertexData.length % 3 === 0)) {
+        // Position-only layout (for skybox): position(3) -> stride 12 bytes
+        count = indices ? count : vertexData.length / 3;
+        mesh.setAttributes([
+            { location: 0, size: 3, type: gl.FLOAT, stride: 12, offset: 0 }   // aPosition (vec3)
+        ]);
     } else {
-        throw new Error(`Unsupported vertex layout: ${vertexData.length} floats (expected stride 6, 8, 9, 11, or 16)`);
+        throw new Error(`Unsupported vertex layout: ${vertexData.length} floats (expected stride 3, 6, 8, 9, 11, or 16)`);
     }
     mesh.setCount(count);
 
@@ -537,4 +543,14 @@ export function clear(rendererId: number, r: number, g: number, b: number, a: nu
 export function resize(width: number, height: number): void {
     if (!context) throw new Error("Velvet not initialized");
     context.resize(width, height);
+}
+
+/**
+ * Enable or disable depth buffer writes.
+ * When disabled, fragments are still depth-tested but don't update the depth buffer.
+ * Useful for rendering skyboxes and other background elements.
+ */
+export function setDepthMask(rendererId: number, enabled: boolean): void {
+    const renderer = RendererManager.get(rendererId);
+    renderer.setDepthMask(enabled);
 }

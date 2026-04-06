@@ -21,6 +21,17 @@ public sealed class VertexLayout
     }
 
     /// <summary>
+    /// Layout: position only (x,y,z) per vertex.
+    /// Format: <c>[x, y, z]</c>
+    /// </summary>
+    public static VertexLayout Position { get; } = new(
+        strideFloats: 3,
+        elements: new[]
+        {
+            new VertexElement(VertexElementSemantic.Position, OffsetFloats: 0, ComponentCount: 3),
+        });
+
+    /// <summary>
     /// Layout: interleaved position (x,y,z) + color (r,g,b) per vertex.
     /// Format: <c>[x, y, z, r, g, b]</c>
     /// </summary>

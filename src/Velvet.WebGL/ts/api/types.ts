@@ -14,6 +14,7 @@ export interface VelvetGlobal {
 
     clear: (r: number, g: number, b: number, a: number) => void;
     resize: (width: number, height: number) => void;
+    setDepthMask: (rendererId: number, enabled: boolean) => void;
 }
 
 declare global {

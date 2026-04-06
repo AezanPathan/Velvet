@@ -31,11 +31,13 @@ public sealed class VelvetApp
     private readonly Dictionary<Skin, float[]> _boneMatrixCache = new();
 
     private ShaderProgram? _program;
+    private ShaderProgram? _skyboxProgram;
     private Camera? _camera;
     private DirectionalLight? _directionalLight;
     private PointLight? _pointLight;
     private SpotLight? _spotLight;
     private OrbitInputBinder? _orbitBinder;
+    private Skybox? _skybox;
 
     private DotNetObjectReference<VelvetApp>? _resizeCallbackRef;
     private string? _resizeBindingId;
@@ -160,6 +162,27 @@ public sealed class VelvetApp
         }
 
         _orbitBinder = new OrbitInputBinder(controller, _camera);
+    }
+
+    /// <summary>
+    /// Sets the skybox for the scene.
+    /// The skybox will be rendered as an infinitely distant background.
+    /// </summary>
+    public async Task SetSkybox(Skybox skybox)
+    {
+        ArgumentNullException.ThrowIfNull(skybox);
+        ThrowIfRunning();
+
+        _skybox = skybox;
+
+        // Create skybox shader program if not already created
+        if (_skyboxProgram is null)
+        {
+            _skyboxProgram = await ShaderProgram.CreateSkyboxAsync(_bridge).ConfigureAwait(false);
+        }
+
+        // Upload skybox mesh
+        await skybox.Mesh.UploadAsync(_meshUploader).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -356,6 +379,24 @@ public sealed class VelvetApp
             }
 
             await _bridge.ClearAsync(_rendererId, 0.08f, 0.08f, 0.10f, 1.0f).ConfigureAwait(false);
+
+            // Render skybox first (if present) with depth mask disabled
+            if (_skybox is not null && _skyboxProgram is not null)
+            {
+                // Disable depth writes so skybox doesn't block scene geometry
+                await _bridge.SetDepthMaskAsync(_rendererId, false).ConfigureAwait(false);
+
+                // Set view and projection matrices for skybox
+                await _skyboxProgram.SetUniformMatrix4fvAsync("uView", camera.ViewMatrix).ConfigureAwait(false);
+                await _skyboxProgram.SetUniformMatrix4fvAsync("uProjection", camera.ProjectionMatrix).ConfigureAwait(false);
+
+                // Draw skybox mesh
+                var skyboxMeshId = _skybox.Mesh.Resources.VertexBufferId.Value;
+                await _skyboxProgram.DrawMeshAsync(skyboxMeshId, _rendererId).ConfigureAwait(false);
+
+                // Re-enable depth writes for scene rendering
+                await _bridge.SetDepthMaskAsync(_rendererId, true).ConfigureAwait(false);
+            }
 
             // Set per-frame matrices once (View and Projection are constant for all meshes in this frame)
             await program.SetUniformMatrix4fvAsync("uView", camera.ViewMatrix).ConfigureAwait(false);

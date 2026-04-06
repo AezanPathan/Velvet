@@ -131,6 +131,12 @@ namespace Velvet.WebGL
         /// </summary>
         Task ResizeAsync(int width, int height);
 
+        /// <summary>
+        /// Enable or disable depth buffer writes.
+        /// When disabled, fragments are still depth tested but don't update the depth buffer.
+        /// </summary>
+        Task SetDepthMaskAsync(int rendererId, bool enabled);
+
         #endregion
     }
 }

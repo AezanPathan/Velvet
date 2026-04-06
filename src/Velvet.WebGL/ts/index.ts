@@ -24,7 +24,8 @@ import "./api/types";
     bindTextureById: API.bindTextureById,
     setBlendMode: API.setBlendMode,
     clear: API.clear,
-    resize: API.resize
+    resize: API.resize,
+    setDepthMask: API.setDepthMask
 };
 
 export const Velvet = (window as any).Velvet;

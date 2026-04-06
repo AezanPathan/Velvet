@@ -141,6 +141,13 @@ export class GLRenderer implements IRenderer {
   }
 
   /**
+   * Enable or disable depth buffer writes.
+   */
+  public setDepthMask(enabled: boolean): void {
+    this.gl.depthMask(enabled);
+  }
+
+  /**
    * Draws a mesh with a specific program.
    */
   public drawMesh(mesh: IMesh, program: IProgram): void {

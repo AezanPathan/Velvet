@@ -192,4 +192,52 @@ public static class ShaderSources
         "void main() {\n" +
         "    outColor = vColor;\n" +
         "}\n";
+
+    /// <summary>
+    /// Skybox vertex shader.
+    /// Removes translation from view matrix so skybox appears infinitely distant.
+    /// Passes position as direction vector to fragment shader.
+    /// </summary>
+    public const string SkyboxVertexShader = "#version 300 es\n" +
+        "precision mediump float;\n" +
+        "\n" +
+        "layout(location = 0) in vec3 aPosition;\n" +
+        "\n" +
+        "uniform mat4 uView;\n" +
+        "uniform mat4 uProjection;\n" +
+        "\n" +
+        "out vec3 vDirection;\n" +
+        "\n" +
+        "void main() {\n" +
+        "    // Remove translation from view matrix by extracting rotation only\n" +
+        "    mat4 viewRotation = mat4(mat3(uView));\n" +
+        "    vec4 pos = uProjection * viewRotation * vec4(aPosition, 1.0);\n" +
+        "    // Set depth to maximum (z = w) so skybox is always behind everything\n" +
+        "    gl_Position = pos.xyww;\n" +
+        "    vDirection = aPosition;\n" +
+        "}\n";
+
+    /// <summary>
+    /// Skybox fragment shader.
+    /// Renders a simple gradient based on the direction vector.
+    /// </summary>
+    public const string SkyboxFragmentShader = "#version 300 es\n" +
+        "precision mediump float;\n" +
+        "\n" +
+        "in vec3 vDirection;\n" +
+        "out vec4 outColor;\n" +
+        "\n" +
+        "void main() {\n" +
+        "    // Simple gradient: blend between horizon and zenith colors based on y\n" +
+        "    vec3 dir = normalize(vDirection);\n" +
+        "    float t = dir.y * 0.5 + 0.5; // Map -1..1 to 0..1\n" +
+        "    \n" +
+        "    // Horizon color (bottom): light blue-gray\n" +
+        "    vec3 horizonColor = vec3(0.5, 0.7, 0.9);\n" +
+        "    // Zenith color (top): deeper blue\n" +
+        "    vec3 zenithColor = vec3(0.2, 0.4, 0.8);\n" +
+        "    \n" +
+        "    vec3 color = mix(horizonColor, zenithColor, t);\n" +
+        "    outColor = vec4(color, 1.0);\n" +
+        "}\n";
 }

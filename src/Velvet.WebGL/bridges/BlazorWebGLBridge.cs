@@ -118,5 +118,8 @@ public sealed class BlazorWebGLBridge : IWebGLBridge
     public Task ResizeAsync(int width, int height)
         => _js.InvokeVoidAsync("Velvet.resize", width, height).AsTask();
 
+    public Task SetDepthMaskAsync(int rendererId, bool enabled)
+        => _js.InvokeVoidAsync("Velvet.setDepthMask", rendererId, enabled).AsTask();
+
     #endregion
 }
