@@ -145,7 +145,7 @@ public sealed class ParticleSystem
         int idx = _freeStack[--_freeCount];
 
         _positions[idx] = Emitter.SampleSpawnPosition(_random);
-        _velocities[idx] = Emitter.InitialVelocity;
+        _velocities[idx] = Emitter.SampleSpawnVelocity(_random);
         _ages[idx] = 0f;
         _lifetimes[idx] = ParticleLifetime;
 

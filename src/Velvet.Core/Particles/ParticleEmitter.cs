@@ -30,6 +30,16 @@ public sealed class ParticleEmitter
     /// </summary>
     public Vector3 InitialVelocity { get; set; } = Vector3.Zero;
 
+    /// <summary>
+    /// Minimum velocity variation applied to spawned particles (per axis).
+    /// </summary>
+    public Vector3 VelocityMin { get; set; } = Vector3.Zero;
+
+    /// <summary>
+    /// Maximum velocity variation applied to spawned particles (per axis).
+    /// </summary>
+    public Vector3 VelocityMax { get; set; } = Vector3.Zero;
+
     internal Vector3 SampleSpawnPosition(Random rng)
     {
         if (Shape == ParticleEmitterShape.Point)
@@ -39,5 +49,13 @@ public sealed class ParticleEmitter
         var y = (float)(rng.NextDouble() * 2.0 - 1.0) * BoxExtents.Y;
         var z = (float)(rng.NextDouble() * 2.0 - 1.0) * BoxExtents.Z;
         return new Vector3(Position.X + x, Position.Y + y, Position.Z + z);
+    }
+
+    internal Vector3 SampleSpawnVelocity(Random rng)
+    {
+        var randomX = (float)(rng.NextDouble() * (VelocityMax.X - VelocityMin.X) + VelocityMin.X);
+        var randomY = (float)(rng.NextDouble() * (VelocityMax.Y - VelocityMin.Y) + VelocityMin.Y);
+        var randomZ = (float)(rng.NextDouble() * (VelocityMax.Z - VelocityMin.Z) + VelocityMin.Z);
+        return InitialVelocity + new Vector3(randomX, randomY, randomZ);
     }
 }

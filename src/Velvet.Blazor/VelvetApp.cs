@@ -8,6 +8,7 @@ using Microsoft.JSInterop;
 using Velvet.Core.Engine;
 using Velvet.Core.Geometry;
 using Velvet.Core.Math;
+using Velvet.Core.Particles;
 using Velvet.Core.Rendering;
 using Velvet.Core.Rendering.Input;
 using Velvet.Core.Rendering.Lighting;
@@ -30,6 +31,10 @@ public sealed class VelvetApp
     private readonly List<MeshInstance> _instances = new();
     private List<RenderBatch>? _batches;
     private readonly Dictionary<Skin, float[]> _boneMatrixCache = new();
+    
+    // Particle system support
+    private readonly List<Velvet.Core.Particles.ParticleSystem> _particleSystems = new();
+    private readonly List<ParticleRenderer> _particleRenderers = new();
 
     private ShaderProgram? _program;
     private ShaderProgram? _skyboxProgram;
@@ -229,6 +234,18 @@ public sealed class VelvetApp
     }
 
     /// <summary>
+    /// Registers a particle system with the application. 
+    /// Particle renderer initialization occurs on <see cref="StartAsync"/>.
+    /// </summary>
+    public void Add(ParticleSystem particleSystem)
+    {
+        ArgumentNullException.ThrowIfNull(particleSystem);
+        ThrowIfRunning();
+
+        _particleSystems.Add(particleSystem);
+    }
+
+    /// <summary>
     /// Prepares a scene for rendering using its current node transforms.
     /// This updates mesh instance matrices and computes bone matrices for skinned meshes.
     /// Animation time is not advanced here; call Animator.Update(dt) explicitly before Render(...).
@@ -260,7 +277,8 @@ public sealed class VelvetApp
     public Task StartAsync(Func<float, Task>? onFrame = null)
     {
         if (_program is null) throw new InvalidOperationException("Shader program not configured. Provide a programFactory to CreateAsync(...).");
-        if (_instances.Count == 0) throw new InvalidOperationException("No meshes added. Call Add(scene) before StartAsync().");
+        if (_instances.Count == 0 && _particleSystems.Count == 0) 
+            throw new InvalidOperationException("No meshes or particle systems added. Call Add(scene) or Add(particleSystem) before StartAsync().");
         if (_loopTask is not null) return Task.CompletedTask;
 
         // Build batches from instances
@@ -274,7 +292,8 @@ public sealed class VelvetApp
     public Task StartAsync(Func<float, Task>? onFrame, Func<Mesh, Task>? beforeDrawMesh)
     {
         if (_program is null) throw new InvalidOperationException("Shader program not configured. Provide a programFactory to CreateAsync(...).");
-        if (_instances.Count == 0) throw new InvalidOperationException("No meshes added. Call Add(scene) before StartAsync().");
+        if (_instances.Count == 0 && _particleSystems.Count == 0) 
+            throw new InvalidOperationException("No meshes or particle systems added. Call Add(scene) or Add(particleSystem) before StartAsync().");
         if (_loopTask is not null) return Task.CompletedTask;
 
         // Build batches from instances
@@ -371,6 +390,14 @@ public sealed class VelvetApp
             await instance.Mesh.UploadAsync(_meshUploader, cancellationToken).ConfigureAwait(false);
         }
 
+        // Initialize particle renderers
+        foreach (var particleSystem in _particleSystems)
+        {
+            var particleRenderer = new ParticleRenderer(particleSystem, _bridge);
+            await particleRenderer.InitializeAsync().ConfigureAwait(false);
+            _particleRenderers.Add(particleRenderer);
+        }
+
         using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(16));
 
         var stopwatch = Stopwatch.StartNew();
@@ -393,6 +420,12 @@ public sealed class VelvetApp
 
             // Prepare per-frame caches (e.g., skinning) before user frame logic runs.
             _boneMatrixCache.Clear();
+
+            // Update particle systems
+            foreach (var particleSystem in _particleSystems)
+            {
+                particleSystem.Update(deltaSeconds);
+            }
 
             if (onFrame is not null)
             {
@@ -513,6 +546,13 @@ public sealed class VelvetApp
 
                     await program.DrawMeshAsync(meshId, _rendererId).ConfigureAwait(false);
                 }
+            }
+
+            // Render particles
+            foreach (var particleRenderer in _particleRenderers)
+            {
+                await particleRenderer.UploadAsync().ConfigureAwait(false);
+                await particleRenderer.RenderAsync(_rendererId, camera).ConfigureAwait(false);
             }
 
         }
