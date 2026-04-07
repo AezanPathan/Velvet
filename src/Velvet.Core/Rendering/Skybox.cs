@@ -14,9 +14,16 @@ public sealed class Skybox
     /// </summary>
     public Mesh Mesh { get; }
 
-    private Skybox(Mesh mesh)
+    /// <summary>
+    /// Optional cubemap texture ID for image-based skybox.
+    /// If null, the skybox will use a gradient.
+    /// </summary>
+    public int? CubemapTextureId { get; }
+
+    public Skybox(Mesh mesh, int? cubemapTextureId = null)
     {
         Mesh = mesh ?? throw new ArgumentNullException(nameof(mesh));
+        CubemapTextureId = cubemapTextureId;
     }
 
     /// <summary>

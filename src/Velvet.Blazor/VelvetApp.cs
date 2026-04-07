@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using Velvet.Core.Engine;
+using Velvet.Core.Geometry;
 using Velvet.Core.Math;
 using Velvet.Core.Rendering;
 using Velvet.Core.Rendering.Input;
@@ -183,6 +184,26 @@ public sealed class VelvetApp
 
         // Upload skybox mesh
         await skybox.Mesh.UploadAsync(_meshUploader).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Creates and sets a cubemap skybox from 6 face images.
+    /// Face order: +X, -X, +Y, -Y, +Z, -Z
+    /// </summary>
+    public async Task SetCubemapSkybox(string px, string nx, string py, string ny, string pz, string nz)
+    {
+        ThrowIfRunning();
+        
+        // Create cubemap texture
+        var faceUrls = new[] { px, nx, py, ny, pz, nz };
+        var textureId = await _bridge.CreateCubemapTextureAsync(faceUrls).ConfigureAwait(false);
+        
+        // Create skybox with cubemap
+        var geometry = new SkyboxGeometry();
+        var mesh = new Mesh(geometry);
+        var skybox = new Skybox(mesh, textureId);
+        
+        await SetSkybox(skybox).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -389,6 +410,21 @@ public sealed class VelvetApp
                 // Set view and projection matrices for skybox
                 await _skyboxProgram.SetUniformMatrix4fvAsync("uView", camera.ViewMatrix).ConfigureAwait(false);
                 await _skyboxProgram.SetUniformMatrix4fvAsync("uProjection", camera.ProjectionMatrix).ConfigureAwait(false);
+
+                // Set cubemap texture if available
+                if (_skybox.CubemapTextureId.HasValue)
+                {
+                    await _bridge.BindCubemapTextureAsync(
+                        _skyboxProgram.ProgramId,
+                        "u_Skybox",
+                        _skybox.CubemapTextureId.Value,
+                        0).ConfigureAwait(false);
+                    await _skyboxProgram.SetUniform1bAsync("u_HasCubemap", true).ConfigureAwait(false);
+                }
+                else
+                {
+                    await _skyboxProgram.SetUniform1bAsync("u_HasCubemap", false).ConfigureAwait(false);
+                }
 
                 // Draw skybox mesh
                 var skyboxMeshId = _skybox.Mesh.Resources.VertexBufferId.Value;

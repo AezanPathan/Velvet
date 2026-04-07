@@ -112,8 +112,14 @@ public sealed class BlazorWebGLBridge : IWebGLBridge
     public Task<int> CreateTextureFromUrlAsync(string url)
         => _js.InvokeAsync<int>("Velvet.createTextureFromUrl", url).AsTask();
 
+    public Task<int> CreateCubemapTextureAsync(string[] faceUrls)
+        => _js.InvokeAsync<int>("Velvet.createCubemapTexture", (object)faceUrls).AsTask();
+
     public Task BindTextureAsync(int programId, string samplerName, int textureId, int textureUnit)
         => _js.InvokeVoidAsync("Velvet.bindTextureById", programId, samplerName, textureId, textureUnit).AsTask();
+
+    public Task BindCubemapTextureAsync(int programId, string samplerName, int textureId, int textureUnit)
+        => _js.InvokeVoidAsync("Velvet.bindCubemapTextureById", programId, samplerName, textureId, textureUnit).AsTask();
 
     public Task ResizeAsync(int width, int height)
         => _js.InvokeVoidAsync("Velvet.resize", width, height).AsTask();

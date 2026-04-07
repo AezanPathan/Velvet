@@ -483,6 +483,99 @@ export function bindTextureById(programId: number, samplerName: string, textureI
 }
 
 /**
+ * Create a cubemap texture from 6 face URLs.
+ * Face order: +X, -X, +Y, -Y, +Z, -Z
+ */
+export function createCubemapTexture(faceUrls: string[]): Promise<number> {
+    return new Promise((resolve, reject) => {
+        if (!context) return reject(new Error("Velvet not initialized"));
+        if (faceUrls.length !== 6) {
+            return reject(new Error("createCubemapTexture: exactly 6 face URLs required"));
+        }
+
+        const gl = context.gl;
+        const texture = gl.createTexture();
+        if (!texture) {
+            return reject(new Error("createCubemapTexture: gl.createTexture failed"));
+        }
+
+        gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture);
+
+        // Set texture parameters
+        gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
+
+        // Face targets in order: +X, -X, +Y, -Y, +Z, -Z
+        const faceTargets = [
+            gl.TEXTURE_CUBE_MAP_POSITIVE_X,
+            gl.TEXTURE_CUBE_MAP_NEGATIVE_X,
+            gl.TEXTURE_CUBE_MAP_POSITIVE_Y,
+            gl.TEXTURE_CUBE_MAP_NEGATIVE_Y,
+            gl.TEXTURE_CUBE_MAP_POSITIVE_Z,
+            gl.TEXTURE_CUBE_MAP_NEGATIVE_Z
+        ];
+
+        let loadedCount = 0;
+        let hasError = false;
+
+        for (let i = 0; i < 6; i++) {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            
+            img.onload = () => {
+                if (hasError) return;
+
+                try {
+                    gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture);
+                    gl.texImage2D(faceTargets[i], 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+                    
+                    loadedCount++;
+                    if (loadedCount === 6) {
+                        gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
+                        const textureId = TextureManager.add(texture);
+                        console.log(`[Velvet] Cubemap texture loaded successfully, id=${textureId}`);
+                        resolve(textureId);
+                    }
+                } catch (e) {
+                    hasError = true;
+                    reject(e);
+                }
+            };
+
+            img.onerror = () => {
+                if (!hasError) {
+                    hasError = true;
+                    reject(new Error(`createCubemapTexture: failed to load face ${i}: ${faceUrls[i]}`));
+                }
+            };
+
+            img.src = faceUrls[i];
+        }
+    });
+}
+
+/**
+ * Bind a cubemap texture by ID to a sampler uniform.
+ */
+export function bindCubemapTextureById(programId: number, samplerName: string, textureId: number, textureUnit: number): void {
+    if (!context) throw new Error("Velvet not initialized");
+
+    const gl = context.gl;
+    const texture = TextureManager.get(textureId);
+    const program = ProgramManager.get(programId) as any;
+    const location = program.getUniformLocation(samplerName);
+    if (!location) throw new Error(`bindCubemapTextureById: uniform ${samplerName} not found`);
+
+    program.use();
+    gl.activeTexture(gl.TEXTURE0 + textureUnit);
+    gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture);
+    gl.uniform1i(location, textureUnit);
+}
+
+/**
  * Bind a texture to a texture unit and set the sampler uniform.
  * 
  * @param texture - WebGLTexture object from loadTexture()

@@ -24,6 +24,11 @@ public sealed class ShaderProgram
         _hasBonesSupport = hasBonesSupport;
     }
 
+    /// <summary>
+    /// Gets the internal program ID for advanced operations.
+    /// </summary>
+    public int ProgramId => _programId;
+
     public static async Task<ShaderProgram> CreateFromSourcesAsync(IWebGLBridge bridge, string vertexSource, string fragmentSource)
     {
         ArgumentNullException.ThrowIfNull(bridge);
@@ -66,6 +71,9 @@ public sealed class ShaderProgram
 
     public Task SetUniform1fAsync(string name, float value)
         => _bridge.SetUniform1fAsync(_programId, name, value);
+
+    public Task SetUniform1bAsync(string name, bool value)
+        => _bridge.SetUniform1bAsync(_programId, name, value);
 
     /// <summary>
     /// Sets an array of bone matrices for GPU skinning.

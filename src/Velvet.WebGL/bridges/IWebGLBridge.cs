@@ -96,9 +96,20 @@ namespace Velvet.WebGL
         Task<int> CreateTextureFromUrlAsync(string url);
 
         /// <summary>
+        /// Create a cubemap texture from 6 face URLs and return a texture ID.
+        /// Face order: +X, -X, +Y, -Y, +Z, -Z
+        /// </summary>
+        Task<int> CreateCubemapTextureAsync(string[] faceUrls);
+
+        /// <summary>
         /// Bind a texture by ID to the given sampler uniform on a program.
         /// </summary>
         Task BindTextureAsync(int programId, string samplerName, int textureId, int textureUnit);
+
+        /// <summary>
+        /// Bind a cubemap texture by ID to the given sampler uniform on a program.
+        /// </summary>
+        Task BindCubemapTextureAsync(int programId, string samplerName, int textureId, int textureUnit);
 
         #endregion
 

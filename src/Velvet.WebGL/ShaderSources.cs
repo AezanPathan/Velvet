@@ -219,7 +219,7 @@ public static class ShaderSources
 
     /// <summary>
     /// Skybox fragment shader.
-    /// Renders a simple gradient based on the direction vector.
+    /// Supports both cubemap textures and gradient fallback.
     /// </summary>
     public const string SkyboxFragmentShader = "#version 300 es\n" +
         "precision mediump float;\n" +
@@ -227,17 +227,25 @@ public static class ShaderSources
         "in vec3 vDirection;\n" +
         "out vec4 outColor;\n" +
         "\n" +
+        "uniform samplerCube u_Skybox;\n" +
+        "uniform bool u_HasCubemap;\n" +
+        "\n" +
         "void main() {\n" +
-        "    // Simple gradient: blend between horizon and zenith colors based on y\n" +
-        "    vec3 dir = normalize(vDirection);\n" +
-        "    float t = dir.y * 0.5 + 0.5; // Map -1..1 to 0..1\n" +
-        "    \n" +
-        "    // Horizon color (bottom): light blue-gray\n" +
-        "    vec3 horizonColor = vec3(0.5, 0.7, 0.9);\n" +
-        "    // Zenith color (top): deeper blue\n" +
-        "    vec3 zenithColor = vec3(0.2, 0.4, 0.8);\n" +
-        "    \n" +
-        "    vec3 color = mix(horizonColor, zenithColor, t);\n" +
-        "    outColor = vec4(color, 1.0);\n" +
+        "    if (u_HasCubemap) {\n" +
+        "        // Sample cubemap texture\n" +
+        "        outColor = texture(u_Skybox, vDirection);\n" +
+        "    } else {\n" +
+        "        // Simple gradient: blend between horizon and zenith colors based on y\n" +
+        "        vec3 dir = normalize(vDirection);\n" +
+        "        float t = dir.y * 0.5 + 0.5; // Map -1..1 to 0..1\n" +
+        "        \n" +
+        "        // Horizon color (bottom): light blue-gray\n" +
+        "        vec3 horizonColor = vec3(0.5, 0.7, 0.9);\n" +
+        "        // Zenith color (top): deeper blue\n" +
+        "        vec3 zenithColor = vec3(0.2, 0.4, 0.8);\n" +
+        "        \n" +
+        "        vec3 color = mix(horizonColor, zenithColor, t);\n" +
+        "        outColor = vec4(color, 1.0);\n" +
+        "    }\n" +
         "}\n";
 }
