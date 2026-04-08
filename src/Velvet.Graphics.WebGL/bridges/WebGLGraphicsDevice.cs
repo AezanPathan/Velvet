@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using Velvet.Core.Engine;
 using Velvet.Core.Rendering;
 
-namespace Velvet.WebGL;
+namespace Velvet.Graphics.WebGL;
 
 public class WebGLGraphicsDevice : IGraphicsDevice
 {

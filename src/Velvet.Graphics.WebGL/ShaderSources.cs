@@ -1,6 +1,6 @@
 using System;
 
-namespace Velvet.WebGL;
+namespace Velvet.Graphics.WebGL;
 
 /// <summary>
 /// Built-in shader sources for Velvet rendering.

@@ -1,4 +1,4 @@
-namespace Velvet.WebGL;
+namespace Velvet.Graphics.WebGL;
 
 /// <summary>
 /// Lightweight wrapper that provides a concrete WebGL device instance.

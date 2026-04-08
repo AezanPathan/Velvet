@@ -12,9 +12,9 @@ using Velvet.Core.Particles;
 using Velvet.Core.Rendering;
 using Velvet.Core.Rendering.Input;
 using Velvet.Core.Rendering.Lighting;
-using Velvet.WebGL;
+using Velvet.Graphics.WebGL;
 
-namespace Velvet.Blazor;
+namespace Velvet.Hosting.Web;
 
 /// <summary>
 /// Blazor-first engine entry point for Velvet.

@@ -97,7 +97,7 @@ Applied new Material system to [Velvet-Site/Pages/MaterialDemo.razor.cs](Velvet-
    - Engine layer handles conversion
 
 2. **Option B** (Alternative):
-   - Create Material adapter in Velvet.WebGL layer
+   - Create Material adapter in Velvet.Graphics.WebGL layer
    - `public static Material CreateFromOldMaterial(ShaderProgram program, Velvet.Core.Rendering.Material oldMaterial)`
    - VelvetApp converts old Materials to new on-the-fly during rendering
 
@@ -135,9 +135,9 @@ Applied new Material system to [Velvet-Site/Pages/MaterialDemo.razor.cs](Velvet-
 
 ## Backend Implementation: WebGLShader
 
-**Location:** `src/Velvet.WebGL/Shaders/WebGLShader.cs`
+**Location:** `src/Velvet.Graphics.WebGL/Shaders/WebGLShader.cs`
 
-**Namespace:** `Velvet.WebGL.Shaders`
+**Namespace:** `Velvet.Graphics.WebGL.Shaders`
 
 ### Why It Exists
 - Implements the `IShader` interface for the new Material system
@@ -256,7 +256,7 @@ src/
         IShader.cs
       Materials/
         Material.cs                   ← New (shader-driven)
-  Velvet.WebGL/
+  Velvet.Graphics.WebGL/
     Shaders/
       WebGLShader.cs                  ← IShader implementation
 Velvet-Site/

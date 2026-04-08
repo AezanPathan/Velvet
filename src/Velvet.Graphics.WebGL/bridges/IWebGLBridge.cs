@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-namespace Velvet.WebGL
+namespace Velvet.Graphics.WebGL
 {
     /// <summary>
     /// Minimal JS bridge interface for Velvet's WebGL backend.

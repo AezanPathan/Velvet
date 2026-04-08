@@ -1,4 +1,4 @@
-namespace Velvet.WebGL;
+namespace Velvet.Graphics.WebGL;
 
 /// <summary>
 /// Host-side extension helpers to configure Velvet WebGL integration.

@@ -1,6 +1,6 @@
 using System;
 
-namespace Velvet.WebGL;
+namespace Velvet.Graphics.WebGL;
 
 /// <summary>
 /// Simple global bridge registry so hosts can wire in their preferred JS transport.

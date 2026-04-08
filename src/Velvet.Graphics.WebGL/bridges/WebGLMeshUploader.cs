@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Velvet.Core.Geometry;
 using Velvet.Core.Rendering;
 
-namespace Velvet.WebGL;
+namespace Velvet.Graphics.WebGL;
 
 /// <summary>
 /// WebGL-backed mesh uploader that delegates GPU upload to the Velvet JavaScript API via <see cref="IWebGLBridge"/>.

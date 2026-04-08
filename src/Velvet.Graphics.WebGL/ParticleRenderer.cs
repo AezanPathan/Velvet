@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using Velvet.Core.Particles;
 using Velvet.Core.Rendering;
 
-namespace Velvet.WebGL;
+namespace Velvet.Graphics.WebGL;
 
 /// <summary>
 /// GPU renderer for <see cref="ParticleSystem"/> using WebGL point rendering.
@@ -11,14 +11,14 @@ namespace Velvet.WebGL;
 public sealed class ParticleRenderer
 {
     private readonly ParticleSystem _system;
-    private readonly global::Velvet.WebGL.IWebGLBridge _bridge;
+    private readonly IWebGLBridge _bridge;
     private ShaderProgram? _program;
     private int _meshId = -1;
     private float[]? _vertexBuffer;
 
     public ShaderProgram? Program => _program;
 
-    public ParticleRenderer(ParticleSystem system, global::Velvet.WebGL.IWebGLBridge bridge)
+    public ParticleRenderer(ParticleSystem system, IWebGLBridge bridge)
     {
         _system = system ?? throw new ArgumentNullException(nameof(system));
         _bridge = bridge ?? throw new ArgumentNullException(nameof(bridge));

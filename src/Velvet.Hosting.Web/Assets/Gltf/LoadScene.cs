@@ -1,7 +1,7 @@
 using Velvet.Core.Assets.Gltf;
 using Velvet.Core.Engine;
 
-namespace Velvet.Blazor.Assets.Gltf;
+namespace Velvet.Hosting.Web.Assets.Gltf;
 
 public static class LoadScene
 {

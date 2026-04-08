@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Velvet.Core.Math;
 using Velvet.Core.Rendering.Shaders;
 
-namespace Velvet.WebGL.Shaders;
+namespace Velvet.Graphics.WebGL.Shaders;
 
 /// <summary>
 /// WebGL implementation of the IShader interface.

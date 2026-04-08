@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Velvet.Core.Rendering;
 
-namespace Velvet.WebGL;
+namespace Velvet.Graphics.WebGL;
 
 /// <summary>
 /// A minimal shader program wrapper that hides program IDs and delegates work to an <see cref="IWebGLBridge"/>.

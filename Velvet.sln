@@ -5,9 +5,9 @@ VisualStudioVersion = 17.12.35527.113 d17.12
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Velvet.Core", "src\Velvet.Core\Velvet.Core.csproj", "{B1D71DA9-4421-4BCA-9C59-9A4C5D2B987E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Velvet.WebGL", "src\Velvet.WebGL\Velvet.WebGL.csproj", "{80C9D5C4-1B5E-452E-99EE-66D876823B20}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Velvet.Graphics.WebGL", "src\Velvet.Graphics.WebGL\Velvet.Graphics.WebGL.csproj", "{80C9D5C4-1B5E-452E-99EE-66D876823B20}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Velvet.Blazor", "src\Velvet.Blazor\Velvet.Blazor.csproj", "{2ED282DE-4BB9-474E-927A-F96C1DD194D8}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Velvet.Hosting.Web", "src\Velvet.Hosting.Web\Velvet.Hosting.Web.csproj", "{2ED282DE-4BB9-474E-927A-F96C1DD194D8}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{C79FDC70-AD46-4BB5-BB92-3F236CFB774F}"
 EndProject

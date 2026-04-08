@@ -1,7 +1,7 @@
 using Microsoft.JSInterop;
-using Velvet.WebGL;
+using Velvet.Graphics.WebGL;
 
-namespace Velvet.Blazor;
+namespace Velvet.Hosting.Web;
 
 public static class VelvetBlazorExtensions
 {

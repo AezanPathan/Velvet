@@ -2,16 +2,14 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.JSInterop;
 
-namespace Velvet.WebGL;
+namespace Velvet.Graphics.WebGL;
 
 /// <summary>
-/// Blazor bridge implementation that talks to the Velvet JavaScript API via IJSRuntime.
-/// This implementation intentionally avoids a compile-time dependency on Blazor types
-/// (e.g. ElementReference) so the Velvet.WebGL project remains host-agnostic.
-/// 
-/// At runtime, Blazor should pass an ElementReference object; IJSRuntime will marshal it.
+/// Static bridge implementation that calls Velvet API using IJSRuntime.
+/// Intended for static HTML / non-Blazor WASM hosts that only have canvas IDs.
+/// Uses IJSRuntime so the same code works for many hosting scenarios.
 /// </summary>
-public sealed class BlazorWebGLBridge : IWebGLBridge
+public sealed class StaticWebGLBridge : IWebGLBridge
 {
     #region Fields
 
@@ -21,7 +19,11 @@ public sealed class BlazorWebGLBridge : IWebGLBridge
 
     #region Constructor
 
-    public BlazorWebGLBridge(IJSRuntime js)
+    /// <summary>
+    /// Create a new StaticWebGLBridge.
+    /// </summary>
+    /// <param name="js">IJSRuntime instance (available in static WASM or other hosts).</param>
+    public StaticWebGLBridge(IJSRuntime js)
     {
         _js = js ?? throw new ArgumentNullException(nameof(js));
     }
@@ -31,44 +33,41 @@ public sealed class BlazorWebGLBridge : IWebGLBridge
     #region Initialization
 
     /// <inheritdoc />
-    /// <remarks>
-    /// The parameter is declared as <see cref="object"/> to avoid a compile-time
-    /// dependency on Microsoft.AspNetCore.Components. When calling from a Razor
-    /// component, pass the ElementReference (e.g. `await Bridge.InitWithElementAsync(canvasRef)`).
-    /// </remarks>
-    public Task<int> InitWithElementAsync(object canvasElement)
+    public async Task<int> InitWithIdAsync(string canvasId)
     {
-        if (canvasElement is null) throw new ArgumentNullException(nameof(canvasElement));
-
-        // We intentionally do not type-check for ElementReference at compile-time.
-        // If you want compile-time checks, add a reference to Microsoft.AspNetCore.Components and
-        // change the parameter type to ElementReference.
-        return _js.InvokeAsync<int>("Velvet.init", canvasElement).AsTask();
+        if (string.IsNullOrWhiteSpace(canvasId)) throw new ArgumentNullException(nameof(canvasId));
+        // Call the Velvet.init(canvasId) convention in the demo (JS should accept either ID or element).
+        return await _js.InvokeAsync<int>("Velvet.init", canvasId).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public Task<int> InitWithIdAsync(string canvasId)
+    public Task<int> InitWithElementAsync(object canvasElement)
     {
-        // Blazor bridge intentionally does not support string id init.
-        throw new NotSupportedException("BlazorWebGLBridge does not support InitWithIdAsync. Use InitWithElementAsync with an ElementReference.");
+        // Static bridge does not accept ElementReference; host should call InitWithIdAsync.
+        throw new NotSupportedException("StaticWebGLBridge supports initialization by canvas ID only. Use InitWithIdAsync.");
     }
 
     #endregion
 
     #region Resource creation / management
 
+    /// <inheritdoc />
     public Task<int> CreateShaderAsync(string source, string type)
         => _js.InvokeAsync<int>("Velvet.createShader", source, type).AsTask();
 
+    /// <inheritdoc />
     public Task<int> CreateProgramAsync()
         => _js.InvokeAsync<int>("Velvet.createProgram").AsTask();
 
+    /// <inheritdoc />
     public Task AttachShaderAsync(int programId, int shaderId)
         => _js.InvokeVoidAsync("Velvet.attachShader", programId, shaderId).AsTask();
 
+    /// <inheritdoc />
     public Task LinkProgramAsync(int programId)
         => _js.InvokeVoidAsync("Velvet.linkProgram", programId).AsTask();
 
+    /// <inheritdoc />
     public Task<int> CreateMeshAsync(float[] vertices, uint[]? indices = null, int vertexStrideFloats = 0)
         => _js.InvokeAsync<int>("Velvet.createMesh", vertices, indices, vertexStrideFloats).AsTask();
 
@@ -82,15 +81,18 @@ public sealed class BlazorWebGLBridge : IWebGLBridge
 
     #region Rendering / state
 
+    /// <inheritdoc />
     public Task DrawMeshAsync(int meshId, int programId, int rendererId)
         => _js.InvokeVoidAsync("Velvet.drawMesh", meshId, programId, rendererId).AsTask();
 
+    /// <inheritdoc />
     public Task ClearAsync(int rendererId, float r, float g, float b, float a)
         => _js.InvokeVoidAsync("Velvet.clear", rendererId, r, g, b, a).AsTask();
 
     public Task SetBlendModeAsync(int rendererId, string mode)
         => _js.InvokeVoidAsync("Velvet.setBlendMode", rendererId, mode).AsTask();
 
+    /// <inheritdoc />
     public Task SetUniformMatrix4fvAsync(int programId, string name, float[] matrix)
         => _js.InvokeVoidAsync("Velvet.setUniformMatrix4fv", programId, name, matrix).AsTask();
 
@@ -113,7 +115,7 @@ public sealed class BlazorWebGLBridge : IWebGLBridge
         => _js.InvokeAsync<int>("Velvet.createTextureFromUrl", url).AsTask();
 
     public Task<int> CreateCubemapTextureAsync(string[] faceUrls)
-        => _js.InvokeAsync<int>("Velvet.createCubemapTexture", (object)faceUrls).AsTask();
+        => _js.InvokeAsync<int>("Velvet.createCubemapTexture", faceUrls).AsTask();
 
     public Task BindTextureAsync(int programId, string samplerName, int textureId, int textureUnit)
         => _js.InvokeVoidAsync("Velvet.bindTextureById", programId, samplerName, textureId, textureUnit).AsTask();
@@ -121,6 +123,7 @@ public sealed class BlazorWebGLBridge : IWebGLBridge
     public Task BindCubemapTextureAsync(int programId, string samplerName, int textureId, int textureUnit)
         => _js.InvokeVoidAsync("Velvet.bindCubemapTextureById", programId, samplerName, textureId, textureUnit).AsTask();
 
+    /// <inheritdoc />
     public Task ResizeAsync(int width, int height)
         => _js.InvokeVoidAsync("Velvet.resize", width, height).AsTask();
 
