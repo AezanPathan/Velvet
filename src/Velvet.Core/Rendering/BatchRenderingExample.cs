@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
-using Velvet.Core.Engine;
 using Velvet.Core.Rendering;
+using Velvet.Core.Rendering.Batching;
+using Scene = Velvet.Core.Scene.Scene;
 
 namespace Velvet.Examples;
 
@@ -13,21 +14,21 @@ public static class BatchRenderingExample
 {
     /// <summary>
     /// Example 1: Automatic batching (recommended for most use cases).
-    /// VelvetApp handles batching internally when you call StartAsync().
+    /// VelvetHost handles batching internally when you call StartAsync().
     /// </summary>
     /// <remarks>
     /// In your real code:
     /// <code>
-    /// var app = await VelvetApp.CreateAsync(canvasRef, JS, ShaderProgram.CreateDefaultAsync);
+    /// var host = await VelvetHost.CreateAsync(canvasRef, JS, ShaderProgram.CreateDefaultAsync);
     /// var scene = await GltfLoader.LoadScene(bytes);
-    /// app.Add(scene);
-    /// await app.StartAsync(OnFrameAsync);  // Batches built automatically
+    /// host.Add(scene);
+    /// await host.StartAsync(OnFrameAsync);  // Batches built automatically
     /// </code>
     /// </remarks>
     public static void AutomaticBatchingExample()
     {
         // This is a documentation example showing the pattern.
-        // VelvetApp now groups meshes by (Shader, Material, VertexLayout)
+        // VelvetHost now groups meshes by (Shader, Material, VertexLayout)
         // and renders them efficiently with minimal state changes.
         
         // See your existing ModelDemo.razor.cs for a working example.
@@ -54,7 +55,7 @@ public static class BatchRenderingExample
     /// Example 3: Batch rendering pattern (pseudo-code for documentation).
     /// </summary>
     /// <remarks>
-    /// This shows the conceptual pattern. In practice, VelvetApp handles this automatically.
+    /// This shows the conceptual pattern. In practice, VelvetHost handles this automatically.
     /// </remarks>
     public static void CustomRenderLoopPattern()
     {

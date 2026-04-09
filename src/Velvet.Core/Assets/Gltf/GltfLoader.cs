@@ -5,11 +5,13 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using SceneModel = Velvet.Core.Scene.Scene;
+using SceneNode = Velvet.Core.Scene.SceneNode;
 using Velvet.Core.Animation;
-using Velvet.Core.Engine;
 using Velvet.Core.Geometry;
 using Velvet.Core.Math;
 using Velvet.Core.Rendering;
+using Velvet.Core.Rendering.Meshes;
 
 namespace Velvet.Core.Assets.Gltf;
 
@@ -19,7 +21,7 @@ namespace Velvet.Core.Assets.Gltf;
 /// </summary>
 public static class GltfLoader
 {
-    public static async Task<Scene> LoadScene(byte[] data, string? baseUrl = null)
+    public static async Task<SceneModel> LoadScene(byte[] data, string? baseUrl = null)
     {
         ArgumentNullException.ThrowIfNull(data);
 
@@ -41,7 +43,7 @@ public static class GltfLoader
         }
     }
 
-    public static async Task<(Scene Scene, List<AnimationClip> Animations)> LoadSceneWithAnimations(byte[] data, string? baseUrl = null)
+    public static async Task<(SceneModel Scene, List<AnimationClip> Animations)> LoadSceneWithAnimations(byte[] data, string? baseUrl = null)
     {
         ArgumentNullException.ThrowIfNull(data);
 
@@ -194,7 +196,7 @@ public static class GltfLoader
         return meshesOut;
     }
 
-    private static Scene BuildScene(JsonElement root, List<List<Mesh>> meshesByIndex, Dictionary<int, Skin> skinsById)
+    private static SceneModel BuildScene(JsonElement root, List<List<Mesh>> meshesByIndex, Dictionary<int, Skin> skinsById)
     {
         if (!root.TryGetProperty("nodes", out var nodesEl) || nodesEl.ValueKind != JsonValueKind.Array)
         {
@@ -235,7 +237,7 @@ public static class GltfLoader
             roots.Add(BuildNode(nodeIndex, nodesEl, meshesByIndex, skinsById));
         }
 
-        return new Scene(roots);
+        return new SceneModel(roots);
     }
 
     private static SceneNode BuildNode(int nodeIndex, JsonElement nodesEl, List<List<Mesh>> meshesByIndex, Dictionary<int, Skin> skinsById)

@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-namespace Velvet.Core.Engine;
+namespace Velvet.Core.Graphics;
 
 public interface IGraphicsDevice
 {

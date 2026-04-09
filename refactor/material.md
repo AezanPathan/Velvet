@@ -99,7 +99,7 @@ Applied new Material system to [Velvet-Site/Pages/MaterialDemo.razor.cs](Velvet-
 2. **Option B** (Alternative):
    - Create Material adapter in Velvet.Graphics.WebGL layer
    - `public static Material CreateFromOldMaterial(ShaderProgram program, Velvet.Core.Rendering.Material oldMaterial)`
-   - VelvetApp converts old Materials to new on-the-fly during rendering
+   - VelvetHost converts old Materials to new on-the-fly during rendering
 
 3. **Option C** (Future):
    - Promote shader abstraction to Core.Rendering.Shaders
@@ -167,7 +167,7 @@ This pattern **solves the WASM "Cannot wait on monitors" error** by moving async
 
 ## Mesh Rendering Choice
 
-**In `VelvetApp.RunLoopAsync()` render pipeline:**
+**In `VelvetHost.RunLoopAsync()` render pipeline:**
 
 Currently, meshes are rendered with the **new Material system** only. The render loop invokes:
 ```csharp

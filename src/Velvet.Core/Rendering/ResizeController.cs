@@ -1,9 +1,9 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Velvet.Core.Rendering;
+using Velvet.Core.Rendering.Cameras;
 
-namespace Velvet.Core.Engine;
+namespace Velvet.Core.Rendering;
 
 /// <summary>
 /// Engine-level resize state machine.

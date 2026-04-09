@@ -1,5 +1,6 @@
 using System;
 using Velvet.Core.Geometry;
+using Velvet.Core.Rendering.Meshes;
 
 namespace Velvet.Core.Rendering;
 

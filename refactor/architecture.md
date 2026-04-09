@@ -27,8 +27,8 @@ Purpose:
 - no direct JavaScript runtime dependency
 
 Key contracts:
-- `Velvet.Core.Engine.IGraphicsDevice`
-- `Velvet.Core.Engine.IRenderable`
+- `Velvet.Core.Graphics.IGraphicsDevice`
+- `Velvet.Core.Rendering.IRenderable`
 - `Velvet.Core.Rendering.Shaders.IShader`
 
 Key engine types:
@@ -55,14 +55,14 @@ Frontend asset pipeline:
 - TypeScript sources in `src/Velvet.WebGL/ts`
 - bundled by webpack to `src/Velvet.WebGL/wwwroot/velvet.js`
 
-### 3) Host Integration Layer (`Velvet.Blazor`)
+### 3) Host Integration Layer (`Velvet.Hosting.Web`)
 
 Purpose:
 - Blazor-first application runtime that orchestrates render loop, input, resize, and frame updates
 
 Key types:
-- `Velvet.Blazor.VelvetApp` (high-level app runtime used by pages)
-- `VelvetBlazorExtensions` (simple setup helper)
+- `Velvet.Hosting.Web.VelvetHost` (high-level app runtime used by pages)
+- `ServiceExtensions` (simple setup helper)
 
 This layer connects browser events and JS interop to engine state, then drives per-frame rendering.
 
@@ -73,7 +73,7 @@ Purpose:
 - no backend implementation details
 
 Example:
-- `Velvet-Site/Pages/Scene06.razor.cs` creates a `Velvet.Blazor.VelvetApp`, configures camera/lights/particles, and starts the frame loop.
+- `Velvet-Site/Pages/Scene06.razor.cs` creates a `Velvet.Hosting.Web.VelvetHost`, configures camera/lights/particles, and starts the frame loop.
 
 ## Dependency Direction
 
@@ -81,8 +81,8 @@ Current project references enforce this direction:
 
 - `Velvet.Core` -> (no project references)
 - `Velvet.WebGL` -> `Velvet.Core`
-- `Velvet.Blazor` -> `Velvet.Core`, `Velvet.WebGL`
-- `Velvet-Site` -> `Velvet.Core`, `Velvet.WebGL`, `Velvet.Blazor`
+- `Velvet.Hosting.Web` -> `Velvet.Core`, `Velvet.WebGL`
+- `Velvet-Site` -> `Velvet.Core`, `Velvet.WebGL`, `Velvet.Hosting.Web`
 
 Design intent:
 - inner engine abstractions live in Core
@@ -92,7 +92,7 @@ Design intent:
 
 ## Runtime Flows
 
-## A) Minimal engine flow (`Velvet.Core.Engine.VelvetApp`)
+## A) Minimal engine flow (`Velvet.Core.VelvetHost`)
 
 1. Host configures graphics device via `UseGraphics(IGraphicsDevice)`.
 2. Host registers `IRenderable` instances.
@@ -100,7 +100,7 @@ Design intent:
 
 This is a lightweight baseline app loop.
 
-## B) Blazor scene flow (`Velvet.Blazor.VelvetApp`)
+## B) Blazor scene flow (`Velvet.Hosting.Web.VelvetHost`)
 
 1. `CreateAsync(canvas, js, programFactory)` creates `BlazorWebGLBridge`, initializes renderer, binds resize/input callbacks.
 2. Host sets camera/lights/controller and adds scenes or particle systems.
@@ -137,7 +137,7 @@ Blazor host decides:
 ## Resize and Input Lifecycle
 
 Current resize pattern:
-- JS side reports size changes to `Velvet.Blazor.VelvetApp`.
+- JS side reports size changes to `Velvet.Hosting.Web.VelvetHost`.
 - App queues resize through `ResizeController.RequestResize(...)`.
 - Resize is applied at frame boundary in render loop.
 
@@ -163,7 +163,7 @@ See `refactor/material.md` for migration details and rationale.
 
 ## Current Constraints and Tradeoffs
 
-- Two app entry styles exist (`Velvet.Core.Engine.VelvetApp` and `Velvet.Blazor.VelvetApp`), which can create API overlap.
+- Two app entry styles exist (`Velvet.Core.VelvetHost` and `Velvet.Hosting.Web.VelvetHost`), which can create API overlap.
 - Material migration is not yet fully unified.
 - `JsBridge` global state simplifies setup but introduces shared mutable configuration.
 - `Velvet-Site` not being in `Velvet.sln` can hide integration breakages unless built explicitly.
@@ -175,3 +175,95 @@ See `refactor/material.md` for migration details and rationale.
 3. Reduce global bridge state by preferring explicit bridge injection where practical.
 4. Add architecture tests/checks around dependency direction and host/backend contracts.
 5. Optionally include `Velvet-Site` in solution for full workspace build validation.
+
+## Folder Hierarchy (Short)
+
+```text
+Velvet/
+|- README.md                       # Project overview
+|- Velvet.sln                      # Solution file (engine projects)
+|- refactor/
+|  |- architecture.md             # Architecture notes
+|  |- material.md                 # Material-system migration notes
+|- src/
+|  |- Velvet.Core/                # Engine core
+|  |  |- Velvet.Core.csproj       # Core project definition
+|  |  |- Animation/               # Clips, samplers, animator
+|  |  |  |- AnimationClip.cs
+|  |  |  |- Animator.cs
+|  |  |- Engine/                  # App loop + core contracts
+|  |  |  |- VelvetHost.cs
+|  |  |  |- IGraphicsDevice.cs
+|  |  |  |- IRenderable.cs
+|  |  |  |- Scene.cs
+|  |  |- Geometry/                # Built-in geometry and layouts
+|  |  |  |- CubeGeometry.cs
+|  |  |  |- SphereGeometry.cs
+|  |  |- Math/                    # Matrix/vector/quaternion types
+|  |  |  |- Matrix4.cs
+|  |  |  |- Vector3.cs
+|  |  |- Particles/               # Particle system domain
+|  |  |  |- ParticleSystem.cs
+|  |  |- Rendering/               # Camera, mesh, batching, materials
+|  |     |- Camera.cs
+|  |     |- Mesh.cs
+|  |     |- RenderBatcher.cs
+|  |     |- Materials/
+|  |     |- Shaders/
+|  |
+|  |- Velvet.Graphics.WebGL/      # WebGL backend + JS bridge
+|  |  |- Velvet.Graphics.WebGL.csproj
+|  |  |- package.json             # TS/Webpack toolchain
+|  |  |- tsconfig.json
+|  |  |- webpack.config.js
+|  |  |- bridges/                 # C# to JS bridge + WebGL device impl
+|  |  |  |- IWebGLBridge.cs
+|  |  |  |- BlazorWebGLBridge.cs
+|  |  |  |- WebGLGraphicsDevice.cs
+|  |  |- Shaders/
+|  |  |  |- WebGLShader.cs
+|  |  |- ts/                      # TypeScript runtime source
+|  |  |  |- index.ts
+|  |  |  |- api/
+|  |  |  |- core/
+|  |  |  |- webgl/
+|  |  |- wwwroot/                 # Built browser assets
+|  |     |- velvet.js
+|  |     |- velvet-debug-ui.js
+|  |
+|  |- Velvet.Hosting.Web/         # Hosting integration layer
+|     |- Velvet.Hosting.Web.csproj
+|     |- VelvetHost.cs
+|     |- ServiceExtensions.cs
+|     |- Assets/
+|        |- Gltf/
+|- Velvet-Site/                   # Blazor demo app
+|  |- Velvet-Site.csproj
+|  |- Program.cs
+|  |- App.razor
+|  |- _Imports.razor
+|  |- Layout/
+|  |  |- MainLayout.razor
+|  |  |- NavMenu.razor
+|  |- Pages/                      # Demo pages and scene code-behind
+|  |  |- Home.razor
+|  |  |- MaterialDemo.razor
+|  |  |- MaterialDemo.razor.cs
+|  |  |- Scene04.razor
+|  |  |- Scene05.razor
+|  |  |- Scene06.razor
+|  |- wwwroot/
+|     |- index.html
+|     |- css/
+|     |- js/
+|     |- models/
+|     |- skybox/
+```
+
+### Main Folder Info
+
+- `src/Velvet.Core`: backend-agnostic engine logic and contracts.
+- `src/Velvet.Graphics.WebGL`: concrete GPU/WebGL implementation and browser JS interop.
+- `src/Velvet.Hosting.Web`: host glue code that wires runtime and rendering for web.
+- `Velvet-Site`: app layer with demo pages (`SceneXX.razor`) and scene setup code.
+- `refactor`: living design docs for ongoing architecture/material changes.

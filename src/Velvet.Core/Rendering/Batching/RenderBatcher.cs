@@ -1,7 +1,7 @@
 using System.Collections.Generic;
-using Velvet.Core.Engine;
+using SceneModel = Velvet.Core.Scene.Scene;
 
-namespace Velvet.Core.Rendering;
+namespace Velvet.Core.Rendering.Batching;
 
 /// <summary>
 /// Builds render batches from a scene's mesh instances.
@@ -43,7 +43,7 @@ public static class RenderBatcher
     /// <summary>
     /// Creates batches from a scene.
     /// </summary>
-    public static List<RenderBatch> BuildBatches(Scene scene, object shaderProgram)
+    public static List<RenderBatch> BuildBatches(SceneModel scene, object shaderProgram)
     {
         System.ArgumentNullException.ThrowIfNull(scene);
         return BuildBatches(scene.MeshInstances, shaderProgram);

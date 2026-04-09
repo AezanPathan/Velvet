@@ -1,5 +1,6 @@
 using System.Collections.Generic;
-using Velvet.Core.Engine;
+using SceneModel = Velvet.Core.Scene.Scene;
+using SceneNode = Velvet.Core.Scene.SceneNode;
 
 namespace Velvet.Core.Animation;
 
@@ -21,7 +22,7 @@ namespace Velvet.Core.Animation;
 /// </summary>
 public sealed class Animator
 {
-    private readonly Scene _scene;
+    private readonly SceneModel _scene;
     private readonly Dictionary<SceneNode, float[]> _animatedTransforms; // Cache of updated transforms
     private readonly Dictionary<string, AnimationAction> _actions; // Play clip -> action
     private readonly Dictionary<string, SceneNode> _nodesByName; // Fast node lookup
@@ -31,7 +32,7 @@ public sealed class Animator
     /// Creates a new Animator for a given scene.
     /// The scene is not modified; the Animator maintains its own transform cache.
     /// </summary>
-    public Animator(Scene scene)
+    public Animator(SceneModel scene)
     {
         ArgumentNullException.ThrowIfNull(scene);
         _scene = scene;

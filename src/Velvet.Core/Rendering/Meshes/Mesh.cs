@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Velvet.Core.Geometry;
 
-namespace Velvet.Core.Rendering;
+namespace Velvet.Core.Rendering.Meshes;
 
 /// <summary>
 /// Represents geometry uploaded to a GPU backend.

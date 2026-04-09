@@ -1,6 +1,6 @@
 using System;
 using System.Threading.Tasks;
-using Velvet.Core.Engine;
+using Velvet.Core.Graphics;
 using Velvet.Core.Rendering;
 
 namespace Velvet.Graphics.WebGL;

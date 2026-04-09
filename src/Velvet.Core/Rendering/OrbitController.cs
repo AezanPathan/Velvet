@@ -1,5 +1,6 @@
 using System;
 using Velvet.Core.Math;
+using Velvet.Core.Rendering.Cameras;
 
 namespace Velvet.Core.Rendering;
 

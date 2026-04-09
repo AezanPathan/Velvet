@@ -1,6 +1,6 @@
 using Velvet.Core.Math;
 
-namespace Velvet.Core.Rendering;
+namespace Velvet.Core.Rendering.Cameras;
 
 /// <summary>
 /// perspective camera.

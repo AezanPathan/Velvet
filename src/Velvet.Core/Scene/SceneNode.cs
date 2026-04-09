@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using Velvet.Core.Geometry;
 using Velvet.Core.Math;
 using Velvet.Core.Rendering;
+using Velvet.Core.Rendering.Meshes;
 
-namespace Velvet.Core.Engine;
+namespace Velvet.Core.Scene;
 
 /// <summary>
 /// Node in the scene graph containing an optional mesh list and child nodes.

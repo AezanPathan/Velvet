@@ -5,13 +5,16 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
-using Velvet.Core.Engine;
 using Velvet.Core.Geometry;
 using Velvet.Core.Math;
 using Velvet.Core.Particles;
 using Velvet.Core.Rendering;
+using Velvet.Core.Rendering.Batching;
+using Velvet.Core.Rendering.Cameras;
 using Velvet.Core.Rendering.Input;
 using Velvet.Core.Rendering.Lighting;
+using Velvet.Core.Rendering.Meshes;
+using Velvet.Core.Scene;
 using Velvet.Graphics.WebGL;
 
 namespace Velvet.Hosting.Web;
@@ -20,7 +23,7 @@ namespace Velvet.Hosting.Web;
 /// Blazor-first engine entry point for Velvet.
 /// Owns the WebGL renderer, shader program, uploaded meshes, and the update/render loop.
 /// </summary>
-public sealed class VelvetApp
+public sealed class VelvetHost
 {
     private readonly IJSRuntime _js;
     private readonly IWebGLBridge _bridge;
@@ -45,7 +48,7 @@ public sealed class VelvetApp
     private OrbitInputBinder? _orbitBinder;
     private Skybox? _skybox;
 
-    private DotNetObjectReference<VelvetApp>? _resizeCallbackRef;
+    private DotNetObjectReference<VelvetHost>? _resizeCallbackRef;
     private string? _resizeBindingId;
     private string? _orbitInputBindingId;
 
@@ -56,7 +59,7 @@ public sealed class VelvetApp
     private CancellationTokenSource? _loopCts;
     private Task? _loopTask;
 
-    private VelvetApp(IJSRuntime js, IWebGLBridge bridge, int rendererId)
+    private VelvetHost(IJSRuntime js, IWebGLBridge bridge, int rendererId)
     {
         _js = js;
         _bridge = bridge;
@@ -67,7 +70,7 @@ public sealed class VelvetApp
     /// <summary>
     /// Creates and initializes a Velvet application bound to a Blazor canvas.
     /// </summary>
-    public static async Task<VelvetApp> CreateAsync(
+    public static async Task<VelvetHost> CreateAsync(
         ElementReference canvas,
         IJSRuntime js,
         Func<IWebGLBridge, Task<ShaderProgram>>? programFactory = null)
@@ -77,7 +80,7 @@ public sealed class VelvetApp
         var bridge = new BlazorWebGLBridge(js);
         var rendererId = await bridge.InitWithElementAsync(canvas).ConfigureAwait(false);
 
-        var app = new VelvetApp(js, bridge, rendererId);
+        var app = new VelvetHost(js, bridge, rendererId);
         app._resizeCallbackRef = DotNetObjectReference.Create(app);
         app._resizeBindingId = await js.InvokeAsync<string>(
             "CanvasHelpers.bindResizeTracking",
@@ -562,7 +565,7 @@ public sealed class VelvetApp
     {
         if (_loopTask is not null)
         {
-            throw new InvalidOperationException("Cannot modify VelvetApp while running. Call StopAsync() first.");
+            throw new InvalidOperationException("Cannot modify VelvetHost while running. Call StopAsync() first.");
         }
     }
 

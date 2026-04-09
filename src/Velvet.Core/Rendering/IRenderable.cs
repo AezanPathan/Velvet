@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
-using Velvet.Core.Rendering;
+using Velvet.Core.Graphics;
 
-namespace Velvet.Core.Engine;
+namespace Velvet.Core.Rendering;
 
 public interface IRenderable
 {

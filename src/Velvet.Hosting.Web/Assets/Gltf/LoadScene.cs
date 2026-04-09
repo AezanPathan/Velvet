@@ -1,5 +1,5 @@
 using Velvet.Core.Assets.Gltf;
-using Velvet.Core.Engine;
+using Velvet.Core.Scene;
 
 namespace Velvet.Hosting.Web.Assets.Gltf;
 

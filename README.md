@@ -4,14 +4,14 @@ A minimal cross-platform graphics engine inspired by Three.js/Babylon.js. The re
 
 - `Velvet.Core` – pure C# engine primitives (no JS dependencies)
 - `Velvet.WebGL` – WebGL backend, bridge abstractions, and the shared `velvet.js`
-- `Velvet.Blazor` – helper glue for Blazor apps to configure the WebGL backend
+- `Velvet.Hosting.Web` – helper glue for Blazor apps to configure the WebGL backend
 - `Velvet.Demo.Blazor` – Blazor WebAssembly demo rendering a triangle
 - `Velvet.Demo.Static` – plain .NET WebAssembly demo that boots via a simple HTML page (no Blazor)
 
 ## Usage
 
 ```csharp
-var app = new VelvetApp();
+var app = new VelvetHost();
 app.UseGraphics(new WebGLDevice());
 app.Add(new DrawTriangle());
 await app.RunAsync();
@@ -21,7 +21,7 @@ On Blazor, configure the bridge before running:
 
 ```csharp
 JsBridge.Configure(new BlazorWebGLBridge(JSRuntime));
-var app = new VelvetApp();
+var app = new VelvetHost();
 app.UseGraphics(new WebGLDevice());
 app.Add(new DrawTriangle());
 await app.RunAsync();
@@ -31,7 +31,7 @@ On static WebAssembly (no Blazor):
 
 ```csharp
 JsBridge.Configure(new StaticWebGLBridge());
-var app = new VelvetApp();
+var app = new VelvetHost();
 app.UseGraphics(new WebGLDevice());
 app.Add(new DrawTriangle());
 await app.RunAsync();
