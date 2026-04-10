@@ -39,10 +39,13 @@ public static class BatchRenderingExample
     /// </summary>
     public static void ManualBatching(Scene scene, object shaderProgram)
     {
+        var instances = new List<MeshInstance>();
+        scene.CollectMeshes(instances);
+
         // Build batches from the scene
         List<RenderBatch> batches = RenderBatcher.BuildBatches(scene, shaderProgram);
 
-        Console.WriteLine($"Scene has {scene.MeshInstances.Count} instances grouped into {batches.Count} batches");
+        Console.WriteLine($"Scene has {instances.Count} instances grouped into {batches.Count} batches");
 
         // Inspect batch composition
         foreach (var batch in batches)

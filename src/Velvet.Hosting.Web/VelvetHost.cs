@@ -32,6 +32,7 @@ public sealed class VelvetHost
     private readonly ResizeController _resizeController = new();
 
     private readonly List<MeshInstance> _instances = new();
+    private readonly List<(Scene Scene, int Start, int Count)> _sceneInstanceRanges = new();
     private List<RenderBatch>? _batches;
     private readonly Dictionary<Skin, float[]> _boneMatrixCache = new();
     
@@ -230,10 +231,16 @@ public sealed class VelvetHost
         ArgumentNullException.ThrowIfNull(scene);
         ThrowIfRunning();
 
-        foreach (var instance in scene.MeshInstances)
+        var sceneInstances = new List<MeshInstance>();
+        scene.CollectMeshes(sceneInstances);
+
+        var start = _instances.Count;
+        foreach (var instance in sceneInstances)
         {
             _instances.Add(instance);
         }
+
+        _sceneInstanceRanges.Add((scene, start, sceneInstances.Count));
     }
 
     /// <summary>
@@ -257,11 +264,31 @@ public sealed class VelvetHost
     {
         ArgumentNullException.ThrowIfNull(scene);
 
-        // Update world/normal matrices based on the scene's current node transforms.
-        scene.UpdateMeshInstances(_ => null);
+        var currentInstances = new List<MeshInstance>();
+        scene.CollectMeshes(currentInstances);
 
-        // Compute bone matrices from current node transforms (no time logic).
-        foreach (var instance in scene.MeshInstances)
+        foreach (var range in _sceneInstanceRanges)
+        {
+            if (!ReferenceEquals(range.Scene, scene))
+            {
+                continue;
+            }
+
+            if (currentInstances.Count != range.Count)
+            {
+                throw new InvalidOperationException("Mesh instance count mismatch while updating transforms.");
+            }
+
+            for (var i = 0; i < range.Count; i++)
+            {
+                var source = currentInstances[i];
+                var destination = _instances[range.Start + i];
+                Array.Copy(source.ModelMatrix, destination.ModelMatrix, source.ModelMatrix.Length);
+                Array.Copy(source.NormalMatrix, destination.NormalMatrix, source.NormalMatrix.Length);
+            }
+        }
+
+        foreach (var instance in currentInstances)
         {
             var skin = instance.Skin;
             if (skin is null)

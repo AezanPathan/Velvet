@@ -46,6 +46,8 @@ public static class RenderBatcher
     public static List<RenderBatch> BuildBatches(SceneModel scene, object shaderProgram)
     {
         System.ArgumentNullException.ThrowIfNull(scene);
-        return BuildBatches(scene.MeshInstances, shaderProgram);
+        var instances = new List<MeshInstance>();
+        scene.CollectMeshes(instances);
+        return BuildBatches(instances, shaderProgram);
     }
 }

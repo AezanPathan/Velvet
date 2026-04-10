@@ -18,7 +18,7 @@ namespace Velvet.Core.Animation;
 /// - Caller plays/stops clips via PlayClip() and StopClip()
 /// - Caller calls Update(deltaTime) each frame
 /// - Animator looks up nodes by name and updates their local transforms
-/// - Scene.MeshInstances are regenerated from the modified SceneNode hierarchy
+/// - Mesh instances are collected from the modified SceneNode hierarchy
 /// </summary>
 public sealed class Animator
 {

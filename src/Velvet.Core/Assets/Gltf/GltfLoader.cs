@@ -74,8 +74,11 @@ public static class GltfLoader
         var scene = await LoadScene(data);
         var unique = new HashSet<Mesh>();
         var meshes = new List<Mesh>();
+        var instances = new List<MeshInstance>();
 
-        foreach (var instance in scene.MeshInstances)
+        scene.CollectMeshes(instances);
+
+        foreach (var instance in instances)
         {
             if (unique.Add(instance.Mesh))
                 meshes.Add(instance.Mesh);
