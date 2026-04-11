@@ -147,12 +147,8 @@ public sealed class SceneNode
     private static VertexElement? FindPositionElement(VertexLayout layout)
     {
         foreach (var element in layout.Elements)
-        {
-            if (element.Semantic == VertexElementSemantic.Position)
-            {
-                return element;
-            }
-        }
+            if (element.Semantic == VertexElementSemantic.Position) return element;
+
         return null;
     }
 

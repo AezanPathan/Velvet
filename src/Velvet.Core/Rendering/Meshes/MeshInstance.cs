@@ -1,8 +1,7 @@
+namespace Velvet.Core.Rendering.Meshes;
+
 using System;
 using Velvet.Core.Math;
-using Velvet.Core.Rendering.Meshes;
-
-namespace Velvet.Core.Rendering;
 
 /// <summary>
 /// A mesh with an immutable world transform.

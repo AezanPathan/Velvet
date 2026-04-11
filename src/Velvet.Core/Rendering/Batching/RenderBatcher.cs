@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using SceneModel = Velvet.Core.Scene.Scene;
+using Velvet.Core.Rendering.Meshes;
 
 namespace Velvet.Core.Rendering.Batching;
 

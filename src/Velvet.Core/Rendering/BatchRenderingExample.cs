@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Velvet.Core.Rendering;
 using Velvet.Core.Rendering.Batching;
+using Velvet.Core.Rendering.Meshes;
 using Scene = Velvet.Core.Scene.Scene;
 
 namespace Velvet.Examples;

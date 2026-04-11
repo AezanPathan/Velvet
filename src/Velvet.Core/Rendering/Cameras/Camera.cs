@@ -1,41 +1,33 @@
-using Velvet.Core.Math;
-
 namespace Velvet.Core.Rendering.Cameras;
 
-/// <summary>
-/// perspective camera.
-/// Produces view and projection matrices (column-major).
-/// Pure C#; no rendering, no JS, no UI concerns.
-/// </summary>
+using Velvet.Core.Math;
+
 public sealed class Camera
 {
-	// --- View state (world space) ---
-
 	private Vector3 _position;
 	private Vector3 _target;
 	private Vector3 _up;
-
-	// --- Projection state ---
 
 	private float _fovYRadians;
 	private float _aspectRatio;
 	private float _nearPlane;
 	private float _farPlane;
 
-	// --- Dirty flags ---
-
 	private bool _viewDirty = true;
 	private bool _projectionDirty = true;
-
-	// --- Cached matrices (column-major) ---
 
 	private float[] _view = Matrix.Identity();
 	private float[] _projection = Matrix.Identity();
 
-	/// <summary>
-	/// Creates a camera with fully specified perspective parameters.
-	/// Use <see cref="CreatePerspective"/> for cleaner call sites.
-	/// </summary>
+	public Camera()
+	{
+		_position = new Vector3(0f, 0f, 5f);
+		_target = Vector3.Zero;
+		_up = Vector3.UnitY;
+
+		SetPerspective(MathF.PI / 3f, 16f / 9f, 0.1f, 100f);
+	}
+
 	public Camera(Vector3 position,
 		Vector3 target,
 		Vector3 up,
@@ -50,27 +42,6 @@ public sealed class Camera
 
 		SetPerspective(fovYRadians, aspectRatio, nearPlane, farPlane);
 	}
-
-	/// <summary>
-	/// Convenience factory for a standard perspective camera.
-	/// </summary>
-	public static Camera CreatePerspective(Vector3 position,
-		Vector3 target,
-		float fovYRadians,
-		float aspectRatio,
-		float nearPlane = 0.1f,
-		float farPlane = 100f)
-	{
-		return new Camera(position,
-			target,
-			Vector3.UnitY,
-			fovYRadians,
-			aspectRatio,
-			nearPlane,
-			farPlane);
-	}
-
-	// --- View properties ---
 
 	public Vector3 Position
 	{
@@ -92,9 +63,6 @@ public sealed class Camera
 		}
 	}
 
-	/// <summary>
-	/// Normalized forward direction derived from Position and Target.
-	/// </summary>
 	public Vector3 Forward => (_target - _position).Normalized();
 
 	public Vector3 Up
@@ -107,12 +75,7 @@ public sealed class Camera
 		}
 	}
 
-	// --- Projection properties ---
-
-	/// <summary>
-	/// Vertical field of view in radians.
-	/// </summary>
-	public float FovYRadians
+	public float Fov
 	{
 		get => _fovYRadians;
 		set
@@ -168,9 +131,39 @@ public sealed class Camera
 		}
 	}
 
-	/// <summary>
-	/// Updates all perspective parameters atomically.
-	/// </summary>
+	public float[] ViewMatrix
+	{
+		get
+		{
+			if (_viewDirty)
+			{
+				_view = Matrix.LookAt(_position, _target, _up);
+				_viewDirty = false;
+			}
+
+			return _view;
+		}
+	}
+
+	public float[] ProjectionMatrix
+	{
+		get
+		{
+			if (_projectionDirty)
+			{
+				_projection = Matrix.Perspective(
+					_fovYRadians,
+					_aspectRatio,
+					_nearPlane,
+					_farPlane);
+
+				_projectionDirty = false;
+			}
+
+			return _projection;
+		}
+	}
+
 	public void SetPerspective(float fovYRadians, float aspectRatio, float nearPlane, float farPlane)
 	{
 		if (fovYRadians <= 0f || fovYRadians >= MathF.PI)
@@ -189,9 +182,6 @@ public sealed class Camera
 		_projectionDirty = true;
 	}
 
-	/// <summary>
-	/// Updates aspect ratio from a viewport size.
-	/// </summary>
 	public void SetViewportSize(float width, float height)
 	{
 		if (width <= 0f || height <= 0f)
@@ -200,95 +190,47 @@ public sealed class Camera
 		AspectRatio = width / height;
 	}
 
-	/// <summary>
-	/// Marks the projection matrix dirty so it is recalculated on next access.
-	/// </summary>
 	public void UpdateProjection()
 	{
 		_projectionDirty = true;
 	}
 
-	/// <summary>
-	/// Frames a bounding box in the camera view by positioning the camera so the entire bounds are visible.
-	/// Sets target to the center of the bounds and moves the camera backward along the forward axis.
-	/// Also adjusts near and far planes to fit the bounds comfortably.
-	/// </summary>
-	/// <param name="bounds">The bounding box to frame.</param>
-	/// <param name="frameMultiplier">Optional multiplier (default 1.2) to add padding around the model.
-	/// Values > 1 move camera farther away; should typically be 1.0–1.5.</param>
 	public void Frame(BoundingBox bounds, float frameMultiplier = 1.2f)
 	{
 		if (frameMultiplier <= 0f)
 			throw new ArgumentOutOfRangeException(nameof(frameMultiplier), "Frame multiplier must be > 0.");
 
-		// Set target to the center of the bounding box.
 		Target = bounds.Center;
 
-		// Compute the distance required to fit the bounding box radius within the FOV.
-		// Using the formula: distance = radius / tan(fov/2)
+		// distance = radius / tan(fov / 2)
 		var halfFovY = _fovYRadians * 0.5f;
 		var tanHalfFov = MathF.Tan(halfFovY);
 		var distance = bounds.Radius / tanHalfFov;
 
-		// Apply the frame multiplier to add padding around the model.
 		distance *= frameMultiplier;
 
-		// Position the camera along the forward direction (away from target).
-		// forward is computed from current position and target, but we're changing target,
-		// so we use an initial forward direction (default is negative Z).
-		// We compute position as: target - (forward * distance)
-		var forward = (_target - _position).Normalized();
+		var forward = Forward;
 		Position = _target - (forward * distance);
 
-		// Adjust near and far planes to comfortably contain the bounds.
-		// Near plane: small value, but at least 1% of the distance to avoid clipping.
-		// Far plane: sufficiently far to see the entire model.
 		var nearPlane = MathF.Max(0.01f, distance * 0.01f);
 		var farPlane = distance * 10f;
 
 		SetPerspective(_fovYRadians, _aspectRatio, nearPlane, farPlane);
 	}
 
-	// --- Matrices ---
-
-	/// <summary>
-	/// Column-major view matrix.
-	/// Recomputed only when view state changes.
-	/// </summary>
-	public float[] ViewMatrix
+	public static Camera CreatePerspective(Vector3 position,
+		Vector3 target,
+		float fovYRadians,
+		float aspectRatio,
+		float nearPlane = 0.1f,
+		float farPlane = 100f)
 	{
-		get
-		{
-			if (_viewDirty)
-			{
-				_view = Matrix.LookAt(_position, _target, _up);
-				_viewDirty = false;
-			}
-
-			return _view;
-		}
-	}
-
-	/// <summary>
-	/// Column-major projection matrix.
-	/// Recomputed only when projection parameters change.
-	/// </summary>
-	public float[] ProjectionMatrix
-	{
-		get
-		{
-			if (_projectionDirty)
-			{
-				_projection = Matrix.Perspective(
-					_fovYRadians,
-					_aspectRatio,
-					_nearPlane,
-					_farPlane);
-
-				_projectionDirty = false;
-			}
-
-			return _projection;
-		}
+		return new Camera(position,
+			target,
+			Vector3.UnitY,
+			fovYRadians,
+			aspectRatio,
+			nearPlane,
+			farPlane);
 	}
 }

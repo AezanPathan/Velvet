@@ -1,6 +1,7 @@
 namespace Velvet.Core.Rendering.Input;
 
 using Velvet.Core.Rendering.Cameras;
+using Velvet.Core.Rendering.Cameras.Controllers;
 
 public class OrbitInputBinder
 {

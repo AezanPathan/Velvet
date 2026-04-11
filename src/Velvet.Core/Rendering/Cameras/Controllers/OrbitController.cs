@@ -1,30 +1,21 @@
+namespace Velvet.Core.Rendering.Cameras.Controllers;
+
 using System;
 using Velvet.Core.Math;
 using Velvet.Core.Rendering.Cameras;
 
-namespace Velvet.Core.Rendering;
-
-/// <summary>
-/// Minimal orbit controller for camera manipulation.
-/// Orbits around a target point with yaw (horizontal) and pitch (vertical) rotation.
-/// Updates camera position based on internal state; does not handle input directly.
-/// Three.js–style OrbitControls behavior without smoothing or inertia.
-/// </summary>
 public class OrbitController
 {
 	private Vector3 _target;
-	private float _yaw;        // Radians; rotation around up axis (Y)
-	private float _pitch;      // Radians; elevation from horizontal plane
-	private float _distance;   // Distance from target to camera
+	private float _yaw;
+	private float _pitch;
+	private float _distance;
 
 	private float _minDistance;
 	private float _maxDistance;
-	private float _minPitch;   // Radians (typically ≈ -85°)
-	private float _maxPitch;   // Radians (typically ≈ +85°)
+	private float _minPitch;
+	private float _maxPitch;
 
-	/// <summary>
-	/// Creates an orbit controller with default pitch clamping at ±85°.
-	/// </summary>
 	public OrbitController(
 		Vector3 target,
 		float yaw = 0f,
@@ -47,37 +38,24 @@ public class OrbitController
 		_minDistance = minDistance;
 		_maxDistance = maxDistance;
 
-		// Default pitch clamping: ±85° to avoid gimbal lock and camera flipping.
-		// Convert 85 degrees to radians: 85° * π/180 ≈ 1.4835 rad
 		_minPitch = -1.4835f;
 		_maxPitch = 1.4835f;
 
-		// Clamp initial pitch.
 		ClampPitch();
 	}
 
-	/// <summary>
-	/// The point around which the camera orbits.
-	/// </summary>
 	public Vector3 Target
 	{
 		get => _target;
 		set => _target = value;
 	}
 
-	/// <summary>
-	/// Horizontal rotation in radians (around the up/Y axis).
-	/// </summary>
 	public float Yaw
 	{
 		get => _yaw;
 		set => _yaw = value;
 	}
 
-	/// <summary>
-	/// Vertical rotation in radians (elevation from the horizontal plane).
-	/// Automatically clamped to minPitch/maxPitch when set.
-	/// </summary>
 	public float Pitch
 	{
 		get => _pitch;
@@ -88,9 +66,6 @@ public class OrbitController
 		}
 	}
 
-	/// <summary>
-	/// Distance from target to camera.
-	/// </summary>
 	public float Distance
 	{
 		get => _distance;
@@ -104,27 +79,18 @@ public class OrbitController
 		}
 	}
 
-	/// <summary>
-	/// Minimum allowed pitch in radians (default ≈ -85°).
-	/// </summary>
 	public float MinPitch
 	{
 		get => _minPitch;
 		set => _minPitch = value;
 	}
 
-	/// <summary>
-	/// Maximum allowed pitch in radians (default ≈ +85°).
-	/// </summary>
 	public float MaxPitch
 	{
 		get => _maxPitch;
 		set => _maxPitch = value;
 	}
 
-	/// <summary>
-	/// Minimum allowed distance (for zoom limits).
-	/// </summary>
 	public float MinDistance
 	{
 		get => _minDistance;
@@ -137,9 +103,6 @@ public class OrbitController
 		}
 	}
 
-	/// <summary>
-	/// Maximum allowed distance (for zoom limits).
-	/// </summary>
 	public float MaxDistance
 	{
 		get => _maxDistance;
@@ -152,39 +115,23 @@ public class OrbitController
 		}
 	}
 
-	/// <summary>
-	/// Applies a yaw change (horizontal rotation) in radians.
-	/// Positive values rotate counterclockwise (when viewed from above).
-	/// </summary>
 	public void ApplyYaw(float deltaYaw)
 	{
 		_yaw += deltaYaw;
 	}
 
-	/// <summary>
-	/// Applies a pitch change (vertical rotation) in radians.
-	/// Positive values rotate upward; automatically clamped to prevent flipping.
-	/// </summary>
 	public void ApplyPitch(float deltaPitch)
 	{
 		_pitch += deltaPitch;
 		ClampPitch();
 	}
 
-	/// <summary>
-	/// Applies a distance change (zoom).
-	/// Positive values move camera away from target; automatically clamped.
-	/// </summary>
 	public void ApplyZoom(float deltaDistance)
 	{
 		_distance += deltaDistance;
 		ClampDistance();
 	}
 
-	/// <summary>
-	/// Applies a multiplicative zoom (e.g., 0.95 zooms in, 1.05 zooms out).
-	/// Automatically clamped to distance limits.
-	/// </summary>
 	public void ApplyZoomMultiplier(float multiplier)
 	{
 		if (multiplier <= 0f)
@@ -194,19 +141,13 @@ public class OrbitController
 		ClampDistance();
 	}
 
-	/// <summary>
-	/// Updates the camera position and target based on current controller state.
-	/// Call this every frame after applying input.
-	/// </summary>
 	public void UpdateCamera(Camera camera)
 	{
 		ArgumentNullException.ThrowIfNull(camera);
 
-		// Set the camera target.
 		camera.Target = _target;
 
-		// Compute camera position using spherical coordinates.
-		// Position = Target + distance * (cos(pitch)*sin(yaw), sin(pitch), cos(pitch)*cos(yaw))
+		// Spherical coordinates around target.
 		var cosPitch = MathF.Cos(_pitch);
 		var sinPitch = MathF.Sin(_pitch);
 		var sinYaw = MathF.Sin(_yaw);
@@ -221,9 +162,6 @@ public class OrbitController
 		camera.Position = _target + offset;
 	}
 
-	/// <summary>
-	/// Resets the controller to a default state facing the target.
-	/// </summary>
 	public void Reset(Vector3 target, float distance = 5f)
 	{
 		_target = target;
