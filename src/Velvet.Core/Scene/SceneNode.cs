@@ -56,7 +56,7 @@ public sealed class SceneNode
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(parentWorld);
 
-        var world = Matrix.Multiply(parentWorld, _localTransform);
+        var world = Matrix4.Multiply(parentWorld, _localTransform).Data;
 
         foreach (var mesh in Meshes)
             output.Add(new MeshInstance(mesh, world, Skin));
@@ -71,7 +71,7 @@ public sealed class SceneNode
     {
         ArgumentNullException.ThrowIfNull(parentWorld);
 
-        var world = Matrix.Multiply(parentWorld, _localTransform);
+        var world = Matrix4.Multiply(parentWorld, _localTransform).Data;
 
         BoundingBox? bounds = null;
 

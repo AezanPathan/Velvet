@@ -35,7 +35,7 @@ public sealed class BoneMatrixCalculator
         if (worldTransforms == null)
         {
             worldTransforms = new Dictionary<int, float[]>();
-            BuildWorldTransformMap(roots, Matrix.Identity(), worldTransforms);
+            BuildWorldTransformMap(roots, Matrix4.Identity.Data, worldTransforms);
         }
 
         // For each joint, compute: boneMatrix = jointWorldMatrix * inverseBindMatrix
@@ -53,12 +53,12 @@ public sealed class BoneMatrixCalculator
             else
             {
                 // Joint not found, use identity (should log a warning in real use)
-                jointWorldMatrix = Matrix.Identity();
+                jointWorldMatrix = Matrix4.Identity.Data;
                 System.Diagnostics.Debug.WriteLine($"[BONE] WARNING: Joint node index {jointNodeIndex} not found in world transforms. Using identity.");
             }
 
             // Compute bone matrix
-            var boneMatrix = Matrix.Multiply(jointWorldMatrix, inverseBindMatrix);
+            var boneMatrix = Matrix4.Multiply(jointWorldMatrix, inverseBindMatrix).Data;
 
             // Copy into result array
             Array.Copy(boneMatrix, 0, result, i * 16, 16);
@@ -83,7 +83,7 @@ public sealed class BoneMatrixCalculator
     {
         foreach (var node in nodes)
         {
-            var worldMatrix = Matrix.Multiply(parentWorld, node.LocalTransform);
+            var worldMatrix = Matrix4.Multiply(parentWorld, node.LocalTransform).Data;
 
             if (node.NodeIndex >= 0)
             {

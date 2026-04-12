@@ -46,4 +46,38 @@ public readonly struct Matrix4
     /// Creates an identity matrix.
     /// </summary>
     public static Matrix4 Identity => new Matrix4(Matrix.Identity());
+
+    /// <summary>
+    /// Multiplies two 4x4 matrices and returns the result.
+    /// </summary>
+    public static Matrix4 Multiply(in Matrix4 a, in Matrix4 b) => new Matrix4(Matrix.Multiply(a.Data, b.Data));
+
+    /// <summary>
+    /// Multiplies two raw 4x4 matrices and returns a wrapped result.
+    /// </summary>
+    public static Matrix4 Multiply(float[] a, float[] b) => new Matrix4(Matrix.Multiply(a, b));
+
+    /// <summary>
+    /// Builds a TRS matrix (T * R * S).
+    /// </summary>
+    public static Matrix4 Trs(in Vector3 translation, in Quaternion rotation, in Vector3 scale)
+        => new Matrix4(Matrix.Trs(translation, rotation, scale));
+
+    /// <summary>
+    /// Builds a right-handed view matrix.
+    /// </summary>
+    public static Matrix4 LookAt(in Vector3 eye, in Vector3 target, in Vector3 up)
+        => new Matrix4(Matrix.LookAt(eye, target, up));
+
+    /// <summary>
+    /// Builds a right-handed perspective projection matrix.
+    /// </summary>
+    public static Matrix4 Perspective(float fovYRadians, float aspectRatio, float nearPlane, float farPlane)
+        => new Matrix4(Matrix.Perspective(fovYRadians, aspectRatio, nearPlane, farPlane));
+
+    /// <summary>
+    /// Computes a normal matrix (inverse-transpose of upper-left 3x3).
+    /// </summary>
+    public static float[] NormalMatrix(in Matrix4 matrix)
+        => Matrix.NormalMatrix(matrix.Data);
 }

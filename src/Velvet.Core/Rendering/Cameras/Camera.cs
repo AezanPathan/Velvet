@@ -16,8 +16,8 @@ public sealed class Camera
 	private bool _viewDirty = true;
 	private bool _projectionDirty = true;
 
-	private float[] _view = Matrix.Identity();
-	private float[] _projection = Matrix.Identity();
+	private float[] _view = Matrix4.Identity.Data;
+	private float[] _projection = Matrix4.Identity.Data;
 
 	public Camera()
 	{
@@ -137,7 +137,7 @@ public sealed class Camera
 		{
 			if (_viewDirty)
 			{
-				_view = Matrix.LookAt(_position, _target, _up);
+				_view = Matrix4.LookAt(_position, _target, _up).Data;
 				_viewDirty = false;
 			}
 
@@ -151,11 +151,11 @@ public sealed class Camera
 		{
 			if (_projectionDirty)
 			{
-				_projection = Matrix.Perspective(
+				_projection = Matrix4.Perspective(
 					_fovYRadians,
 					_aspectRatio,
 					_nearPlane,
-					_farPlane);
+					_farPlane).Data;
 
 				_projectionDirty = false;
 			}

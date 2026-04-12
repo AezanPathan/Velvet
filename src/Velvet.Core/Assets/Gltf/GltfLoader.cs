@@ -619,7 +619,7 @@ public static class GltfLoader
         }
 
         // Compose TRS into a single 4x4 column-major matrix.
-        return Matrix.Trs(translation, rotation, scale);
+        return Matrix4.Trs(translation, rotation, scale).Data;
     }
 
     private static bool IsGlb(byte[] data)
@@ -791,7 +791,7 @@ public static class GltfLoader
         var geo = new LoadedGeometry(vertices, indices, vertexLayout);
         var mesh = new Mesh(geo);
         var materialIndex = prim.TryGetProperty("material", out var materialEl) ? materialEl.GetInt32() : (int?)null;
-        mesh.Material = TryReadMaterial(root, bin, baseUrl, materialIndex);
+        mesh.Material = GltfMaterialReader.TryReadMaterial(root, bin, baseUrl, materialIndex);
 
         return mesh;
     }
@@ -937,74 +937,6 @@ public static class GltfLoader
         }
 
         return normals;
-    }
-
-    private static Material? TryReadMaterial(JsonElement root, byte[] bin, string? baseUrl = null, int? materialIndex = null)
-    {
-        if (!root.TryGetProperty("materials", out var materials) || materials.GetArrayLength() < 1)
-        {
-            return null;
-        }
-
-        var index = materialIndex ?? 0;
-        if (index < 0 || index >= materials.GetArrayLength())
-        {
-            index = 0;
-        }
-
-        var m = materials[index];
-
-        // Unlit extension (optional)
-        var unlit = false;
-        if (m.TryGetProperty("extensions", out var ext) && ext.ValueKind == JsonValueKind.Object)
-        {
-            if (ext.TryGetProperty("KHR_materials_unlit", out _))
-            {
-                unlit = true;
-            }
-        }
-
-        Vector3 color = new(1, 1, 1);
-        if (m.TryGetProperty("pbrMetallicRoughness", out var pbr) && pbr.ValueKind == JsonValueKind.Object)
-        {
-            if (pbr.TryGetProperty("baseColorFactor", out var f) && f.ValueKind == JsonValueKind.Array && f.GetArrayLength() >= 3)
-            {
-                color = new Vector3(
-                    (float)f[0].GetDouble(),
-                    (float)f[1].GetDouble(),
-                    (float)f[2].GetDouble());
-            }
-        }
-
-        var material = new Material(
-            albedoColor: color,
-            ambientStrength: 0.05f,
-            diffuseStrength: 1.0f,
-            unlit: unlit);
-
-        // Extract baseColorTexture URI if present and resolve relative to baseUrl
-        var textureUri = TryReadBaseColorImage(root, m, bin);
-        System.Diagnostics.Debug.WriteLine($"[GltfLoader] TryReadBaseColorImage returned: '{textureUri}'");
-        System.Diagnostics.Debug.WriteLine($"[GltfLoader] baseUrl parameter: '{baseUrl}'");
-        if (textureUri != null)
-        {
-            // If a baseUrl is provided, resolve relative texture URIs
-            if (!string.IsNullOrWhiteSpace(baseUrl) && !textureUri.StartsWith("data:") && !textureUri.StartsWith("/"))
-            {
-                // Ensure baseUrl ends with /
-                if (!baseUrl.EndsWith("/"))
-                    baseUrl += "/";
-                textureUri = baseUrl + textureUri;
-            }
-            material.BaseColorTextureUri = textureUri;
-            System.Diagnostics.Debug.WriteLine($"[GltfLoader] Material.BaseColorTextureUri set to: '{material.BaseColorTextureUri}'");
-        }
-        else
-        {
-            System.Diagnostics.Debug.WriteLine($"[GltfLoader] No texture URI found in glTF");
-        }
-
-        return material;
     }
 
     private static byte[] StripUtf8Bom(byte[] bytes)
@@ -1365,110 +1297,5 @@ public static class GltfLoader
 
         return result;
     }
-
-    private static string? TryReadBaseColorImage(JsonElement root, JsonElement material, byte[] bin)
-    {
-        if (!material.TryGetProperty("pbrMetallicRoughness", out var pbr))
-        {
-            System.Diagnostics.Debug.WriteLine("[TryReadBaseColorImage] No pbrMetallicRoughness");
-            return null;
-        }
-
-        if (!pbr.TryGetProperty("baseColorTexture", out var tex))
-        {
-            System.Diagnostics.Debug.WriteLine("[TryReadBaseColorImage] No baseColorTexture");
-            return null;
-        }
-
-        if (!tex.TryGetProperty("index", out var indexEl))
-        {
-            System.Diagnostics.Debug.WriteLine("[TryReadBaseColorImage] No texture index");
-            return null;
-        }
-
-        int textureIndex = indexEl.GetInt32();
-        System.Diagnostics.Debug.WriteLine($"[TryReadBaseColorImage] textureIndex = {textureIndex}");
-
-        if (!root.TryGetProperty("textures", out var texturesEl) || texturesEl.ValueKind != JsonValueKind.Array)
-        {
-            System.Diagnostics.Debug.WriteLine("[TryReadBaseColorImage] No textures array");
-            return null;
-        }
-
-        if (textureIndex < 0 || textureIndex >= texturesEl.GetArrayLength())
-        {
-            System.Diagnostics.Debug.WriteLine($"[TryReadBaseColorImage] textureIndex {textureIndex} out of bounds (count={texturesEl.GetArrayLength()})");
-            return null;
-        }
-
-        var texture = texturesEl[textureIndex];
-        if (!texture.TryGetProperty("source", out var sourceEl))
-        {
-            System.Diagnostics.Debug.WriteLine("[TryReadBaseColorImage] No source in texture");
-            return null;
-        }
-
-        int imageIndex = sourceEl.GetInt32();
-        System.Diagnostics.Debug.WriteLine($"[TryReadBaseColorImage] imageIndex = {imageIndex}");
-
-        if (!root.TryGetProperty("images", out var imagesEl) || imagesEl.ValueKind != JsonValueKind.Array)
-        {
-            System.Diagnostics.Debug.WriteLine("[TryReadBaseColorImage] No images array");
-            return null;
-        }
-
-        if (imageIndex < 0 || imageIndex >= imagesEl.GetArrayLength())
-        {
-            System.Diagnostics.Debug.WriteLine($"[TryReadBaseColorImage] imageIndex {imageIndex} out of bounds (count={imagesEl.GetArrayLength()})");
-            return null;
-        }
-
-        var image = imagesEl[imageIndex];
-
-        // Case 1: External or data URI
-        if (image.TryGetProperty("uri", out var uriEl))
-        {
-            var resultUri = uriEl.GetString();
-            System.Diagnostics.Debug.WriteLine($"[TryReadBaseColorImage] SUCCESS - uri = '{resultUri}'");
-            return resultUri;
-        }
-
-        // Case 2: Embedded image in GLB via bufferView + mimeType
-        if (image.TryGetProperty("bufferView", out var bvEl))
-        {
-            var viewIndex = bvEl.GetInt32();
-            if (!root.TryGetProperty("bufferViews", out var bufferViews) || bufferViews.ValueKind != JsonValueKind.Array)
-            {
-                System.Diagnostics.Debug.WriteLine("[TryReadBaseColorImage] bufferView present but no bufferViews array");
-                return null;
-            }
-            if (viewIndex < 0 || viewIndex >= bufferViews.GetArrayLength())
-            {
-                System.Diagnostics.Debug.WriteLine($"[TryReadBaseColorImage] bufferView index {viewIndex} out of bounds");
-                return null;
-            }
-
-            var view = bufferViews[viewIndex];
-            var byteOffset = view.TryGetProperty("byteOffset", out var bo) ? bo.GetInt32() : 0;
-            var byteLength = view.TryGetProperty("byteLength", out var bl) ? bl.GetInt32() : 0;
-            if (byteLength <= 0)
-            {
-                System.Diagnostics.Debug.WriteLine("[TryReadBaseColorImage] Invalid byteLength for image bufferView");
-                return null;
-            }
-
-            var mimeType = image.TryGetProperty("mimeType", out var mtEl) ? (mtEl.GetString() ?? "image/png") : "image/png";
-            var bytes = new byte[byteLength];
-            Buffer.BlockCopy(bin, byteOffset, bytes, 0, byteLength);
-            var base64 = Convert.ToBase64String(bytes);
-            var dataUrl = $"data:{mimeType};base64,{base64}";
-            System.Diagnostics.Debug.WriteLine($"[TryReadBaseColorImage] Built data URL from bufferView (length={byteLength}, mime='{mimeType}')");
-            return dataUrl;
-        }
-
-        System.Diagnostics.Debug.WriteLine("[TryReadBaseColorImage] Image has neither uri nor bufferView");
-        return null;
-    }
-
 
 }

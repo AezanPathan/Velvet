@@ -16,3 +16,12 @@ export const BufferManager = new ResourceManager<GLBuffer>();
 export const MeshManager = new ResourceManager<GLMesh>();
 export const RendererManager = new ResourceManager<GLRenderer>();
 export const TextureManager = new ResourceManager<WebGLTexture>();
+
+export function clearAllManagers(): void {
+    ShaderManager.clear();
+    ProgramManager.clear();
+    BufferManager.clear();
+    MeshManager.clear();
+    RendererManager.clear();
+    TextureManager.clear();
+}

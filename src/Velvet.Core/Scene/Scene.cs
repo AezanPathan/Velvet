@@ -25,7 +25,7 @@ public sealed class Scene
 
 		foreach (var root in _roots)
 		{
-			root.CollectMeshes(output, Matrix.Identity());
+			root.CollectMeshes(output, Matrix4.Identity.Data);
 		}
 	}
 
@@ -35,7 +35,7 @@ public sealed class Scene
 
 		foreach (var root in _roots)
 		{
-			var rootBounds = root.ComputeBoundsRecursive(Matrix.Identity());
+			var rootBounds = root.ComputeBoundsRecursive(Matrix4.Identity.Data);
 			if (rootBounds.HasValue)
 			{
 				if (bounds == null)

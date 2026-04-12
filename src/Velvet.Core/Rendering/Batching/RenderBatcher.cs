@@ -6,7 +6,7 @@ namespace Velvet.Core.Rendering.Batching;
 
 /// <summary>
 /// Builds render batches from a scene's mesh instances.
-/// Groups instances by (ShaderProgram, Material, VertexLayout) to minimize state changes.
+/// Groups instances by (RenderProgram, Material, VertexLayout) to minimize state changes.
 /// </summary>
 public static class RenderBatcher
 {
@@ -14,11 +14,11 @@ public static class RenderBatcher
     /// Creates batches from mesh instances.
     /// </summary>
     /// <param name="instances">All mesh instances to batch.</param>
-    /// <param name="shaderProgram">The shader program to use (passed as object to avoid coupling).</param>
+    /// <param name="renderProgram">The backend render program handle used for this batch pass.</param>
     /// <returns>List of batches, each containing instances with matching rendering state.</returns>
     public static List<RenderBatch> BuildBatches(
         IReadOnlyList<MeshInstance> instances,
-        object shaderProgram)
+        IRenderProgram renderProgram)
     {
         var batchMap = new Dictionary<BatchKey, RenderBatch>();
 
@@ -27,7 +27,7 @@ public static class RenderBatcher
             var material = instance.Mesh.Material ?? Material.Default;
             var vertexLayout = instance.Mesh.Geometry.Layout;
 
-            var key = new BatchKey(shaderProgram, material, vertexLayout);
+            var key = new BatchKey(renderProgram, material, vertexLayout);
 
             if (!batchMap.TryGetValue(key, out var batch))
             {
@@ -41,14 +41,24 @@ public static class RenderBatcher
         return new List<RenderBatch>(batchMap.Values);
     }
 
+    [System.Obsolete("Use BuildBatches(IReadOnlyList<MeshInstance>, IRenderProgram) for type-safe contracts.")]
+    public static List<RenderBatch> BuildBatches(
+        IReadOnlyList<MeshInstance> instances,
+        object shaderProgram)
+        => BuildBatches(instances, new ObjectRenderProgram(shaderProgram ?? throw new System.ArgumentNullException(nameof(shaderProgram))));
+
     /// <summary>
     /// Creates batches from a scene.
     /// </summary>
-    public static List<RenderBatch> BuildBatches(SceneModel scene, object shaderProgram)
+    public static List<RenderBatch> BuildBatches(SceneModel scene, IRenderProgram renderProgram)
     {
         System.ArgumentNullException.ThrowIfNull(scene);
         var instances = new List<MeshInstance>();
         scene.CollectMeshes(instances);
-        return BuildBatches(instances, shaderProgram);
+        return BuildBatches(instances, renderProgram);
     }
+
+    [System.Obsolete("Use BuildBatches(Scene, IRenderProgram) for type-safe contracts.")]
+    public static List<RenderBatch> BuildBatches(SceneModel scene, object shaderProgram)
+        => BuildBatches(scene, new ObjectRenderProgram(shaderProgram ?? throw new System.ArgumentNullException(nameof(shaderProgram))));
 }

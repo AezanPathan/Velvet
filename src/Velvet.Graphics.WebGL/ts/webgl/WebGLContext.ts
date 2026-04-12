@@ -25,6 +25,9 @@ export class WebGLContext {
     maxTextureSize: number;
   };
 
+  private readonly contextLostHandlers: Array<() => void> = [];
+  private readonly contextRestoredHandlers: Array<() => void> = [];
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
 
@@ -67,13 +70,24 @@ export class WebGLContext {
     // Context loss handling
     this.canvas.addEventListener("webglcontextlost", (e) => {
       e.preventDefault();
-      console.warn("Velvet: WebGL context lost.");
+      for (const handler of this.contextLostHandlers) {
+        handler();
+      }
     });
 
     this.canvas.addEventListener("webglcontextrestored", () => {
-      console.warn("Velvet: WebGL context restored.");
-      // TODO: Reinitialize resources when we add ResourceManager
+      for (const handler of this.contextRestoredHandlers) {
+        handler();
+      }
     });
+  }
+
+  public onContextLost(handler: () => void): void {
+    this.contextLostHandlers.push(handler);
+  }
+
+  public onContextRestored(handler: () => void): void {
+    this.contextRestoredHandlers.push(handler);
   }
 
   /**

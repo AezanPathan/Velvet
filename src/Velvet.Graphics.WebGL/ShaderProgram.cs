@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using Velvet.Core.Rendering;
 
@@ -10,17 +9,18 @@ namespace Velvet.Graphics.WebGL;
 /// 
 /// Supports both standard and skinned rendering pipelines.
 /// </summary>
-public sealed class ShaderProgram
+public sealed class ShaderProgram : IRenderProgram
 {
     private readonly IWebGLBridge _bridge;
     private readonly int _programId;
-    private readonly Dictionary<string, int> _textureCache = new();
+    private readonly ShaderProgramMaterialBinder _materialBinder;
     private bool _hasBonesSupport = false;
 
     private ShaderProgram(IWebGLBridge bridge, int programId, bool hasBonesSupport = false)
     {
         _bridge = bridge ?? throw new ArgumentNullException(nameof(bridge));
         _programId = programId;
+        _materialBinder = new ShaderProgramMaterialBinder(_bridge, _programId);
         _hasBonesSupport = hasBonesSupport;
     }
 
@@ -109,32 +109,8 @@ public sealed class ShaderProgram
         await _bridge.SetUniform1iAsync(_programId, "uBoneCount", boneCount).ConfigureAwait(false);
     }
 
-    public async Task SetMaterialAsync(Material material)
-    {
-        ArgumentNullException.ThrowIfNull(material);
-
-        var c = material.AlbedoColor;
-        await SetUniform3fAsync("uBaseColor", c.X, c.Y, c.Z).ConfigureAwait(false);
-        await SetUniform1fAsync("uAmbientStrength", material.AmbientStrength).ConfigureAwait(false);
-        await SetUniform1fAsync("uMaterialUnlit", material.Unlit ? 1.0f : 0.0f).ConfigureAwait(false);
-
-        // Minimal texture support: baseColor texture
-        var hasTex = !string.IsNullOrWhiteSpace(material.BaseColorTextureUri);
-        System.Diagnostics.Debug.WriteLine($"[Material] BaseColorTextureUri = '{material.BaseColorTextureUri}', hasTex = {hasTex}");
-        
-        await _bridge.SetUniform1bAsync(_programId, "uHasTexture", hasTex).ConfigureAwait(false);
-        if (hasTex)
-        {
-            var uri = material.BaseColorTextureUri!;
-            if (!_textureCache.TryGetValue(uri, out var texId))
-            {
-                texId = await _bridge.CreateTextureFromUrlAsync(uri).ConfigureAwait(false);
-                _textureCache[uri] = texId;
-            }
-            // Bind to texture unit 0 and set sampler
-            await _bridge.BindTextureAsync(_programId, "uBaseColorTex", texId, 0).ConfigureAwait(false);
-        }
-    }
+    public Task SetMaterialAsync(Material material)
+        => _materialBinder.SetMaterialAsync(material);
 
     public Task DrawMeshAsync(int meshId, int rendererId)
         => _bridge.DrawMeshAsync(meshId, _programId, rendererId);

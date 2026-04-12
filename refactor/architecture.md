@@ -150,7 +150,7 @@ Current input pattern:
 
 Material system is currently transitional:
 - legacy standard material path exists
-- shader-driven material path exists (`Velvet.Core.Rendering.Materials.Material` + `IShader`)
+- shader-driven material path exists (`Velvet.Core.Rendering.Materials.ShaderMaterial` + `IShader`, with obsolete alias for `Rendering.Materials.Material`)
 
 See `refactor/material.md` for migration details and rationale.
 

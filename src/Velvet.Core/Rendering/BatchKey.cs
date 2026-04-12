@@ -8,18 +8,32 @@ namespace Velvet.Core.Rendering;
 /// </summary>
 public readonly struct BatchKey : System.IEquatable<BatchKey>
 {
-    public BatchKey(object shaderProgram, Material material, VertexLayout vertexLayout)
+    public BatchKey(IRenderProgram renderProgram, Material material, VertexLayout vertexLayout)
     {
-        ShaderProgram = shaderProgram ?? throw new System.ArgumentNullException(nameof(shaderProgram));
+        RenderProgram = renderProgram ?? throw new System.ArgumentNullException(nameof(renderProgram));
         Material = material ?? throw new System.ArgumentNullException(nameof(material));
         VertexLayout = vertexLayout ?? throw new System.ArgumentNullException(nameof(vertexLayout));
     }
 
     /// <summary>
-    /// The shader program used for rendering.
-    /// Stored as object to avoid coupling to WebGL-specific types.
+    /// Compatibility constructor for older object-based callers.
     /// </summary>
-    public object ShaderProgram { get; }
+    [System.Obsolete("Use BatchKey(IRenderProgram, Material, VertexLayout) for type-safe batching contracts.")]
+    public BatchKey(object shaderProgram, Material material, VertexLayout vertexLayout)
+        : this(new ObjectRenderProgram(shaderProgram ?? throw new System.ArgumentNullException(nameof(shaderProgram))), material, vertexLayout)
+    {
+    }
+
+    /// <summary>
+    /// The backend render program used for this batch.
+    /// </summary>
+    public IRenderProgram RenderProgram { get; }
+
+    /// <summary>
+    /// Backward-compatible alias for older callers.
+    /// </summary>
+    [System.Obsolete("Use RenderProgram.")]
+    public object ShaderProgram => RenderProgram;
 
     /// <summary>
     /// Material defining appearance (color, lighting properties).
@@ -32,7 +46,7 @@ public readonly struct BatchKey : System.IEquatable<BatchKey>
     public VertexLayout VertexLayout { get; }
 
     public bool Equals(BatchKey other)
-        => ShaderProgram.Equals(other.ShaderProgram)
+        => RenderProgram.Equals(other.RenderProgram)
         && Material.Equals(other.Material)
         && VertexLayout.Equals(other.VertexLayout);
 
@@ -40,11 +54,30 @@ public readonly struct BatchKey : System.IEquatable<BatchKey>
         => obj is BatchKey other && Equals(other);
 
     public override int GetHashCode()
-        => System.HashCode.Combine(ShaderProgram, Material, VertexLayout);
+        => System.HashCode.Combine(RenderProgram, Material, VertexLayout);
 
     public static bool operator ==(BatchKey left, BatchKey right)
         => left.Equals(right);
 
     public static bool operator !=(BatchKey left, BatchKey right)
         => !left.Equals(right);
+}
+
+internal sealed class ObjectRenderProgram : IRenderProgram, System.IEquatable<ObjectRenderProgram>
+{
+    private readonly object _value;
+
+    public ObjectRenderProgram(object value)
+    {
+        _value = value ?? throw new System.ArgumentNullException(nameof(value));
+    }
+
+    public bool Equals(ObjectRenderProgram? other)
+        => other is not null && _value.Equals(other._value);
+
+    public override bool Equals(object? obj)
+        => obj is ObjectRenderProgram other && Equals(other);
+
+    public override int GetHashCode()
+        => _value.GetHashCode();
 }
