@@ -26,8 +26,6 @@ public sealed class SceneNode
         NodeIndex = nodeIndex;
     }
 
-    #region Properties
-
     public string? Name { get; }
 
     public IReadOnlyList<Mesh> Meshes { get; }
@@ -40,14 +38,15 @@ public sealed class SceneNode
 
     public float[] LocalTransform => _localTransform;
 
-    #endregion
-
     internal void SetLocalTransform(float[] localTransform)
     {
         ArgumentNullException.ThrowIfNull(localTransform);
+
         if (localTransform.Length != 16)
+        {
             throw new ArgumentException("Local transform must be a 4x4 matrix.", nameof(localTransform));
-        
+        }
+
         _localTransform = localTransform;
     }
 
@@ -60,11 +59,9 @@ public sealed class SceneNode
 
         foreach (var mesh in Meshes)
             output.Add(new MeshInstance(mesh, world, Skin));
-        
 
         foreach (var child in Children)
             child.CollectMeshes(output, world);
-        
     }
 
     internal BoundingBox? ComputeBoundsRecursive(float[] parentWorld)
@@ -78,13 +75,7 @@ public sealed class SceneNode
         foreach (var mesh in Meshes)
         {
             var meshBounds = ComputeMeshBounds(mesh, world);
-
-            if (bounds == null)
-                bounds = meshBounds;
-            
-            else
-                bounds.Value.Expand(meshBounds);
-            
+            SceneBoundsAccumulator.Expand(ref bounds, meshBounds);
         }
 
         foreach (var child in Children)
@@ -92,12 +83,7 @@ public sealed class SceneNode
             var childBounds = child.ComputeBoundsRecursive(world);
             if (childBounds.HasValue)
             {
-                if (bounds == null)
-                    bounds = childBounds.Value;
-                
-                else
-                    bounds.Value.Expand(childBounds.Value);
-                
+                SceneBoundsAccumulator.Expand(ref bounds, childBounds.Value);
             }
         }
 
@@ -173,4 +159,5 @@ public sealed class SceneNode
         }
 
         return new Vector3(resultX, resultY, resultZ);
-    }}
+    }
+}

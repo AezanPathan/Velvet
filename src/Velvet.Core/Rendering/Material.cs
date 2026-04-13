@@ -8,8 +8,6 @@ namespace Velvet.Core.Rendering;
 /// </summary>
 public sealed class Material
 {
-    #region Properties
-
     /// <summary>
     /// Base surface color
     /// </summary>
@@ -35,9 +33,6 @@ public sealed class Material
     /// </summary>
     public string? BaseColorTextureUri { get; set; }
 
-    #endregion
-
-    #region  Ctor
     public Material(Vector3 albedoColor, float ambientStrength, float diffuseStrength, bool unlit = false)
     {
         AlbedoColor = albedoColor;
@@ -46,16 +41,10 @@ public sealed class Material
         Unlit = unlit;
     }
 
-    #endregion
-
-    #region  Methods
-
     // Default material color 
     public static Material Default { get; } = new(
         albedoColor: new Vector3(1.0f, 1.0f, 1.0f),
         ambientStrength: 0.05f,
         diffuseStrength: 1.0f,
         unlit: false);
-
-    #endregion
 }

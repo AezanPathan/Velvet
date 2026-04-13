@@ -1,22 +1,20 @@
+using System;
+using System.ComponentModel;
 using Velvet.Core.Rendering.Shaders;
 
 namespace Velvet.Core.Rendering.Materials;
 
 /// <summary>
-/// Backward-compatible alias for the previous shader-driven Material type.
-/// Use <see cref="ShaderMaterial"/> for all new code.
+/// Backward-compatible alias for the legacy shader-driven material type.
+/// Use <see cref="ShaderMaterial"/> for shader property bags and
+/// <see cref="Velvet.Core.Rendering.Material"/> for data-only mesh materials.
 /// </summary>
-[Obsolete("Use ShaderMaterial instead. This alias remains for compatibility during migration.")]
-public sealed class Material
+[EditorBrowsable(EditorBrowsableState.Never)]
+[Obsolete("Use ShaderMaterial or Velvet.Core.Rendering.Material. This alias remains for compatibility during migration.")]
+public sealed class Material : ShaderMaterial
 {
-    private readonly ShaderMaterial _inner;
-
     public Material(IShader shader)
+        : base(shader)
     {
-        _inner = new ShaderMaterial(shader);
     }
-
-    public void Set(string name, object value) => _inner.Set(name, value);
-
-    public void Apply() => _inner.Apply();
 }

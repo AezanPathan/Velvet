@@ -1,4 +1,5 @@
 using Velvet.Core.Geometry;
+using DataMaterial = Velvet.Core.Rendering.Material;
 
 namespace Velvet.Core.Rendering;
 
@@ -8,7 +9,7 @@ namespace Velvet.Core.Rendering;
 /// </summary>
 public readonly struct BatchKey : System.IEquatable<BatchKey>
 {
-    public BatchKey(IRenderProgram renderProgram, Material material, VertexLayout vertexLayout)
+    public BatchKey(IRenderProgram renderProgram, DataMaterial material, VertexLayout vertexLayout)
     {
         RenderProgram = renderProgram ?? throw new System.ArgumentNullException(nameof(renderProgram));
         Material = material ?? throw new System.ArgumentNullException(nameof(material));
@@ -18,8 +19,8 @@ public readonly struct BatchKey : System.IEquatable<BatchKey>
     /// <summary>
     /// Compatibility constructor for older object-based callers.
     /// </summary>
-    [System.Obsolete("Use BatchKey(IRenderProgram, Material, VertexLayout) for type-safe batching contracts.")]
-    public BatchKey(object shaderProgram, Material material, VertexLayout vertexLayout)
+    [System.Obsolete("Use BatchKey(IRenderProgram, Velvet.Core.Rendering.Material, VertexLayout) for type-safe batching contracts.")]
+    public BatchKey(object shaderProgram, DataMaterial material, VertexLayout vertexLayout)
         : this(new ObjectRenderProgram(shaderProgram ?? throw new System.ArgumentNullException(nameof(shaderProgram))), material, vertexLayout)
     {
     }
@@ -38,7 +39,7 @@ public readonly struct BatchKey : System.IEquatable<BatchKey>
     /// <summary>
     /// Material defining appearance (color, lighting properties).
     /// </summary>
-    public Material Material { get; }
+    public DataMaterial Material { get; }
 
     /// <summary>
     /// Vertex layout describing buffer structure.

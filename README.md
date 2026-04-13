@@ -3,62 +3,34 @@
 A minimal cross-platform graphics engine inspired by Three.js/Babylon.js. The repository now contains:
 
 - `Velvet.Core` – pure C# engine primitives (no JS dependencies)
-- `Velvet.WebGL` – WebGL backend, bridge abstractions, and the shared `velvet.js`
+- `Velvet.Graphics.WebGL` – WebGL backend, bridge abstractions, and the shared `velvet.js`
 - `Velvet.Hosting.Web` – helper glue for Blazor apps to configure the WebGL backend
-- `Velvet.Demo.Blazor` – Blazor WebAssembly demo rendering a triangle
-- `Velvet.Demo.Static` – plain .NET WebAssembly demo that boots via a simple HTML page (no Blazor)
+- `Velvet-Site` – Blazor WebAssembly sample app using the projects above
 
 ## Usage
 
+The current hosting API is Blazor-first via `Velvet.Hosting.Web.VelvetHost`.
+
 ```csharp
-var app = new VelvetHost();
-app.UseGraphics(new WebGLDevice());
-app.Add(new DrawTriangle());
-await app.RunAsync();
+var app = await VelvetHost.CreateAsync(canvasRef, JS, ShaderProgram.CreateDefaultAsync);
+app.Add(scene);
+app.Camera = camera;
+await app.StartAsync();
 ```
 
-On Blazor, configure the bridge before running:
+When your component/page is disposed:
 
 ```csharp
-JsBridge.Configure(new BlazorWebGLBridge(JSRuntime));
-var app = new VelvetHost();
-app.UseGraphics(new WebGLDevice());
-app.Add(new DrawTriangle());
-await app.RunAsync();
-```
-
-On static WebAssembly (no Blazor):
-
-```csharp
-JsBridge.Configure(new StaticWebGLBridge());
-var app = new VelvetHost();
-app.UseGraphics(new WebGLDevice());
-app.Add(new DrawTriangle());
-await app.RunAsync();
+await app.StopAsync();
 ```
 
 ## Running demos
 
-### Blazor demo
-
-```powershell
-cd Velvet/src
-dotnet run --project Velvet.Demo.Blazor
-
-// for debug
-dotnet watch --project Velvet.Demo.Blazor run
-netstat -ano | findstr :5052
-taskkill /PID taskid /F
-
-```
-
-Browse to the logged `localhost` port to see the triangle.
-
-### Static demo
+### Velvet-Site (Blazor WebAssembly)
 
 ```powershell
 cd Velvet
-dotnet publish Velvet.Demo.Static -c Release
+dotnet run --project Velvet-Site/Velvet-Site.csproj
 ```
 
-Serve the contents of `Velvet.Demo.Static\bin\Release\net9.0\browser-wasm\publish\wwwroot` (e.g., via `npx serve`).
+Browse to the logged `localhost` URL to open the sample scenes.

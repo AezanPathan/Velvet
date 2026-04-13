@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Velvet.Core.Geometry;
+using RenderingMaterial = Velvet.Core.Rendering.Material;
 
 namespace Velvet.Core.Rendering.Meshes;
 
@@ -22,9 +23,9 @@ public sealed class Mesh
 
     /// <summary>
     /// Optional material assigned to this mesh.
-    /// If null, renderers should use <see cref="Material.Default"/>.
+    /// If null, renderers should use <see cref="RenderingMaterial.Default"/>.
     /// </summary>
-    public Material? Material { get; set; }
+    public RenderingMaterial? Material { get; set; }
 
     /// <summary>
     /// Optional skin for skeletal deformation (skinning).
@@ -93,4 +94,3 @@ public sealed class Mesh
         }
     }
 }
-

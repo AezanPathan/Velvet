@@ -28,8 +28,26 @@ export class ResourceManager<TResource> {
      */
     public add(resource: TResource): number {
         const id = this.generateId();
-        this.resources.set(id, resource);
+        this.register(id, resource);
         return id;
+    }
+
+    /**
+     * Registers a resource with an explicit ID.
+     * Useful when the resource object also stores its own ID and both must stay aligned.
+     */
+    public register(id: number, resource: TResource): void {
+        if (!Number.isInteger(id) || id <= 0) {
+            throw new Error(`ResourceManager.register: id must be a positive integer (received ${id})`);
+        }
+        if (this.resources.has(id)) {
+            throw new Error(`ResourceManager.register: duplicate id=${id}`);
+        }
+
+        this.resources.set(id, resource);
+        if (id >= this.nextId) {
+            this.nextId = id + 1;
+        }
     }
 
     /**
@@ -37,7 +55,7 @@ export class ResourceManager<TResource> {
      */
     public get(id: number): TResource {
         const resource = this.resources.get(id);
-        if (!resource) {
+        if (resource === undefined) {
             throw new Error(`ResourceManager: No resource found for id=${id}`);
         }
         return resource;
@@ -47,9 +65,9 @@ export class ResourceManager<TResource> {
      * Removes and returns a resource.
      */
     public remove(id: number): TResource | null {
-        const resource = this.resources.get(id) || null;
+        const resource = this.resources.get(id);
         this.resources.delete(id);
-        return resource;
+        return resource ?? null;
     }
 
     /**

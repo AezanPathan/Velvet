@@ -7,7 +7,7 @@ namespace Velvet.Graphics.WebGL;
 /// <summary>
 /// Blazor bridge implementation that talks to the Velvet JavaScript API via IJSRuntime.
 /// This implementation intentionally avoids a compile-time dependency on Blazor types
-/// (e.g. ElementReference) so the Velvet.WebGL project remains host-agnostic.
+/// (e.g. ElementReference) so the Velvet.Graphics.WebGL project remains host-agnostic.
 /// 
 /// At runtime, Blazor should pass an ElementReference object; IJSRuntime will marshal it.
 /// </summary>

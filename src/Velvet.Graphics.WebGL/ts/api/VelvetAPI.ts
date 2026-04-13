@@ -50,22 +50,27 @@ export function init(canvas: string | HTMLCanvasElement): number {
   const context = new WebGLContext(canvasElement);
   setContext(context);
 
-  const renderer = new GLRenderer(context.gl, RendererManager.generateId());
-  return RendererManager.add(renderer);
+  const rendererId = RendererManager.generateId();
+  const renderer = new GLRenderer(context.gl, rendererId);
+  RendererManager.register(rendererId, renderer);
+  return rendererId;
 }
 
 export function createShader(source: string, type: "vertex" | "fragment"): number {
   const gl = getContext().gl;
-  const shader = new GLShader(gl, ShaderManager.generateId());
+  const shaderId = ShaderManager.generateId();
+  const shader = new GLShader(gl, shaderId);
   shader.compile(source, type);
-
-  return ShaderManager.add(shader);
+  ShaderManager.register(shaderId, shader);
+  return shaderId;
 }
 
 export function createProgram(): number {
   const gl = getContext().gl;
-  const program = new GLProgram(gl, ProgramManager.generateId());
-  return ProgramManager.add(program);
+  const programId = ProgramManager.generateId();
+  const program = new GLProgram(gl, programId);
+  ProgramManager.register(programId, program);
+  return programId;
 }
 
 export function attachShader(programId: number, shaderId: number): void {

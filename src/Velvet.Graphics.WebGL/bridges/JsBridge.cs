@@ -18,7 +18,7 @@ public static class JsBridge
     {
         if (_bridge is null)
         {
-            throw new InvalidOperationException("No WebGL bridge configured. Call app.UseWebGL(...) or provide a WebGLDevice with an explicit bridge.");
+            throw new InvalidOperationException("No WebGL bridge configured. Call JsBridge.Configure(...) or provide a WebGLDevice with an explicit bridge.");
         }
 
         return _bridge;

@@ -33,13 +33,9 @@ public static class GltfLoader
         {
             // Yield between heavy steps
             await Task.Yield();
-
-            var accessors = gltf.Doc.RootElement.GetProperty("accessors");
-            var bufferViews = gltf.Doc.RootElement.GetProperty("bufferViews");
-            var skinsById = LoadSkins(gltf.Doc.RootElement, accessors, bufferViews, gltf.Bin);
-            var meshesByIndex = LoadMeshesByIndex(gltf.Doc.RootElement, gltf.Bin, baseUrl);
+            var sceneData = LoadSceneGraphData(gltf.Doc.RootElement, gltf.Bin, baseUrl);
             await Task.Yield();
-            return BuildScene(gltf.Doc.RootElement, meshesByIndex, skinsById);
+            return BuildScene(sceneData.Root, sceneData.MeshesByIndex, sceneData.SkinsById);
         }
     }
 
@@ -55,15 +51,11 @@ public static class GltfLoader
         {
             // Yield between heavy steps
             await Task.Yield();
-
-            var accessors = gltf.Doc.RootElement.GetProperty("accessors");
-            var bufferViews = gltf.Doc.RootElement.GetProperty("bufferViews");
-            var skinsById = LoadSkins(gltf.Doc.RootElement, accessors, bufferViews, gltf.Bin);
-            var meshesByIndex = LoadMeshesByIndex(gltf.Doc.RootElement, gltf.Bin, baseUrl);
+            var sceneData = LoadSceneGraphData(gltf.Doc.RootElement, gltf.Bin, baseUrl);
             await Task.Yield();
 
-            var scene = BuildScene(gltf.Doc.RootElement, meshesByIndex, skinsById);
-            var animations = LoadAnimations(gltf.Doc.RootElement, gltf.Bin);
+            var scene = BuildScene(sceneData.Root, sceneData.MeshesByIndex, sceneData.SkinsById);
+            var animations = LoadAnimations(sceneData.Root, gltf.Bin);
 
             return (scene, animations);
         }
@@ -97,6 +89,18 @@ public static class GltfLoader
 
         // Demo fallback: embedded-base64 .gltf
         return LoadFromGltfJson(data);
+    }
+
+    private static (JsonElement Root, Dictionary<int, Skin> SkinsById, List<List<Mesh>> MeshesByIndex) LoadSceneGraphData(
+        JsonElement root,
+        byte[] bin,
+        string? baseUrl)
+    {
+        var accessors = root.GetProperty("accessors");
+        var bufferViews = root.GetProperty("bufferViews");
+        var skinsById = LoadSkins(root, accessors, bufferViews, bin);
+        var meshesByIndex = LoadMeshesByIndex(root, bin, baseUrl);
+        return (root, skinsById, meshesByIndex);
     }
 
     private static (JsonDocument Doc, byte[] Bin) LoadFromGlb(byte[] glb)
@@ -172,13 +176,11 @@ public static class GltfLoader
         var accessors = root.GetProperty("accessors");
         var bufferViews = root.GetProperty("bufferViews");
 
-        int meshIdx = 0;
         foreach (var meshEl in meshes.EnumerateArray())
         {
             if (!meshEl.TryGetProperty("primitives", out var primitives) || primitives.ValueKind != JsonValueKind.Array)
             {
                 meshesOut.Add(new List<Mesh>());
-                meshIdx++;
                 continue;
             }
 
@@ -193,7 +195,6 @@ public static class GltfLoader
             }
 
             meshesOut.Add(meshPrimitives);
-            meshIdx++;
         }
 
         return meshesOut;
@@ -248,44 +249,65 @@ public static class GltfLoader
         var nodeEl = nodesEl[nodeIndex];
 
         var localTransform = ReadNodeTransform(nodeEl);
-
-        var meshes = Array.Empty<Mesh>();
-        if (nodeEl.TryGetProperty("mesh", out var meshIndexEl))
-        {
-            var meshIndex = meshIndexEl.GetInt32();
-            if (meshIndex >= 0 && meshIndex < meshesByIndex.Count)
-            {
-                meshes = meshesByIndex[meshIndex].ToArray();
-            }
-        }
-
-        var children = new List<SceneNode>();
-        if (nodeEl.TryGetProperty("children", out var childrenEl) && childrenEl.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var childIndexEl in childrenEl.EnumerateArray())
-            {
-                children.Add(BuildNode(childIndexEl.GetInt32(), nodesEl, meshesByIndex, skinsById));
-            }
-        }
-
-        var name = nodeEl.TryGetProperty("name", out var nameEl) ? nameEl.GetString() : null;
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            name = $"Node_{nodeIndex}";
-        }
-
-        Skin? skin = null;
-        if (nodeEl.TryGetProperty("skin", out var skinIndexEl))
-        {
-            var skinIndex = skinIndexEl.GetInt32();
-            if (skinsById.TryGetValue(skinIndex, out var foundSkin))
-            {
-                skin = foundSkin;
-                System.Diagnostics.Debug.WriteLine($"[LOADER] Attached skin {skinIndex} to node {nodeIndex} ({name})");
-            }
-        }
+        var meshes = ResolveNodeMeshes(nodeEl, meshesByIndex);
+        var children = ResolveNodeChildren(nodeEl, nodesEl, meshesByIndex, skinsById);
+        var name = ResolveNodeName(nodeEl, nodeIndex);
+        var skin = ResolveNodeSkin(nodeEl, skinsById);
 
         return new SceneNode(localTransform, meshes, children, name, skin, nodeIndex);
+    }
+
+    private static Mesh[] ResolveNodeMeshes(JsonElement nodeEl, List<List<Mesh>> meshesByIndex)
+    {
+        if (!nodeEl.TryGetProperty("mesh", out var meshIndexEl))
+        {
+            return Array.Empty<Mesh>();
+        }
+
+        var meshIndex = meshIndexEl.GetInt32();
+        if (meshIndex < 0 || meshIndex >= meshesByIndex.Count)
+        {
+            return Array.Empty<Mesh>();
+        }
+
+        return meshesByIndex[meshIndex].ToArray();
+    }
+
+    private static List<SceneNode> ResolveNodeChildren(
+        JsonElement nodeEl,
+        JsonElement nodesEl,
+        List<List<Mesh>> meshesByIndex,
+        Dictionary<int, Skin> skinsById)
+    {
+        var children = new List<SceneNode>();
+        if (!nodeEl.TryGetProperty("children", out var childrenEl) || childrenEl.ValueKind != JsonValueKind.Array)
+        {
+            return children;
+        }
+
+        foreach (var childIndexEl in childrenEl.EnumerateArray())
+        {
+            children.Add(BuildNode(childIndexEl.GetInt32(), nodesEl, meshesByIndex, skinsById));
+        }
+
+        return children;
+    }
+
+    private static string ResolveNodeName(JsonElement nodeEl, int nodeIndex)
+    {
+        var name = nodeEl.TryGetProperty("name", out var nameEl) ? nameEl.GetString() : null;
+        return string.IsNullOrWhiteSpace(name) ? $"Node_{nodeIndex}" : name;
+    }
+
+    private static Skin? ResolveNodeSkin(JsonElement nodeEl, Dictionary<int, Skin> skinsById)
+    {
+        if (!nodeEl.TryGetProperty("skin", out var skinIndexEl))
+        {
+            return null;
+        }
+
+        var skinIndex = skinIndexEl.GetInt32();
+        return skinsById.TryGetValue(skinIndex, out var skin) ? skin : null;
     }
 
     private static List<AnimationClip> LoadAnimations(JsonElement root, byte[] bin)
@@ -639,154 +661,20 @@ public static class GltfLoader
             return null!;
         }
 
-        int posAcc = attrs.GetProperty("POSITION").GetInt32();
+        var positions = ReadPositions(attrs, accessors, bufferViews, bin);
+        var vertexCount = positions.Length / 3;
+        var indices = ReadPrimitiveIndices(prim, accessors, bufferViews, bin);
+        var normals = ReadNormals(attrs, accessors, bufferViews, bin, positions, indices);
+        var uvs = ReadUvs(attrs, accessors, bufferViews, bin, vertexCount);
+        var skinning = TryReadSkinningData(attrs, accessors, bufferViews, bin, vertexCount);
 
-        int? norAcc = null;
-        if (attrs.TryGetProperty("NORMAL", out var normalEl))
-        {
-            norAcc = normalEl.GetInt32();
-        }
+        var vertices = skinning.HasValue
+            ? PackSkinnedVertices(positions, normals, uvs, skinning.Value.Joints, skinning.Value.Weights)
+            : PackStandardVertices(positions, normals, uvs);
 
-        float[] positions = ReadAccessorFloatVec3(accessors, bufferViews, bin, posAcc);
-        float[] normals;
-
-        // Texture UV coordinates
-        int? uvAcc = null;
-        if (attrs.TryGetProperty("TEXCOORD_0", out var uvEl))
-            uvAcc = uvEl.GetInt32();
-
-        float[] uvs = uvAcc.HasValue
-                  ? ReadAccessorFloatVec2(accessors, bufferViews, bin, uvAcc.Value)
-                  : new float[(positions.Length / 3) * 2];
-
-        uint[]? indices = null;
-        int indexCount = 0;
-        if (prim.TryGetProperty("indices", out var idx))
-        {
-            indices = ReadAccessorIndicesU32(
-                accessors,
-                bufferViews,
-                bin,
-                idx.GetInt32());
-            indexCount = indices.Length;
-        }
-
-        if (norAcc.HasValue)
-        {
-            normals = ReadAccessorFloatVec3(accessors, bufferViews, bin, norAcc.Value);
-        }
-        else
-        {
-            // Fallback normals: compute from geometry when normals are missing (e.g., Fox.glb)
-            normals = ComputeNormals(positions, indices);
-        }
-
-        int vertexCount = positions.Length / 3;
-        System.Diagnostics.Debug.WriteLine($"[glTF] Loaded primitive: {vertexCount} vertices, {indexCount} indices");
-
-        // Check for skinning data (JOINTS_0 and WEIGHTS_0)
-        byte[]? joints = null;
-        float[]? weights = null;
-        bool hasSkinning = false;
-
-        if (attrs.TryGetProperty("JOINTS_0", out var jointsEl) && attrs.TryGetProperty("WEIGHTS_0", out var weightsEl))
-        {
-            joints = ReadAccessorJointsU8(accessors, bufferViews, bin, jointsEl.GetInt32(), vertexCount);
-            weights = ReadAccessorFloatVec4(accessors, bufferViews, bin, weightsEl.GetInt32());
-            hasSkinning = true;
-        }
-
-        // Determine vertex layout and pack vertices
-        float[] vertices;
-        var vertexLayout = VertexLayout.PositionNormalUV;
-
-        if (hasSkinning && joints != null && weights != null)
-        {
-            // Normalize weights (JOINTS_0 validation happens at runtime with the attached skin)
-            for (int i = 0; i < vertexCount; i++)
-            {
-                int j = i * 4;
-                float weightSum = weights[j + 0] + weights[j + 1] + weights[j + 2] + weights[j + 3];
-                if (System.Math.Abs(weightSum - 1.0f) > 0.01f)
-                {
-                    if (weightSum > 0.0001f)
-                    {
-                        weights[j + 0] /= weightSum;
-                        weights[j + 1] /= weightSum;
-                        weights[j + 2] /= weightSum;
-                        weights[j + 3] /= weightSum;
-                    }
-                    else
-                    {
-                        weights[j + 0] = 1.0f;
-                    }
-                }
-            }
-            
-            // Pack vertices: POSITION(3) + NORMAL(3) + UV(2) + JOINTS(4 as floats) + WEIGHTS(4) = 16 floats per vertex
-            vertexLayout = VertexLayout.PositionNormalUVSkinnedJointsWeights;
-            vertices = new float[vertexCount * 16];
-
-            for (int i = 0; i < vertexCount; i++)
-            {
-                int p = i * 3;
-                int v = i * 16;
-                int uv = i * 2;
-                int j = i * 4;
-
-                // Position
-                vertices[v + 0] = positions[p + 0];
-                vertices[v + 1] = positions[p + 1];
-                vertices[v + 2] = positions[p + 2];
-
-                // Normal
-                vertices[v + 3] = normals[p + 0];
-                vertices[v + 4] = normals[p + 1];
-                vertices[v + 5] = normals[p + 2];
-
-                // UV
-                vertices[v + 6] = uvs[uv + 0];
-                vertices[v + 7] = uvs[uv + 1];
-
-                // Joints (stored as floats but represent uint8 indices, will be unpacked in shader)
-                vertices[v + 8] = (float)joints[j + 0];
-                vertices[v + 9] = (float)joints[j + 1];
-                vertices[v + 10] = (float)joints[j + 2];
-                vertices[v + 11] = (float)joints[j + 3];
-
-                // Weights
-                vertices[v + 12] = weights[j + 0];
-                vertices[v + 13] = weights[j + 1];
-                vertices[v + 14] = weights[j + 2];
-                vertices[v + 15] = weights[j + 3];
-            }
-        }
-        else
-        {
-            // Standard layout: POSITION(3) + NORMAL(3) + UV(2) = 8 floats per vertex
-            vertices = new float[vertexCount * 8];
-
-            for (int i = 0; i < vertexCount; i++)
-            {
-                int p = i * 3;
-                int v = i * 8;
-                int uv = i * 2;
-
-                // Position
-                vertices[v + 0] = positions[p + 0];
-                vertices[v + 1] = positions[p + 1];
-                vertices[v + 2] = positions[p + 2];
-
-                // Normal
-                vertices[v + 3] = normals[p + 0];
-                vertices[v + 4] = normals[p + 1];
-                vertices[v + 5] = normals[p + 2];
-
-                // UV
-                vertices[v + 6] = uvs[uv + 0];
-                vertices[v + 7] = uvs[uv + 1];
-            }
-        }
+        var vertexLayout = skinning.HasValue
+            ? VertexLayout.PositionNormalUVSkinnedJointsWeights
+            : VertexLayout.PositionNormalUV;
 
         var geo = new LoadedGeometry(vertices, indices, vertexLayout);
         var mesh = new Mesh(geo);
@@ -794,6 +682,160 @@ public static class GltfLoader
         mesh.Material = GltfMaterialReader.TryReadMaterial(root, bin, baseUrl, materialIndex);
 
         return mesh;
+    }
+
+    private static float[] ReadPositions(JsonElement attrs, JsonElement accessors, JsonElement bufferViews, byte[] bin)
+    {
+        var positionAccessor = attrs.GetProperty("POSITION").GetInt32();
+        return ReadAccessorFloatVec3(accessors, bufferViews, bin, positionAccessor);
+    }
+
+    private static uint[]? ReadPrimitiveIndices(JsonElement prim, JsonElement accessors, JsonElement bufferViews, byte[] bin)
+    {
+        return prim.TryGetProperty("indices", out var idx)
+            ? ReadAccessorIndicesU32(accessors, bufferViews, bin, idx.GetInt32())
+            : null;
+    }
+
+    private static float[] ReadNormals(
+        JsonElement attrs,
+        JsonElement accessors,
+        JsonElement bufferViews,
+        byte[] bin,
+        float[] positions,
+        uint[]? indices)
+    {
+        if (attrs.TryGetProperty("NORMAL", out var normalEl))
+        {
+            return ReadAccessorFloatVec3(accessors, bufferViews, bin, normalEl.GetInt32());
+        }
+
+        // Fallback normals: compute from geometry when normals are missing (e.g., Fox.glb)
+        return ComputeNormals(positions, indices);
+    }
+
+    private static float[] ReadUvs(
+        JsonElement attrs,
+        JsonElement accessors,
+        JsonElement bufferViews,
+        byte[] bin,
+        int vertexCount)
+    {
+        if (attrs.TryGetProperty("TEXCOORD_0", out var uvEl))
+        {
+            return ReadAccessorFloatVec2(accessors, bufferViews, bin, uvEl.GetInt32());
+        }
+
+        return new float[vertexCount * 2];
+    }
+
+    private static (byte[] Joints, float[] Weights)? TryReadSkinningData(
+        JsonElement attrs,
+        JsonElement accessors,
+        JsonElement bufferViews,
+        byte[] bin,
+        int vertexCount)
+    {
+        if (!attrs.TryGetProperty("JOINTS_0", out var jointsEl) || !attrs.TryGetProperty("WEIGHTS_0", out var weightsEl))
+        {
+            return null;
+        }
+
+        var joints = ReadAccessorJointsU8(accessors, bufferViews, bin, jointsEl.GetInt32(), vertexCount);
+        var weights = ReadAccessorFloatVec4(accessors, bufferViews, bin, weightsEl.GetInt32());
+        NormalizeWeightsInPlace(weights, vertexCount);
+        return (joints, weights);
+    }
+
+    private static void NormalizeWeightsInPlace(float[] weights, int vertexCount)
+    {
+        // JOINTS_0 validation happens at runtime with the attached skin.
+        for (var i = 0; i < vertexCount; i++)
+        {
+            var weightOffset = i * 4;
+            var weightSum = weights[weightOffset + 0] + weights[weightOffset + 1] + weights[weightOffset + 2] + weights[weightOffset + 3];
+            if (System.Math.Abs(weightSum - 1.0f) <= 0.01f)
+            {
+                continue;
+            }
+
+            if (weightSum > 0.0001f)
+            {
+                weights[weightOffset + 0] /= weightSum;
+                weights[weightOffset + 1] /= weightSum;
+                weights[weightOffset + 2] /= weightSum;
+                weights[weightOffset + 3] /= weightSum;
+            }
+            else
+            {
+                weights[weightOffset + 0] = 1.0f;
+            }
+        }
+    }
+
+    private static float[] PackSkinnedVertices(float[] positions, float[] normals, float[] uvs, byte[] joints, float[] weights)
+    {
+        // POSITION(3) + NORMAL(3) + UV(2) + JOINTS(4 as floats) + WEIGHTS(4)
+        var vertexCount = positions.Length / 3;
+        var vertices = new float[vertexCount * 16];
+
+        for (var i = 0; i < vertexCount; i++)
+        {
+            var positionOffset = i * 3;
+            var vertexOffset = i * 16;
+            var uvOffset = i * 2;
+            var weightOffset = i * 4;
+
+            vertices[vertexOffset + 0] = positions[positionOffset + 0];
+            vertices[vertexOffset + 1] = positions[positionOffset + 1];
+            vertices[vertexOffset + 2] = positions[positionOffset + 2];
+
+            vertices[vertexOffset + 3] = normals[positionOffset + 0];
+            vertices[vertexOffset + 4] = normals[positionOffset + 1];
+            vertices[vertexOffset + 5] = normals[positionOffset + 2];
+
+            vertices[vertexOffset + 6] = uvs[uvOffset + 0];
+            vertices[vertexOffset + 7] = uvs[uvOffset + 1];
+
+            vertices[vertexOffset + 8] = joints[weightOffset + 0];
+            vertices[vertexOffset + 9] = joints[weightOffset + 1];
+            vertices[vertexOffset + 10] = joints[weightOffset + 2];
+            vertices[vertexOffset + 11] = joints[weightOffset + 3];
+
+            vertices[vertexOffset + 12] = weights[weightOffset + 0];
+            vertices[vertexOffset + 13] = weights[weightOffset + 1];
+            vertices[vertexOffset + 14] = weights[weightOffset + 2];
+            vertices[vertexOffset + 15] = weights[weightOffset + 3];
+        }
+
+        return vertices;
+    }
+
+    private static float[] PackStandardVertices(float[] positions, float[] normals, float[] uvs)
+    {
+        // POSITION(3) + NORMAL(3) + UV(2)
+        var vertexCount = positions.Length / 3;
+        var vertices = new float[vertexCount * 8];
+
+        for (var i = 0; i < vertexCount; i++)
+        {
+            var positionOffset = i * 3;
+            var vertexOffset = i * 8;
+            var uvOffset = i * 2;
+
+            vertices[vertexOffset + 0] = positions[positionOffset + 0];
+            vertices[vertexOffset + 1] = positions[positionOffset + 1];
+            vertices[vertexOffset + 2] = positions[positionOffset + 2];
+
+            vertices[vertexOffset + 3] = normals[positionOffset + 0];
+            vertices[vertexOffset + 4] = normals[positionOffset + 1];
+            vertices[vertexOffset + 5] = normals[positionOffset + 2];
+
+            vertices[vertexOffset + 6] = uvs[uvOffset + 0];
+            vertices[vertexOffset + 7] = uvs[uvOffset + 1];
+        }
+
+        return vertices;
     }
 
 
@@ -822,13 +864,6 @@ public static class GltfLoader
         if (stride < elementSize) 
             throw new InvalidDataException("Invalid byteStride for VEC3 float.");
 
-        Console.WriteLine($"[glTF] ReadAccessorFloatVec3:");
-        Console.WriteLine($"  accessor.count={count}");
-        Console.WriteLine($"  bufferView.byteStride={bufferStride}");
-        Console.WriteLine($"  elementSize={elementSize}");
-        Console.WriteLine($"  stride used={stride}");
-        Console.WriteLine($"  final byteOffset={byteOffset} (viewOffset={viewOffset} + accOffset={accOffset})");
-
         var result = new float[count * 3];
         for (var i = 0; i < count; i++)
         {
@@ -836,16 +871,6 @@ public static class GltfLoader
             result[i * 3 + 0] = BitConverter.ToSingle(bin, baseByte + 0);
             result[i * 3 + 1] = BitConverter.ToSingle(bin, baseByte + 4);
             result[i * 3 + 2] = BitConverter.ToSingle(bin, baseByte + 8);
-        }
-
-        // Log first 3 vertices for diagnostics
-        if (count > 0)
-        {
-            Console.WriteLine($"  First 3 vertices:");
-            for (int i = 0; i < System.Math.Min(3, count); i++)
-            {
-                Console.WriteLine($"    [{i}] x={result[i * 3 + 0]:F4} y={result[i * 3 + 1]:F4} z={result[i * 3 + 2]:F4}");
-            }
         }
 
         return result;
@@ -1029,8 +1054,6 @@ public static class GltfLoader
 
             var skin = new Skin(jointNodeIndices, jointNames, matrices);
             result[skinIndex] = skin;
-            System.Diagnostics.Debug.WriteLine($"[LOADER] Loaded skin {skinIndex} with {skin.JointCount} joints: {string.Join(", ", jointNames)}");
-            System.Diagnostics.Debug.WriteLine($"[LOADER]   Joint node indices: {string.Join(", ", jointNodeIndices)}");
             skinIndex++;
         }
 
@@ -1172,8 +1195,6 @@ public static class GltfLoader
 
         var stride = view.TryGetProperty("byteStride", out var bs) ? bs.GetInt32() : 16; // 4 floats * 4 bytes
 
-        System.Diagnostics.Debug.WriteLine($"[glTF] Reading {count} VEC4 weights, byteOffset={byteOffset}, stride={stride}");
-
         var result = new float[count * 4];
         for (int i = 0; i < count; i++)
         {
@@ -1222,8 +1243,6 @@ public static class GltfLoader
                 stride = bufferStride;
             }
         }
-
-        System.Diagnostics.Debug.WriteLine($"[glTF] Reading {count} indices, componentType={componentType}, byteOffset={byteOffset}, stride={stride}");
 
         return componentType switch
         {
@@ -1284,8 +1303,6 @@ public static class GltfLoader
         int byteOffset = viewOffset + accOffset;
 
         int stride = view.TryGetProperty("byteStride", out var bs) ? bs.GetInt32() : 8;
-
-        System.Diagnostics.Debug.WriteLine($"[glTF] Reading {count} VEC2 UVs, byteOffset={byteOffset}, stride={stride}");
 
         var result = new float[count * 2];
         for (int i = 0; i < count; i++)

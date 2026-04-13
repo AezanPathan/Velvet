@@ -307,32 +307,12 @@ public sealed class VelvetHost
 
     public Task StartAsync(Func<float, Task>? onFrame = null)
     {
-        if (_program is null) throw new InvalidOperationException("Shader program not configured. Provide a programFactory to CreateAsync(...).");
-        if (_instances.Count == 0 && _particleSystems.Count == 0) 
-            throw new InvalidOperationException("No meshes or particle systems added. Call Add(scene) or Add(particleSystem) before StartAsync().");
-        if (_loopTask is not null) return Task.CompletedTask;
-
-        // Build batches from instances
-        _batches = RenderBatcher.BuildBatches(_instances, _program);
-
-        _loopCts = new CancellationTokenSource();
-        _loopTask = RunLoopAsync(onFrame, beforeDrawMesh: null, _loopCts.Token);
-        return Task.CompletedTask;
+        return StartAsyncCore(new FrameCallbacks(onFrame, BeforeDrawMesh: null));
     }
 
     public Task StartAsync(Func<float, Task>? onFrame, Func<Mesh, Task>? beforeDrawMesh)
     {
-        if (_program is null) throw new InvalidOperationException("Shader program not configured. Provide a programFactory to CreateAsync(...).");
-        if (_instances.Count == 0 && _particleSystems.Count == 0) 
-            throw new InvalidOperationException("No meshes or particle systems added. Call Add(scene) or Add(particleSystem) before StartAsync().");
-        if (_loopTask is not null) return Task.CompletedTask;
-
-        // Build batches from instances
-        _batches = RenderBatcher.BuildBatches(_instances, _program);
-
-        _loopCts = new CancellationTokenSource();
-        _loopTask = RunLoopAsync(onFrame, beforeDrawMesh, _loopCts.Token);
-        return Task.CompletedTask;
+        return StartAsyncCore(new FrameCallbacks(onFrame, beforeDrawMesh));
     }
 
     public Task StartAsync(Action<float> onFrame)
@@ -409,25 +389,33 @@ public sealed class VelvetHost
         return Task.CompletedTask;
     }
 
-    private async Task RunLoopAsync(Func<float, Task>? onFrame, Func<Mesh, Task>? beforeDrawMesh, CancellationToken cancellationToken)
+    private Task StartAsyncCore(FrameCallbacks callbacks)
+    {
+        var program = _program ?? throw new InvalidOperationException("Shader program not configured. Provide a programFactory to CreateAsync(...).");
+        if (_instances.Count == 0 && _particleSystems.Count == 0)
+        {
+            throw new InvalidOperationException("No meshes or particle systems added. Call Add(scene) or Add(particleSystem) before StartAsync().");
+        }
+
+        if (_loopTask is not null)
+        {
+            return Task.CompletedTask;
+        }
+
+        _batches = RenderBatcher.BuildBatches(_instances, program);
+        _loopCts = new CancellationTokenSource();
+        _loopTask = RunLoopAsync(callbacks, _loopCts.Token);
+        return Task.CompletedTask;
+    }
+
+    private async Task RunLoopAsync(FrameCallbacks callbacks, CancellationToken cancellationToken)
     {
         var program = _program ?? throw new InvalidOperationException("Shader program not configured.");
         var camera = _camera ?? throw new InvalidOperationException("Camera not configured. Assign a Camera before starting.");
         var batches = _batches ?? throw new InvalidOperationException("Batches not built.");
 
-        // Ensure meshes are uploaded before we start drawing.
-        foreach (var instance in _instances)
-        {
-            await instance.Mesh.UploadAsync(_meshUploader, cancellationToken).ConfigureAwait(false);
-        }
-
-        // Initialize particle renderers
-        foreach (var particleSystem in _particleSystems)
-        {
-            var particleRenderer = new ParticleRenderer(particleSystem, _bridge);
-            await particleRenderer.InitializeAsync().ConfigureAwait(false);
-            _particleRenderers.Add(particleRenderer);
-        }
+        await UploadSceneMeshesAsync(cancellationToken).ConfigureAwait(false);
+        await InitializeParticleRenderersAsync().ConfigureAwait(false);
 
         using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(16));
 
@@ -436,158 +424,188 @@ public sealed class VelvetHost
 
         while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
         {
-            if (_resizeController.HasPendingResize)
-            {
-                await _resizeController
-                    .ApplyResizeAsync((pixelWidth, pixelHeight) => _bridge.ResizeAsync(pixelWidth, pixelHeight), _camera, cancellationToken)
-                    .ConfigureAwait(false);
-            }
+            await ApplyPendingResizeAsync(camera, cancellationToken).ConfigureAwait(false);
 
             var nowSeconds = (float)stopwatch.Elapsed.TotalSeconds;
             var deltaSeconds = nowSeconds - lastSeconds;
             lastSeconds = nowSeconds;
 
-            _orbitBinder?.Update();
-
-            // Prepare per-frame caches (e.g., skinning) before user frame logic runs.
-            _boneMatrixCache.Clear();
-
-            // Update particle systems
-            foreach (var particleSystem in _particleSystems)
-            {
-                particleSystem.Update(deltaSeconds);
-            }
-
-            if (onFrame is not null)
-            {
-                await onFrame(deltaSeconds).ConfigureAwait(false);
-            }
-
-            await _bridge.ClearAsync(_rendererId, 0.08f, 0.08f, 0.10f, 1.0f).ConfigureAwait(false);
-
-            // Render skybox first (if present) with depth mask disabled
-            if (_skybox is not null && _skyboxProgram is not null)
-            {
-                // Disable depth writes so skybox doesn't block scene geometry
-                await _bridge.SetDepthMaskAsync(_rendererId, false).ConfigureAwait(false);
-
-                // Set view and projection matrices for skybox
-                await _skyboxProgram.SetUniformMatrix4fvAsync("uView", camera.ViewMatrix).ConfigureAwait(false);
-                await _skyboxProgram.SetUniformMatrix4fvAsync("uProjection", camera.ProjectionMatrix).ConfigureAwait(false);
-
-                // Set cubemap texture if available
-                if (_skybox.CubemapTextureId.HasValue)
-                {
-                    await _bridge.BindCubemapTextureAsync(
-                        _skyboxProgram.ProgramId,
-                        "u_Skybox",
-                        _skybox.CubemapTextureId.Value,
-                        0).ConfigureAwait(false);
-                    await _skyboxProgram.SetUniform1bAsync("u_HasCubemap", true).ConfigureAwait(false);
-                }
-                else
-                {
-                    await _skyboxProgram.SetUniform1bAsync("u_HasCubemap", false).ConfigureAwait(false);
-                }
-
-                // Draw skybox mesh
-                var skyboxMeshId = _skybox.Mesh.Resources.VertexBufferId.Value;
-                await _skyboxProgram.DrawMeshAsync(skyboxMeshId, _rendererId).ConfigureAwait(false);
-
-                // Re-enable depth writes for scene rendering
-                await _bridge.SetDepthMaskAsync(_rendererId, true).ConfigureAwait(false);
-            }
-
-            // Set per-frame matrices once (View and Projection are constant for all meshes in this frame)
-            await program.SetUniformMatrix4fvAsync("uView", camera.ViewMatrix).ConfigureAwait(false);
-            await program.SetUniformMatrix4fvAsync("uProjection", camera.ProjectionMatrix).ConfigureAwait(false);
-
-            // Set per-frame lights
-            if (_directionalLight is not null)
-            {
-                var dir = _directionalLight.Direction;
-                var dirLenSq = dir.LengthSquared;
-                var normalizedDir = dirLenSq > 0.000001f ? dir.Normalized() : new Vector3(0f, -1f, 0f);
-                var directionalColor = _directionalEnabled
-                    ? _directionalLight.Color * _directionalLight.Intensity
-                    : Vector3.Zero;
-                await program.SetUniform3fAsync("uLightDirection", normalizedDir.X, normalizedDir.Y, normalizedDir.Z).ConfigureAwait(false);
-                await program.SetUniform3fAsync("uLightColor", directionalColor.X, directionalColor.Y, directionalColor.Z).ConfigureAwait(false);
-            }
-
-            if (_pointLight is not null)
-            {
-                var intensity = _pointEnabled ? _pointLight.Intensity : 0f;
-                await program.SetUniform3fAsync("uPointLightPosition", _pointLight.Position.X, _pointLight.Position.Y, _pointLight.Position.Z).ConfigureAwait(false);
-                await program.SetUniform3fAsync("uPointLightColor", _pointLight.Color.X, _pointLight.Color.Y, _pointLight.Color.Z).ConfigureAwait(false);
-                await program.SetUniform1fAsync("uPointLightIntensity", intensity).ConfigureAwait(false);
-                await program.SetUniform1fAsync("uPointLightConstant", _pointLight.Constant).ConfigureAwait(false);
-                await program.SetUniform1fAsync("uPointLightLinear", _pointLight.Linear).ConfigureAwait(false);
-                await program.SetUniform1fAsync("uPointLightQuadratic", _pointLight.Quadratic).ConfigureAwait(false);
-            }
-
-            if (_spotLight is not null)
-            {
-                await program.SetUniform3fAsync("uSpotLightPosition", _spotLight.Position.X, _spotLight.Position.Y, _spotLight.Position.Z).ConfigureAwait(false);
-                await program.SetUniform3fAsync("uSpotLightDirection", _spotLight.Direction.X, _spotLight.Direction.Y, _spotLight.Direction.Z).ConfigureAwait(false);
-                await program.SetUniform3fAsync("uSpotLightColor", _spotLight.Color.X, _spotLight.Color.Y, _spotLight.Color.Z).ConfigureAwait(false);
-                await program.SetUniform1fAsync("uSpotLightIntensity", _spotLight.Intensity).ConfigureAwait(false);
-                await program.SetUniform1fAsync("uSpotLightCutoff", _spotLight.Cutoff).ConfigureAwait(false);
-                await program.SetUniform1fAsync("uSpotLightOuterCutoff", _spotLight.OuterCutoff).ConfigureAwait(false);
-                await program.SetUniform1fAsync("uSpotLightConstant", _spotLight.Constant).ConfigureAwait(false);
-                await program.SetUniform1fAsync("uSpotLightLinear", _spotLight.Linear).ConfigureAwait(false);
-                await program.SetUniform1fAsync("uSpotLightQuadratic", _spotLight.Quadratic).ConfigureAwait(false);
-            }
-
-            // Render each batch
-            foreach (var batch in batches)
-            {
-                // Set batch state once (Material is shared across all instances in this batch)
-                await program.SetMaterialAsync(batch.Key.Material).ConfigureAwait(false);
-
-                // Draw all instances in the batch
-                foreach (var instance in batch.Instances)
-                {
-                    var mesh = instance.Mesh;
-                    var meshId = mesh.Resources.VertexBufferId.Value;
-
-                    // Ensure skin ownership is per-instance (node.skin), not shared on mesh.
-                    if (instance.Skin is not null)
-                    {
-                        mesh.Skin = instance.Skin;
-                    }
-                    else
-                    {
-                        mesh.Skin = null;
-                    }
-
-                    if (beforeDrawMesh is not null)
-                    {
-                        await beforeDrawMesh(mesh).ConfigureAwait(false);
-                    }
-
-                    if (mesh.Skin is not null && _boneMatrixCache.TryGetValue(mesh.Skin, out var boneMatrices))
-                    {
-                        await program.SetBoneMatricesAsync(boneMatrices, mesh.Skin.JointCount).ConfigureAwait(false);
-                    }
-
-                    // Set per-mesh Model matrix and Normal matrix
-                    await program.SetUniformMatrix4fvAsync("uModel", instance.ModelMatrix).ConfigureAwait(false);
-                    await program.SetUniformMatrix3fvAsync("uNormalMatrix", instance.NormalMatrix).ConfigureAwait(false);
-
-                    await program.DrawMeshAsync(meshId, _rendererId).ConfigureAwait(false);
-                }
-            }
-
-            // Render particles
-            foreach (var particleRenderer in _particleRenderers)
-            {
-                await particleRenderer.UploadAsync().ConfigureAwait(false);
-                await particleRenderer.RenderAsync(_rendererId, camera).ConfigureAwait(false);
-            }
-
+            await ExecuteFrameAsync(program, camera, batches, callbacks, deltaSeconds).ConfigureAwait(false);
         }
     }
+
+    private async Task UploadSceneMeshesAsync(CancellationToken cancellationToken)
+    {
+        foreach (var instance in _instances)
+        {
+            await instance.Mesh.UploadAsync(_meshUploader, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task InitializeParticleRenderersAsync()
+    {
+        foreach (var particleSystem in _particleSystems)
+        {
+            var particleRenderer = new ParticleRenderer(particleSystem, _bridge);
+            await particleRenderer.InitializeAsync().ConfigureAwait(false);
+            _particleRenderers.Add(particleRenderer);
+        }
+    }
+
+    private async Task ApplyPendingResizeAsync(Camera camera, CancellationToken cancellationToken)
+    {
+        if (_resizeController.HasPendingResize)
+        {
+            await _resizeController
+                .ApplyResizeAsync((pixelWidth, pixelHeight) => _bridge.ResizeAsync(pixelWidth, pixelHeight), camera, cancellationToken)
+                .ConfigureAwait(false);
+        }
+    }
+
+    private async Task ExecuteFrameAsync(
+        ShaderProgram program,
+        Camera camera,
+        List<RenderBatch> batches,
+        FrameCallbacks callbacks,
+        float deltaSeconds)
+    {
+        _orbitBinder?.Update();
+        _boneMatrixCache.Clear();
+
+        foreach (var particleSystem in _particleSystems)
+        {
+            particleSystem.Update(deltaSeconds);
+        }
+
+        if (callbacks.OnFrame is not null)
+        {
+            await callbacks.OnFrame(deltaSeconds).ConfigureAwait(false);
+        }
+
+        await _bridge.ClearAsync(_rendererId, 0.08f, 0.08f, 0.10f, 1.0f).ConfigureAwait(false);
+        await RenderSkyboxAsync(camera).ConfigureAwait(false);
+        await SetFrameUniformsAsync(program, camera).ConfigureAwait(false);
+        await RenderBatchesAsync(program, batches, callbacks.BeforeDrawMesh).ConfigureAwait(false);
+        await RenderParticlesAsync(camera).ConfigureAwait(false);
+    }
+
+    private async Task RenderSkyboxAsync(Camera camera)
+    {
+        if (_skybox is null || _skyboxProgram is null)
+        {
+            return;
+        }
+
+        await _bridge.SetDepthMaskAsync(_rendererId, false).ConfigureAwait(false);
+        await _skyboxProgram.SetUniformMatrix4fvAsync("uView", camera.ViewMatrix).ConfigureAwait(false);
+        await _skyboxProgram.SetUniformMatrix4fvAsync("uProjection", camera.ProjectionMatrix).ConfigureAwait(false);
+
+        if (_skybox.CubemapTextureId.HasValue)
+        {
+            await _bridge.BindCubemapTextureAsync(
+                _skyboxProgram.ProgramId,
+                "u_Skybox",
+                _skybox.CubemapTextureId.Value,
+                0).ConfigureAwait(false);
+            await _skyboxProgram.SetUniform1bAsync("u_HasCubemap", true).ConfigureAwait(false);
+        }
+        else
+        {
+            await _skyboxProgram.SetUniform1bAsync("u_HasCubemap", false).ConfigureAwait(false);
+        }
+
+        var skyboxMeshId = _skybox.Mesh.Resources.VertexBufferId.Value;
+        await _skyboxProgram.DrawMeshAsync(skyboxMeshId, _rendererId).ConfigureAwait(false);
+        await _bridge.SetDepthMaskAsync(_rendererId, true).ConfigureAwait(false);
+    }
+
+    private async Task SetFrameUniformsAsync(ShaderProgram program, Camera camera)
+    {
+        await program.SetUniformMatrix4fvAsync("uView", camera.ViewMatrix).ConfigureAwait(false);
+        await program.SetUniformMatrix4fvAsync("uProjection", camera.ProjectionMatrix).ConfigureAwait(false);
+        await SetFrameLightsAsync(program).ConfigureAwait(false);
+    }
+
+    private async Task SetFrameLightsAsync(ShaderProgram program)
+    {
+        if (_directionalLight is not null)
+        {
+            var dir = _directionalLight.Direction;
+            var dirLenSq = dir.LengthSquared;
+            var normalizedDir = dirLenSq > 0.000001f ? dir.Normalized() : new Vector3(0f, -1f, 0f);
+            var directionalColor = _directionalEnabled
+                ? _directionalLight.Color * _directionalLight.Intensity
+                : Vector3.Zero;
+            await program.SetUniform3fAsync("uLightDirection", normalizedDir.X, normalizedDir.Y, normalizedDir.Z).ConfigureAwait(false);
+            await program.SetUniform3fAsync("uLightColor", directionalColor.X, directionalColor.Y, directionalColor.Z).ConfigureAwait(false);
+        }
+
+        if (_pointLight is not null)
+        {
+            var intensity = _pointEnabled ? _pointLight.Intensity : 0f;
+            await program.SetUniform3fAsync("uPointLightPosition", _pointLight.Position.X, _pointLight.Position.Y, _pointLight.Position.Z).ConfigureAwait(false);
+            await program.SetUniform3fAsync("uPointLightColor", _pointLight.Color.X, _pointLight.Color.Y, _pointLight.Color.Z).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uPointLightIntensity", intensity).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uPointLightConstant", _pointLight.Constant).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uPointLightLinear", _pointLight.Linear).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uPointLightQuadratic", _pointLight.Quadratic).ConfigureAwait(false);
+        }
+
+        if (_spotLight is not null)
+        {
+            await program.SetUniform3fAsync("uSpotLightPosition", _spotLight.Position.X, _spotLight.Position.Y, _spotLight.Position.Z).ConfigureAwait(false);
+            await program.SetUniform3fAsync("uSpotLightDirection", _spotLight.Direction.X, _spotLight.Direction.Y, _spotLight.Direction.Z).ConfigureAwait(false);
+            await program.SetUniform3fAsync("uSpotLightColor", _spotLight.Color.X, _spotLight.Color.Y, _spotLight.Color.Z).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uSpotLightIntensity", _spotLight.Intensity).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uSpotLightCutoff", _spotLight.Cutoff).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uSpotLightOuterCutoff", _spotLight.OuterCutoff).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uSpotLightConstant", _spotLight.Constant).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uSpotLightLinear", _spotLight.Linear).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uSpotLightQuadratic", _spotLight.Quadratic).ConfigureAwait(false);
+        }
+    }
+
+    private async Task RenderBatchesAsync(ShaderProgram program, List<RenderBatch> batches, Func<Mesh, Task>? beforeDrawMesh)
+    {
+        foreach (var batch in batches)
+        {
+            await program.SetMaterialAsync(batch.Key.Material).ConfigureAwait(false);
+
+            foreach (var instance in batch.Instances)
+            {
+                var mesh = instance.Mesh;
+                var meshId = mesh.Resources.VertexBufferId.Value;
+                mesh.Skin = instance.Skin;
+
+                if (beforeDrawMesh is not null)
+                {
+                    await beforeDrawMesh(mesh).ConfigureAwait(false);
+                }
+
+                if (mesh.Skin is not null && _boneMatrixCache.TryGetValue(mesh.Skin, out var boneMatrices))
+                {
+                    await program.SetBoneMatricesAsync(boneMatrices, mesh.Skin.JointCount).ConfigureAwait(false);
+                }
+
+                await program.SetUniformMatrix4fvAsync("uModel", instance.ModelMatrix).ConfigureAwait(false);
+                await program.SetUniformMatrix3fvAsync("uNormalMatrix", instance.NormalMatrix).ConfigureAwait(false);
+                await program.DrawMeshAsync(meshId, _rendererId).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private async Task RenderParticlesAsync(Camera camera)
+    {
+        foreach (var particleRenderer in _particleRenderers)
+        {
+            await particleRenderer.UploadAsync().ConfigureAwait(false);
+            await particleRenderer.RenderAsync(_rendererId, camera).ConfigureAwait(false);
+        }
+    }
+
+    private readonly record struct FrameCallbacks(
+        Func<float, Task>? OnFrame,
+        Func<Mesh, Task>? BeforeDrawMesh);
 
     private void ThrowIfRunning()
     {

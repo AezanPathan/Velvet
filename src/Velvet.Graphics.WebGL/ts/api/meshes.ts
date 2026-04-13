@@ -1,7 +1,87 @@
 import { GLBuffer } from "../webgl/GLBuffer";
 import { GLMesh } from "../webgl/GLMesh";
+import { VertexAttribute } from "../webgl/GLMesh";
 import { BufferManager, MeshManager } from "../core/resource/Managers";
 import { ensureFloat32Array, ensureUint32Array, getContext } from "./runtime";
+
+type LayoutAttribute = Readonly<{
+  location: number;
+  size: number;
+  offsetFloats: number;
+}>;
+
+type VertexLayout = Readonly<{
+  strideFloats: number;
+  attributes: readonly LayoutAttribute[];
+}>;
+
+const VERTEX_LAYOUTS: readonly VertexLayout[] = [
+  {
+    strideFloats: 16,
+    attributes: [
+      { location: 0, size: 3, offsetFloats: 0 },
+      { location: 1, size: 3, offsetFloats: 3 },
+      { location: 2, size: 2, offsetFloats: 6 },
+      { location: 3, size: 4, offsetFloats: 8 },
+      { location: 4, size: 4, offsetFloats: 12 }
+    ]
+  },
+  {
+    strideFloats: 11,
+    attributes: [
+      { location: 0, size: 3, offsetFloats: 0 },
+      { location: 1, size: 3, offsetFloats: 3 },
+      { location: 2, size: 3, offsetFloats: 6 },
+      { location: 3, size: 2, offsetFloats: 9 }
+    ]
+  },
+  {
+    strideFloats: 9,
+    attributes: [
+      { location: 0, size: 3, offsetFloats: 0 },
+      { location: 1, size: 3, offsetFloats: 3 },
+      { location: 2, size: 3, offsetFloats: 6 }
+    ]
+  },
+  {
+    strideFloats: 8,
+    attributes: [
+      { location: 0, size: 3, offsetFloats: 0 },
+      { location: 1, size: 3, offsetFloats: 3 },
+      { location: 2, size: 2, offsetFloats: 6 }
+    ]
+  },
+  {
+    strideFloats: 6,
+    attributes: [
+      { location: 0, size: 3, offsetFloats: 0 },
+      { location: 1, size: 3, offsetFloats: 3 }
+    ]
+  },
+  {
+    strideFloats: 3,
+    attributes: [{ location: 0, size: 3, offsetFloats: 0 }]
+  }
+];
+
+function resolveLayout(vertexLength: number, explicitStride: number): VertexLayout | undefined {
+  if (explicitStride > 0) {
+    return VERTEX_LAYOUTS.find((layout) => layout.strideFloats === explicitStride);
+  }
+
+  return VERTEX_LAYOUTS.find((layout) => vertexLength % layout.strideFloats === 0);
+}
+
+function buildAttributes(gl: WebGL2RenderingContext, layout: VertexLayout): VertexAttribute[] {
+  const stride = layout.strideFloats * 4;
+  return layout.attributes.map((attribute) => ({
+    location: attribute.location,
+    size: attribute.size,
+    type: gl.FLOAT,
+    stride,
+    offset: attribute.offsetFloats * 4
+  }));
+}
 
 export function createMesh(
   vertices: Float32Array,
@@ -12,70 +92,36 @@ export function createMesh(
   const gl = context.gl;
 
   const vertexData = ensureFloat32Array(vertices);
-  const vb = new GLBuffer(gl, BufferManager.generateId(), gl.ARRAY_BUFFER);
+  const vertexBufferId = BufferManager.generateId();
+  const vb = new GLBuffer(gl, vertexBufferId, gl.ARRAY_BUFFER);
   vb.setData(vertexData);
-  BufferManager.add(vb);
+  BufferManager.register(vertexBufferId, vb);
 
   let ib: GLBuffer | undefined;
   let count = 0;
 
   if (indices && indices.length > 0) {
     const indexData = ensureUint32Array(indices);
-    ib = new GLBuffer(gl, BufferManager.generateId(), gl.ELEMENT_ARRAY_BUFFER);
+    const indexBufferId = BufferManager.generateId();
+    ib = new GLBuffer(gl, indexBufferId, gl.ELEMENT_ARRAY_BUFFER);
     ib.setData(indexData);
-    BufferManager.add(ib);
+    BufferManager.register(indexBufferId, ib);
     count = indexData.length;
   }
 
-  const mesh = new GLMesh(gl, MeshManager.generateId(), vb, ib);
+  const meshId = MeshManager.generateId();
+  const mesh = new GLMesh(gl, meshId, vb, ib);
   const effectiveStride = vertexStrideFloats && vertexStrideFloats > 0 ? vertexStrideFloats : 0;
-
-  if (effectiveStride === 16 || (effectiveStride === 0 && vertexData.length % 16 === 0)) {
-    count = indices ? count : vertexData.length / 16;
-    mesh.setAttributes([
-      { location: 0, size: 3, type: gl.FLOAT, stride: 64, offset: 0 },
-      { location: 1, size: 3, type: gl.FLOAT, stride: 64, offset: 12 },
-      { location: 2, size: 2, type: gl.FLOAT, stride: 64, offset: 24 },
-      { location: 3, size: 4, type: gl.FLOAT, stride: 64, offset: 32 },
-      { location: 4, size: 4, type: gl.FLOAT, stride: 64, offset: 48 }
-    ]);
-  } else if (effectiveStride === 11 || (effectiveStride === 0 && vertexData.length % 11 === 0)) {
-    count = indices ? count : vertexData.length / 11;
-    mesh.setAttributes([
-      { location: 0, size: 3, type: gl.FLOAT, stride: 44, offset: 0 },
-      { location: 1, size: 3, type: gl.FLOAT, stride: 44, offset: 12 },
-      { location: 2, size: 3, type: gl.FLOAT, stride: 44, offset: 24 },
-      { location: 3, size: 2, type: gl.FLOAT, stride: 44, offset: 36 }
-    ]);
-  } else if (effectiveStride === 9 || (effectiveStride === 0 && vertexData.length % 9 === 0)) {
-    count = indices ? count : vertexData.length / 9;
-    mesh.setAttributes([
-      { location: 0, size: 3, type: gl.FLOAT, stride: 36, offset: 0 },
-      { location: 1, size: 3, type: gl.FLOAT, stride: 36, offset: 12 },
-      { location: 2, size: 3, type: gl.FLOAT, stride: 36, offset: 24 }
-    ]);
-  } else if (effectiveStride === 8 || (effectiveStride === 0 && vertexData.length % 8 === 0)) {
-    count = indices ? count : vertexData.length / 8;
-    mesh.setAttributes([
-      { location: 0, size: 3, type: gl.FLOAT, stride: 32, offset: 0 },
-      { location: 1, size: 3, type: gl.FLOAT, stride: 32, offset: 12 },
-      { location: 2, size: 2, type: gl.FLOAT, stride: 32, offset: 24 }
-    ]);
-  } else if (effectiveStride === 6 || (effectiveStride === 0 && vertexData.length % 6 === 0)) {
-    count = indices ? count : vertexData.length / 6;
-    mesh.setAttributes([
-      { location: 0, size: 3, type: gl.FLOAT, stride: 24, offset: 0 },
-      { location: 1, size: 3, type: gl.FLOAT, stride: 24, offset: 12 }
-    ]);
-  } else if (effectiveStride === 3 || (effectiveStride === 0 && vertexData.length % 3 === 0)) {
-    count = indices ? count : vertexData.length / 3;
-    mesh.setAttributes([{ location: 0, size: 3, type: gl.FLOAT, stride: 12, offset: 0 }]);
-  } else {
+  const layout = resolveLayout(vertexData.length, effectiveStride);
+  if (!layout) {
     throw new Error(`Unsupported vertex layout: ${vertexData.length} floats (expected stride 3, 6, 8, 9, 11, or 16)`);
   }
 
+  count = indices ? count : vertexData.length / layout.strideFloats;
+  mesh.setAttributes(buildAttributes(gl, layout));
   mesh.setCount(count);
-  return MeshManager.add(mesh);
+  MeshManager.register(meshId, mesh);
+  return meshId;
 }
 
 export function createParticleMesh(capacity: number): number {
@@ -84,11 +130,13 @@ export function createParticleMesh(capacity: number): number {
 
   const gl = context.gl;
   const vertexData = new Float32Array(capacity * 8);
-  const vb = new GLBuffer(gl, BufferManager.generateId(), gl.ARRAY_BUFFER);
+  const vertexBufferId = BufferManager.generateId();
+  const vb = new GLBuffer(gl, vertexBufferId, gl.ARRAY_BUFFER);
   vb.setData(vertexData, gl.DYNAMIC_DRAW);
-  BufferManager.add(vb);
+  BufferManager.register(vertexBufferId, vb);
 
-  const mesh = new GLMesh(gl, MeshManager.generateId(), vb);
+  const meshId = MeshManager.generateId();
+  const mesh = new GLMesh(gl, meshId, vb);
   mesh.setAttributes([
     { location: 0, size: 3, type: gl.FLOAT, stride: 32, offset: 0 },
     { location: 1, size: 1, type: gl.FLOAT, stride: 32, offset: 12 },
@@ -96,11 +144,12 @@ export function createParticleMesh(capacity: number): number {
   ]);
   mesh.setPrimitiveType(gl.POINTS);
   mesh.setCount(0);
-  return MeshManager.add(mesh);
+  MeshManager.register(meshId, mesh);
+  return meshId;
 }
 
 export function updateMeshVertices(meshId: number, vertices: Float32Array, vertexCount: number): void {
-  const mesh = MeshManager.get(meshId) as GLMesh;
+  const mesh = MeshManager.get(meshId);
   const vertexData = ensureFloat32Array(vertices);
   const count = Math.max(0, vertexCount | 0);
 

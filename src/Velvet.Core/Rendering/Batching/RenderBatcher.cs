@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using SceneModel = Velvet.Core.Scene.Scene;
 using Velvet.Core.Rendering.Meshes;
+using DataMaterial = Velvet.Core.Rendering.Material;
 
 namespace Velvet.Core.Rendering.Batching;
 
@@ -24,7 +25,7 @@ public static class RenderBatcher
 
         foreach (var instance in instances)
         {
-            var material = instance.Mesh.Material ?? Material.Default;
+            var material = instance.Mesh.Material ?? DataMaterial.Default;
             var vertexLayout = instance.Mesh.Geometry.Layout;
 
             var key = new BatchKey(renderProgram, material, vertexLayout);

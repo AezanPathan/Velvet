@@ -1,6 +1,5 @@
-import { ProgramManager, TextureManager } from "../core/resource/Managers";
-import { GLProgram } from "../webgl/GLProgram";
-import { getContext } from "./runtime";
+import { TextureManager } from "../core/resource/Managers";
+import { getContext, getRequiredUniformLocation, withOptionalUniformLocation } from "./runtime";
 
 export async function loadTexture(imageUrl: string): Promise<WebGLTexture | null> {
   const context = getContext();
@@ -8,6 +7,7 @@ export async function loadTexture(imageUrl: string): Promise<WebGLTexture | null
   try {
     const response = await fetch(imageUrl);
     if (!response.ok) {
+      console.error(`loadTexture: HTTP ${response.status} when loading '${imageUrl}'`);
       return null;
     }
 
@@ -17,6 +17,7 @@ export async function loadTexture(imageUrl: string): Promise<WebGLTexture | null
     const gl = context.gl;
     const texture = gl.createTexture();
     if (!texture) {
+      console.error("loadTexture: gl.createTexture failed");
       return null;
     }
 
@@ -29,7 +30,8 @@ export async function loadTexture(imageUrl: string): Promise<WebGLTexture | null
     gl.generateMipmap(gl.TEXTURE_2D);
     gl.bindTexture(gl.TEXTURE_2D, null);
     return texture;
-  } catch {
+  } catch (error) {
+    console.error(`loadTexture: failed to load '${imageUrl}'`, error);
     return null;
   }
 }
@@ -70,12 +72,8 @@ export function createTextureFromUrl(url: string): Promise<number> {
 }
 
 export function bindTextureById(programId: number, samplerName: string, textureId: number, textureUnit: number): void {
-  const context = getContext();
-  const gl = context.gl;
+  const { gl, location, program } = getRequiredUniformLocation(programId, samplerName, "bindTextureById");
   const texture = TextureManager.get(textureId);
-  const program = ProgramManager.get(programId) as GLProgram;
-  const location = program.getUniformLocation(samplerName);
-  if (!location) throw new Error(`bindTextureById: uniform ${samplerName} not found`);
 
   program.use();
   gl.activeTexture(gl.TEXTURE0 + textureUnit);
@@ -149,12 +147,8 @@ export function createCubemapTexture(faceUrls: string[]): Promise<number> {
 }
 
 export function bindCubemapTextureById(programId: number, samplerName: string, textureId: number, textureUnit: number): void {
-  const context = getContext();
-  const gl = context.gl;
+  const { gl, location, program } = getRequiredUniformLocation(programId, samplerName, "bindCubemapTextureById");
   const texture = TextureManager.get(textureId);
-  const program = ProgramManager.get(programId) as GLProgram;
-  const location = program.getUniformLocation(samplerName);
-  if (!location) throw new Error(`bindCubemapTextureById: uniform ${samplerName} not found`);
 
   program.use();
   gl.activeTexture(gl.TEXTURE0 + textureUnit);
@@ -163,15 +157,9 @@ export function bindCubemapTextureById(programId: number, samplerName: string, t
 }
 
 export function bindTexture(texture: WebGLTexture, textureUnit: number, programId: number, samplerName: string): void {
-  const context = getContext();
-  const gl = context.gl;
-  gl.activeTexture(gl.TEXTURE0 + textureUnit);
-  gl.bindTexture(gl.TEXTURE_2D, texture);
-
-  const program = ProgramManager.get(programId) as GLProgram;
-  program.use();
-  const location = program.getUniformLocation(samplerName);
-  if (location) {
+  withOptionalUniformLocation(programId, samplerName, (gl, location) => {
+    gl.activeTexture(gl.TEXTURE0 + textureUnit);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.uniform1i(location, textureUnit);
-  }
+  });
 }

@@ -1,24 +1,19 @@
 using System;
 using System.Text.Json;
 using Velvet.Core.Math;
-using Velvet.Core.Rendering;
+using DataMaterial = Velvet.Core.Rendering.Material;
 
 namespace Velvet.Core.Assets.Gltf;
 
 internal static class GltfMaterialReader
 {
-    internal static Material? TryReadMaterial(JsonElement root, byte[] bin, string? baseUrl = null, int? materialIndex = null)
+    internal static DataMaterial? TryReadMaterial(JsonElement root, byte[] bin, string? baseUrl = null, int? materialIndex = null)
     {
-        if (!root.TryGetProperty("materials", out var materials) || materials.GetArrayLength() < 1)
-        {
-            return null;
-        }
+        if (!root.TryGetProperty("materials", out var materials) || materials.GetArrayLength() < 1) return null;
 
         var index = materialIndex ?? 0;
         if (index < 0 || index >= materials.GetArrayLength())
-        {
             index = 0;
-        }
 
         var m = materials[index];
 
@@ -26,9 +21,7 @@ internal static class GltfMaterialReader
         if (m.TryGetProperty("extensions", out var ext) && ext.ValueKind == JsonValueKind.Object)
         {
             if (ext.TryGetProperty("KHR_materials_unlit", out _))
-            {
                 unlit = true;
-            }
         }
 
         Vector3 color = new(1, 1, 1);
@@ -43,7 +36,7 @@ internal static class GltfMaterialReader
             }
         }
 
-        var material = new Material(
+        var material = new DataMaterial(
             albedoColor: color,
             ambientStrength: 0.05f,
             diffuseStrength: 1.0f,
