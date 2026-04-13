@@ -1,15 +1,26 @@
 # Velvet Graphics Engine
 
-A minimal cross-platform graphics engine inspired by Three.js/Babylon.js. The repository now contains:
+A minimal cross-platform graphics engine inspired by Three.js/Babylon.js.
 
-- `Velvet.Core` – pure C# engine primitives (no JS dependencies)
-- `Velvet.Graphics.WebGL` – WebGL backend, bridge abstractions, and the shared `velvet.js`
-- `Velvet.Hosting.Web` – helper glue for Blazor apps to configure the WebGL backend
-- `Velvet-Site` – Blazor WebAssembly sample app using the projects above
+## Release status
+
+Current aligned version: **0.1.0** (`Velvet.Core`, `Velvet.Graphics.WebGL`, `Velvet.Hosting.Web`, `Velvet-Site`, and WebGL package metadata).
+
+Recent release-readiness updates:
+
+- Material migration noise is contained: docs/samples use non-obsolete material APIs (`ShaderMaterial` and `Velvet.Core.Rendering.Material`), while the legacy alias remains compatibility-only.
+- DI host setup is implemented via `Velvet.Hosting.Web.ServiceExtensions`.
+
+## Projects
+
+- `Velvet.Core` – pure C# engine primitives
+- `Velvet.Graphics.WebGL` – WebGL backend and shared `velvet.js`
+- `Velvet.Hosting.Web` – Blazor hosting/orchestration API
+- `Velvet-Site` – Blazor WebAssembly sample app
 
 ## Usage
 
-The current hosting API is Blazor-first via `Velvet.Hosting.Web.VelvetHost`.
+Direct host creation:
 
 ```csharp
 var app = await VelvetHost.CreateAsync(canvasRef, JS, ShaderProgram.CreateDefaultAsync);
@@ -18,7 +29,21 @@ app.Camera = camera;
 await app.StartAsync();
 ```
 
-When your component/page is disposed:
+DI-based setup with `ServiceExtensions`:
+
+```csharp
+// Program.cs
+using Velvet.Hosting.Web;
+
+builder.Services.AddVelvetHost(); // or AddVelvetHost(customProgramFactory)
+
+// Component (.razor.cs)
+[Inject] private IServiceProvider Services { get; set; } = default!;
+
+app = await Services.CreateVelvetHostAsync(canvasRef); // optional per-host programFactory override
+```
+
+Shutdown:
 
 ```csharp
 await app.StopAsync();
@@ -26,11 +51,7 @@ await app.StopAsync();
 
 ## Running demos
 
-### Velvet-Site (Blazor WebAssembly)
-
 ```powershell
 cd Velvet
 dotnet run --project Velvet-Site/Velvet-Site.csproj
 ```
-
-Browse to the logged `localhost` URL to open the sample scenes.
