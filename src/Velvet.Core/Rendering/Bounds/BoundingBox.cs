@@ -1,7 +1,7 @@
 using System;
 using Velvet.Core.Math;
 
-namespace Velvet.Core.Rendering;
+namespace Velvet.Core.Rendering.Bounds;
 
 /// <summary>
 /// Axis-aligned bounding box (AABB) in 3D space.

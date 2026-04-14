@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-
 namespace Velvet.Core.Geometry;
 
 /// <summary>
@@ -19,11 +16,8 @@ public sealed class SkyboxGeometry : GeometryBase
     {
         const float h = 1.0f; // Use size 1.0 for skybox
 
-        var data = new List<float>(capacity: 36 * 3); // 36 vertices * 3 floats
-
-        // Inverted winding: vertices ordered clockwise when viewed from outside
-        // This makes them counter-clockwise when viewed from inside
-
+        var data = new List<float>(capacity: 36 * 3); 
+        
         // Front (+Z) - viewed from inside
         AddFace(data,
             a: (-h, +h, +h),

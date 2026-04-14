@@ -10,8 +10,8 @@ using SceneNode = Velvet.Core.Scene.SceneNode;
 using Velvet.Core.Animation;
 using Velvet.Core.Geometry;
 using Velvet.Core.Math;
-using Velvet.Core.Rendering;
 using Velvet.Core.Rendering.Meshes;
+using Velvet.Core.Rendering.Skinning;
 
 namespace Velvet.Core.Assets.Gltf;
 

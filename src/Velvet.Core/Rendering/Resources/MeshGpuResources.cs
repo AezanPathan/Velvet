@@ -1,4 +1,4 @@
-namespace Velvet.Core.Rendering;
+namespace Velvet.Core.Rendering.Resources;
 
 /// <summary>
 /// GPU resource identifiers associated with a mesh.

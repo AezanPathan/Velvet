@@ -3,7 +3,7 @@ namespace Velvet.Core.Scene;
 using System;
 using System.Collections.Generic;
 using Velvet.Core.Math;
-using Velvet.Core.Rendering;
+using Velvet.Core.Rendering.Bounds;
 using Velvet.Core.Rendering.Meshes;
 
 public sealed class Scene

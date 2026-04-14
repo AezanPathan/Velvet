@@ -1,5 +1,3 @@
-using System.Threading.Tasks;
-
 namespace Velvet.Core.Graphics;
 
 public interface IGraphicsDevice

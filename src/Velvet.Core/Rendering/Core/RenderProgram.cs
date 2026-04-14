@@ -1,4 +1,4 @@
-namespace Velvet.Core.Rendering;
+namespace Velvet.Core.Rendering.Core;
 
 /// <summary>
 /// Marker interface for backend-specific render program handles used by core batching.

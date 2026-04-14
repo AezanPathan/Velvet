@@ -1,4 +1,3 @@
-using System;
 using Velvet.Core.Math;
 
 namespace Velvet.Core.Particles;

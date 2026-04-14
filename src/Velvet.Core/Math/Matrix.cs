@@ -132,7 +132,7 @@ public static class Matrix
         if (det == 0f)
         {
             // Fallback to identity
-            return new float[] { 1,0,0, 0,1,0, 0,0,1 };
+            return [1,0,0, 0,1,0, 0,0,1];
         }
 
         var invDet = 1f / det;
@@ -150,11 +150,11 @@ public static class Matrix
         var c22 = (a11 * a00 - a01 * a10) * invDet;
 
         // Transpose (inverse transpose)
-        return new float[] {
+        return [
             c00, c10, c20,
             c01, c11, c21,
             c02, c12, c22
-        };
+        ];
     }
 
     /// <summary>

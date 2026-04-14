@@ -1,7 +1,7 @@
 using System;
 using System.Text.Json;
 using Velvet.Core.Math;
-using DataMaterial = Velvet.Core.Rendering.Material;
+using DataMaterial = Velvet.Core.Rendering.Materials.Material;
 
 namespace Velvet.Core.Assets.Gltf;
 

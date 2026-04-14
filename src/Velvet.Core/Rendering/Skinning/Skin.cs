@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Velvet.Core.Rendering;
+namespace Velvet.Core.Rendering.Skinning;
 
 /// <summary>
 /// Represents a glTF skin (skeletal deformation) for a mesh.

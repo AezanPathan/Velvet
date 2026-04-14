@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Velvet.Core.Scene;
 using Velvet.Core.Math;
 
-namespace Velvet.Core.Rendering;
+namespace Velvet.Core.Rendering.Skinning;
 
 /// <summary>
 /// Computes bone matrices for GPU skinning.

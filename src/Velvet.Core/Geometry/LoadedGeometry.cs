@@ -1,5 +1,3 @@
-using System;
-
 namespace Velvet.Core.Geometry;
 
 /// <summary>

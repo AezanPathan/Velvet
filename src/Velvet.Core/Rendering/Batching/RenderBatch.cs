@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Velvet.Core.Rendering.Meshes;
 
-namespace Velvet.Core.Rendering;
+namespace Velvet.Core.Rendering.Batching;
 
 /// <summary>
 /// Groups mesh instances that share the same rendering state (shader, material, vertex layout).

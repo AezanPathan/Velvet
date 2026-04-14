@@ -1,7 +1,6 @@
 using System;
 using System.Threading.Tasks;
 using Velvet.Core.Particles;
-using Velvet.Core.Rendering;
 using Velvet.Core.Rendering.Cameras;
 
 namespace Velvet.Graphics.WebGL;

@@ -1,7 +1,8 @@
 using System.Collections.Generic;
 using SceneModel = Velvet.Core.Scene.Scene;
+using Velvet.Core.Rendering.Core;
 using Velvet.Core.Rendering.Meshes;
-using DataMaterial = Velvet.Core.Rendering.Material;
+using DataMaterial = Velvet.Core.Rendering.Materials.Material;
 
 namespace Velvet.Core.Rendering.Batching;
 

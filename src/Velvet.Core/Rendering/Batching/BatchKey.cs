@@ -1,7 +1,8 @@
 using Velvet.Core.Geometry;
-using DataMaterial = Velvet.Core.Rendering.Material;
+using Velvet.Core.Rendering.Core;
+using DataMaterial = Velvet.Core.Rendering.Materials.Material;
 
-namespace Velvet.Core.Rendering;
+namespace Velvet.Core.Rendering.Batching;
 
 /// <summary>
 /// Identifies a unique rendering state for batching meshes together.
@@ -19,7 +20,7 @@ public readonly struct BatchKey : System.IEquatable<BatchKey>
     /// <summary>
     /// Compatibility constructor for older object-based callers.
     /// </summary>
-    [System.Obsolete("Use BatchKey(IRenderProgram, Velvet.Core.Rendering.Material, VertexLayout) for type-safe batching contracts.")]
+    [System.Obsolete("Use BatchKey(IRenderProgram, Velvet.Core.Rendering.Materials.Material, VertexLayout) for type-safe batching contracts.")]
     public BatchKey(object shaderProgram, DataMaterial material, VertexLayout vertexLayout)
         : this(new ObjectRenderProgram(shaderProgram ?? throw new System.ArgumentNullException(nameof(shaderProgram))), material, vertexLayout)
     {

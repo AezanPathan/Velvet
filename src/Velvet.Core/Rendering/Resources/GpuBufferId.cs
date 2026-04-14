@@ -1,4 +1,4 @@
-namespace Velvet.Core.Rendering;
+namespace Velvet.Core.Rendering.Resources;
 
 /// <summary>
 /// Opaque identifier for a GPU buffer allocated by a backend.

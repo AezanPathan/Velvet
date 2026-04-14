@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Velvet.Core.Geometry;
+using Velvet.Core.Rendering.Resources;
 
 namespace Velvet.Core.Rendering;
 

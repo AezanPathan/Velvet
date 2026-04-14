@@ -1,4 +1,4 @@
-using Velvet.Core.Rendering;
+using Velvet.Core.Rendering.Bounds;
 
 namespace Velvet.Core.Scene;
 

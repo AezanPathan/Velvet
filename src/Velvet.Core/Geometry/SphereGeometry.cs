@@ -1,11 +1,7 @@
-using System;
-using System.Collections.Generic;
-
 namespace Velvet.Core.Geometry;
 
 /// <summary>
 /// Simple UV sphere centered at origin.
-/// Indexed triangles with correct per-vertex normals.
 /// </summary>
 public sealed class SphereGeometry : GeometryBase
 {

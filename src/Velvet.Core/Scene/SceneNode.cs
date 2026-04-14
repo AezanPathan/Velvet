@@ -4,8 +4,9 @@ using System;
 using System.Collections.Generic;
 using Velvet.Core.Geometry;
 using Velvet.Core.Math;
-using Velvet.Core.Rendering;
+using Velvet.Core.Rendering.Bounds;
 using Velvet.Core.Rendering.Meshes;
+using Velvet.Core.Rendering.Skinning;
 
 public sealed class SceneNode
 {

@@ -1,5 +1,6 @@
 namespace Velvet.Core.Rendering.Cameras;
 
+using Velvet.Core.Rendering.Bounds;
 using Velvet.Core.Math;
 
 public sealed class Camera

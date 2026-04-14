@@ -2,7 +2,7 @@ using System;
 using Velvet.Core.Geometry;
 using Velvet.Core.Rendering.Meshes;
 
-namespace Velvet.Core.Rendering;
+namespace Velvet.Core.Rendering.Environment;
 
 /// <summary>
 /// Skybox for rendering an environment background.

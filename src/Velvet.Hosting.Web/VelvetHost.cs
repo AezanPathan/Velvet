@@ -11,10 +11,13 @@ using Velvet.Core.Particles;
 using Velvet.Core.Rendering;
 using Velvet.Core.Rendering.Batching;
 using Velvet.Core.Rendering.Cameras;
-using Velvet.Core.Rendering.Cameras.Controllers;
+using Velvet.Core.Rendering.Controllers;
+using Velvet.Core.Rendering.Core;
+using Velvet.Core.Rendering.Environment;
 using Velvet.Core.Rendering.Input;
 using Velvet.Core.Rendering.Lighting;
 using Velvet.Core.Rendering.Meshes;
+using Velvet.Core.Rendering.Skinning;
 using Velvet.Core.Scene;
 using Velvet.Graphics.WebGL;
 
