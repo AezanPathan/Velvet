@@ -8,7 +8,6 @@ namespace Velvet.Core.Rendering.Lighting;
 /// </summary>
 public sealed class PointLight
 {
-    #region Fields
 
     public Vector3 Position { get; set;}
     public Vector3 Color { get; set;}
@@ -17,10 +16,7 @@ public sealed class PointLight
     public float Linear { get; set;}
     public float Quadratic { get; set;}
 
-    #endregion
-
-    #region  Ctor
-
+  
     public PointLight(in Vector3 position,
         in Vector3 color,
         float intensity = 1.0f,
@@ -41,11 +37,5 @@ public sealed class PointLight
         Quadratic = quadratic;
     }
 
-    #endregion
-
-    #region  Methods
-
-    //Methods will go here 
-
-    #endregion
+    
 }

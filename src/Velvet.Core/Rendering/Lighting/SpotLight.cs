@@ -1,11 +1,9 @@
-using System;
 using Velvet.Core.Math;
 
 namespace Velvet.Core.Rendering.Lighting;
 
     /// <summary>
-    /// Simple engine-grade spot light (single-instance friendly).
-    /// Diffuse-only shading is expected (Lambert).
+    /// Simple spot light 
     /// </summary>
     public sealed class SpotLight
     {
@@ -20,9 +18,7 @@ namespace Velvet.Core.Rendering.Lighting;
 
         public Vector3 Position { get; set; }
 
-        /// <summary>
-        /// Direction the spot light points toward (normalized).
-        /// </summary>
+      
         public Vector3 Direction
         {
             get => _direction;
@@ -47,9 +43,7 @@ namespace Velvet.Core.Rendering.Lighting;
             }
         }
 
-        /// <summary>
-        /// Inner cone angle in radians.
-        /// </summary>
+  
         public float Cutoff
         {
             get => _cutoff;
@@ -62,10 +56,7 @@ namespace Velvet.Core.Rendering.Lighting;
                 _cutoff = value;
             }
         }
-
-        /// <summary>
-        /// Outer cone angle in radians.
-        /// </summary>
+        
         public float OuterCutoff
         {
             get => _outerCutoff;

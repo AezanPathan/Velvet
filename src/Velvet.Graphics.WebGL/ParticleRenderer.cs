@@ -1,4 +1,5 @@
 using System;
+
 using System.Threading.Tasks;
 using Velvet.Core.Particles;
 using Velvet.Core.Rendering.Cameras;
@@ -11,6 +12,7 @@ namespace Velvet.Graphics.WebGL;
 public sealed class ParticleRenderer
 {
     private readonly ParticleSystem _system;
+
     private readonly IWebGLBridge _bridge;
     private ShaderProgram? _program;
     private int _meshId = -1;
@@ -56,7 +58,7 @@ public sealed class ParticleRenderer
 
         ArgumentNullException.ThrowIfNull(camera);
 
-        await _bridge.SetBlendModeAsync(rendererId, BlendModeToString(_system.BlendMode)).ConfigureAwait(false);
+        await _bridge.SetBlendModeAsync(rendererId, BlendModeToString(_system.Settings.BlendMode)).ConfigureAwait(false);
         await _program.SetUniformMatrix4fvAsync("uView", camera.ViewMatrix).ConfigureAwait(false);
         await _program.SetUniformMatrix4fvAsync("uProjection", camera.ProjectionMatrix).ConfigureAwait(false);
         await _program.DrawMeshAsync(_meshId, rendererId).ConfigureAwait(false);

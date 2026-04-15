@@ -25,15 +25,15 @@ public sealed class ParticleSystem
 
     public ParticleEmitter Emitter { get; }
 
-    public float ParticleLifetime { get; set; } = 1.5f;
+    // public float ParticleLifetime { get; set; } = 1.5f;
+    // public float StartSize { get; set; } = 8f;
+    // public float EndSize { get; set; } = 2f;
+    // public Vector4 StartColor { get; set; } = new(1f, 1f, 1f, 1f);
+    // public Vector4 EndColor { get; set; } = new(1f, 1f, 1f, 0f);
+    // public ParticleBlendMode BlendMode { get; set; } = ParticleBlendMode.Alpha;
 
-    public float StartSize { get; set; } = 8f;
-    public float EndSize { get; set; } = 2f;
+    public ParticleSystemSettings Settings { get; } = new();
 
-    public Vector4 StartColor { get; set; } = new(1f, 1f, 1f, 1f);
-    public Vector4 EndColor { get; set; } = new(1f, 1f, 1f, 0f);
-
-    public ParticleBlendMode BlendMode { get; set; } = ParticleBlendMode.Alpha;
 
     public ParticleSystem(int capacity, ParticleEmitter emitter)
     {
@@ -103,8 +103,8 @@ public sealed class ParticleSystem
             float t = _lifetimes[idx] <= 0f ? 1f : _ages[idx] / _lifetimes[idx];
             t = MathF.Min(1f, MathF.Max(0f, t));
 
-            float size = Lerp(StartSize, EndSize, t);
-            Vector4 color = Lerp(StartColor, EndColor, t);
+            float size = Lerp(Settings.StartSize, Settings.EndSize, t);
+            Vector4 color = Lerp(Settings.StartColor, Settings.EndColor, t);
 
             int baseIndex = i * 8;
             var p = _positions[idx];
@@ -146,7 +146,7 @@ public sealed class ParticleSystem
         _positions[idx] = Emitter.SampleSpawnPosition(_random);
         _velocities[idx] = Emitter.SampleSpawnVelocity(_random);
         _ages[idx] = 0f;
-        _lifetimes[idx] = ParticleLifetime;
+        _lifetimes[idx] = Settings.Lifetime;
 
         _activeSlots[idx] = _activeCount;
         _activeIndices[_activeCount] = idx;
@@ -174,4 +174,15 @@ public sealed class ParticleSystem
                a.Y + (b.Y - a.Y) * t,
                a.Z + (b.Z - a.Z) * t,
                a.W + (b.W - a.W) * t);
+}
+
+public sealed class ParticleSystemSettings
+{
+
+    public float Lifetime { get; set; } = 1.5f;
+    public float StartSize { get; set; } = 8f;
+    public float EndSize { get; set; } = 2f;
+    public Vector4 StartColor { get; set; } = new(1f, 1f, 1f, 1f);
+    public Vector4 EndColor { get; set; } = new(1f, 1f, 1f, 0f);
+    public ParticleBlendMode BlendMode { get; set; } = ParticleBlendMode.Alpha;
 }

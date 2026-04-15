@@ -8,7 +8,7 @@ namespace Velvet.Core.Rendering.Batching;
 /// Identifies a unique rendering state for batching meshes together.
 /// Meshes with the same BatchKey can be rendered sequentially with minimal state changes.
 /// </summary>
-public readonly struct BatchKey : System.IEquatable<BatchKey>
+public readonly struct BatchKey : IEquatable<BatchKey>
 {
     public BatchKey(IRenderProgram renderProgram, DataMaterial material, VertexLayout vertexLayout)
     {
@@ -65,7 +65,7 @@ public readonly struct BatchKey : System.IEquatable<BatchKey>
         => !left.Equals(right);
 }
 
-internal sealed class ObjectRenderProgram : IRenderProgram, System.IEquatable<ObjectRenderProgram>
+internal sealed class ObjectRenderProgram : IRenderProgram, IEquatable<ObjectRenderProgram>
 {
     private readonly object _value;
 

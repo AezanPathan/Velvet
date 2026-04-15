@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using Velvet.Core.Math;
 using Velvet.Core.Rendering.Shaders;
 

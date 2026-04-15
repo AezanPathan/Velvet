@@ -1,8 +1,4 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Velvet.Core.Geometry;
-using Velvet.Core.Rendering.Materials;
 using Velvet.Core.Rendering.Resources;
 using Velvet.Core.Rendering.Skinning;
 using RenderingMaterial = Velvet.Core.Rendering.Materials.Material;
