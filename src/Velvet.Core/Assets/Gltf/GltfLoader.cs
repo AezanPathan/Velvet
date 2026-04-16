@@ -1,8 +1,4 @@
-using System;
 using System.Buffers.Binary;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Text;
 using System.Text.Json;
 using SceneModel = Velvet.Core.Scene.Scene;
@@ -74,7 +70,6 @@ public static class GltfLoader
         {
             if (unique.Add(instance.Mesh))
                 meshes.Add(instance.Mesh);
-
         }
 
         return meshes;
@@ -383,8 +378,8 @@ public static class GltfLoader
                     continue;
                 }
 
-                var path = ParseAnimationPath(pathEl.GetString());
-                if (path == AnimationPath.Weights)
+                var path = ParseAnimationProperty(pathEl.GetString());
+                if (path == AnimationProperty.Weights)
                 {
                     // Morph target weights are not supported in this node-based animation system.
                     continue;
@@ -451,14 +446,14 @@ public static class GltfLoader
         return name!;
     }
 
-    private static AnimationPath ParseAnimationPath(string? path)
+    private static AnimationProperty ParseAnimationProperty(string? path)
     {
         return path switch
         {
-            "translation" => AnimationPath.Translation,
-            "rotation" => AnimationPath.Rotation,
-            "scale" => AnimationPath.Scale,
-            "weights" => AnimationPath.Weights,
+            "translation" => AnimationProperty.Translation,
+            "rotation" => AnimationProperty.Rotation,
+            "scale" => AnimationProperty.Scale,
+            "weights" => AnimationProperty.Weights,
             _ => throw new NotSupportedException($"Unsupported animation path: {path}")
         };
     }
@@ -480,14 +475,14 @@ public static class GltfLoader
         return InterpolationMode.Linear;
     }
 
-    private static int GetComponentCountForPath(AnimationPath path)
+    private static int GetComponentCountForPath(AnimationProperty path)
     {
         return path switch
         {
-            AnimationPath.Translation => 3,
-            AnimationPath.Rotation => 4,
-            AnimationPath.Scale => 3,
-            AnimationPath.Weights => 1,
+            AnimationProperty.Translation => 3,
+            AnimationProperty.Rotation => 4,
+            AnimationProperty.Scale => 3,
+            AnimationProperty.Weights => 1,
             _ => throw new NotSupportedException($"Unsupported animation path: {path}")
         };
     }

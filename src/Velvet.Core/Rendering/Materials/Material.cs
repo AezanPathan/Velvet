@@ -9,16 +9,17 @@ namespace Velvet.Core.Rendering.Materials;
 public sealed class Material
 {
     /// <summary>
-    /// Base surface color
+    /// Base surface color.
     /// </summary>
     public Vector3 AlbedoColor { get; set; }
+
     /// <summary>
-    /// AmbientStrength
+    /// Ambient strength
     /// </summary>
     public float AmbientStrength { get; set; }
 
     /// <summary>
-    /// DiffuseStrength 
+    /// Diffuse strength
     /// </summary>
     public float DiffuseStrength { get; set; }
 
@@ -41,7 +42,7 @@ public sealed class Material
         Unlit = unlit;
     }
 
-    // Default material color 
+    /// <summary>Default lit white material.</summary>
     public static Material Default { get; } = new(
         albedoColor: new Vector3(1.0f, 1.0f, 1.0f),
         ambientStrength: 0.05f,

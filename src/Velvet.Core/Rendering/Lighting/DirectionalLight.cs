@@ -7,25 +7,14 @@ namespace Velvet.Core.Rendering.Lighting;
 /// </summary>
 public sealed class DirectionalLight
 {
-
     public Vector3 Color { get; set; }
     public float Intensity { get; set; }
-
-
-    // private Vector3 _direction;
-
-    // public Vector3 Direction
-    // {
-    //     get => _direction;
-    //     set => _direction = value.Normalized();
-    // }
 
     public Vector3 Direction
     {
         get;
         set => field = value.Normalized();
     }
-
 
     public DirectionalLight(in Vector3 direction, in Vector3 color, float intensity = 1.0f)
     {
@@ -34,7 +23,4 @@ public sealed class DirectionalLight
         Color = color;
         Intensity = intensity;
     }
-
-
-
 }

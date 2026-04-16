@@ -25,15 +25,7 @@ public sealed class ParticleSystem
 
     public ParticleEmitter Emitter { get; }
 
-    // public float ParticleLifetime { get; set; } = 1.5f;
-    // public float StartSize { get; set; } = 8f;
-    // public float EndSize { get; set; } = 2f;
-    // public Vector4 StartColor { get; set; } = new(1f, 1f, 1f, 1f);
-    // public Vector4 EndColor { get; set; } = new(1f, 1f, 1f, 0f);
-    // public ParticleBlendMode BlendMode { get; set; } = ParticleBlendMode.Alpha;
-
     public ParticleSystemSettings Settings { get; } = new();
-
 
     public ParticleSystem(int capacity, ParticleEmitter emitter)
     {
@@ -178,7 +170,6 @@ public sealed class ParticleSystem
 
 public sealed class ParticleSystemSettings
 {
-
     public float Lifetime { get; set; } = 1.5f;
     public float StartSize { get; set; } = 8f;
     public float EndSize { get; set; } = 2f;

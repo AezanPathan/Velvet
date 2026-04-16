@@ -1,4 +1,3 @@
-using System;
 using System.Text.Json;
 using Velvet.Core.Math;
 using DataMaterial = Velvet.Core.Rendering.Materials.Material;
@@ -17,12 +16,9 @@ internal static class GltfMaterialReader
 
         var m = materials[index];
 
-        var unlit = false;
-        if (m.TryGetProperty("extensions", out var ext) && ext.ValueKind == JsonValueKind.Object)
-        {
-            if (ext.TryGetProperty("KHR_materials_unlit", out _))
-                unlit = true;
-        }
+        var unlit = m.TryGetProperty("extensions", out var ext) && 
+                    ext.ValueKind == JsonValueKind.Object &&
+                    ext.TryGetProperty("KHR_materials_unlit", out _);
 
         Vector3 color = new(1, 1, 1);
         if (m.TryGetProperty("pbrMetallicRoughness", out var pbr) && pbr.ValueKind == JsonValueKind.Object)

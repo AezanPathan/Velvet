@@ -24,7 +24,6 @@ public readonly struct Quaternion
     {
         var lenSq = X * X + Y * Y + Z * Z + W * W;
         if (lenSq <= 0f) return Identity;
-        
 
         var invLen = 1f / MathF.Sqrt(lenSq);
         return new Quaternion(X * invLen, Y * invLen, Z * invLen, W * invLen);

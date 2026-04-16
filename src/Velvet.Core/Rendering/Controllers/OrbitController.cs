@@ -1,6 +1,5 @@
 namespace Velvet.Core.Rendering.Controllers;
 
-using System;
 using Velvet.Core.Math;
 using Velvet.Core.Rendering.Cameras;
 

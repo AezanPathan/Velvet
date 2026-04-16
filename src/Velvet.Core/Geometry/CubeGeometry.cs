@@ -82,9 +82,7 @@ public sealed class CubeGeometry : GeometryBase
             color: cyan);
 
         if (data.Count != 36 * 9)
-        {
             throw new InvalidOperationException($"CubeGeometry authoring error: expected {36 * 9} floats, got {data.Count}.");
-        }
 
         return data.ToArray();
     }
@@ -105,7 +103,12 @@ public sealed class CubeGeometry : GeometryBase
         var nz = ux * vy - uy * vx;
         // Normalize
         var len = (float)System.Math.Sqrt(nx * nx + ny * ny + nz * nz);
-        if (len != 0f) { nx /= len; ny /= len; nz /= len; }
+        if (len != 0f)
+        {
+            nx /= len;
+            ny /= len;
+            nz /= len;
+        }
 
         // Two triangles: (a,b,c) and (a,c,d)
         AddVertex(data, a, color, (nx, ny, nz));

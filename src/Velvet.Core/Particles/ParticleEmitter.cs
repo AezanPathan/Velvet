@@ -9,7 +9,6 @@ public sealed class ParticleEmitter
 {
     public ParticleEmitterShape Shape { get; set; } = ParticleEmitterShape.Point;
 
-    
     public Vector3 Position { get; set; } = Vector3.Zero;
 
     public Vector3 BoxExtents { get; set; } = new(0.5f, 0.5f, 0.5f);

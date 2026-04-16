@@ -1,7 +1,5 @@
 namespace Velvet.Core.Scene;
 
-using System;
-using System.Collections.Generic;
 using Velvet.Core.Math;
 using Velvet.Core.Rendering.Bounds;
 using Velvet.Core.Rendering.Meshes;

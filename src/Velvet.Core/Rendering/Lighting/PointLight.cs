@@ -8,15 +8,13 @@ namespace Velvet.Core.Rendering.Lighting;
 /// </summary>
 public sealed class PointLight
 {
+    public Vector3 Position { get; set; }
+    public Vector3 Color { get; set; }
+    public float Intensity { get; set; }
+    public float Constant { get; set; }
+    public float Linear { get; set; }
+    public float Quadratic { get; set; }
 
-    public Vector3 Position { get; set;}
-    public Vector3 Color { get; set;}
-    public float Intensity { get; set;}
-    public float Constant { get; set;}
-    public float Linear { get; set;}
-    public float Quadratic { get; set;}
-
-  
     public PointLight(in Vector3 position,
         in Vector3 color,
         float intensity = 1.0f,
@@ -36,6 +34,4 @@ public sealed class PointLight
         Linear = linear;
         Quadratic = quadratic;
     }
-
-    
 }

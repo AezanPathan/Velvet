@@ -29,18 +29,6 @@ public sealed class VertexLayout
         });
 
     /// <summary>
-    /// Layout: interleaved position (x,y,z) + color (r,g,b) per vertex.
-    /// Format: <c>[x, y, z, r, g, b]</c>
-    /// </summary>
-    // public static VertexLayout PositionColor { get; } = new(
-    //     strideFloats: 6,
-    //     elements: new[]
-    //     {
-    //         new VertexElement(VertexElementSemantic.Position, OffsetFloats: 0, ComponentCount: 3),
-    //         new VertexElement(VertexElementSemantic.Color, OffsetFloats: 3, ComponentCount: 3),
-    //     });
-
-    /// <summary>
     /// Layout: interleaved position (x,y,z) + color (r,g,b) + normal (nx,ny,nz) per vertex.
     /// Format: <c>[x, y, z, r, g, b, nx, ny, nz]</c>
     /// </summary>
@@ -48,24 +36,10 @@ public sealed class VertexLayout
         strideFloats: 9,
         elements: new[]
         {
-                new VertexElement(VertexElementSemantic.Position, OffsetFloats: 0, ComponentCount: 3),
-                new VertexElement(VertexElementSemantic.Color, OffsetFloats: 3, ComponentCount: 3),
-                new VertexElement(VertexElementSemantic.Normal, OffsetFloats: 6, ComponentCount: 3),
+            new VertexElement(VertexElementSemantic.Position, OffsetFloats: 0, ComponentCount: 3),
+            new VertexElement(VertexElementSemantic.Color, OffsetFloats: 3, ComponentCount: 3),
+            new VertexElement(VertexElementSemantic.Normal, OffsetFloats: 6, ComponentCount: 3),
         });
-
-    /// <summary>
-    /// Layout: interleaved position (x,y,z) + color (r,g,b) + normal (nx,ny,nz) + uv (u,v) per vertex.
-    /// Format: <c>[x, y, z, r, g, b, nx, ny, nz, u, v]</c>
-    /// </summary>
-    // public static VertexLayout PositionColorNormalUV { get; } = new(
-    //     strideFloats: 11,
-    //     elements: new[]
-    //     {
-    //             new VertexElement(VertexElementSemantic.Position, OffsetFloats: 0, ComponentCount: 3),
-    //             new VertexElement(VertexElementSemantic.Color, OffsetFloats: 3, ComponentCount: 3),
-    //             new VertexElement(VertexElementSemantic.Normal, OffsetFloats: 6, ComponentCount: 3),
-    //             new VertexElement(VertexElementSemantic.UV, OffsetFloats: 9, ComponentCount: 2),
-    //     });
 
     /// <summary>
     /// Canonical layout for textured models: position (x,y,z) + normal (nx,ny,nz) + uv (u,v) per vertex.
@@ -76,9 +50,9 @@ public sealed class VertexLayout
         strideFloats: 8,
         elements: new[]
         {
-                new VertexElement(VertexElementSemantic.Position, OffsetFloats: 0, ComponentCount: 3),
-                new VertexElement(VertexElementSemantic.Normal, OffsetFloats: 3, ComponentCount: 3),
-                new VertexElement(VertexElementSemantic.UV, OffsetFloats: 6, ComponentCount: 2),
+            new VertexElement(VertexElementSemantic.Position, OffsetFloats: 0, ComponentCount: 3),
+            new VertexElement(VertexElementSemantic.Normal, OffsetFloats: 3, ComponentCount: 3),
+            new VertexElement(VertexElementSemantic.UV, OffsetFloats: 6, ComponentCount: 2),
         });
 
     /// <summary>
@@ -91,11 +65,11 @@ public sealed class VertexLayout
         strideFloats: 16,
         elements: new[]
         {
-                new VertexElement(VertexElementSemantic.Position, OffsetFloats: 0, ComponentCount: 3),
-                new VertexElement(VertexElementSemantic.Normal, OffsetFloats: 3, ComponentCount: 3),
-                new VertexElement(VertexElementSemantic.UV, OffsetFloats: 6, ComponentCount: 2),
-                new VertexElement(VertexElementSemantic.Joints, OffsetFloats: 8, ComponentCount: 4),
-                new VertexElement(VertexElementSemantic.Weights, OffsetFloats: 9, ComponentCount: 4),
+            new VertexElement(VertexElementSemantic.Position, OffsetFloats: 0, ComponentCount: 3),
+            new VertexElement(VertexElementSemantic.Normal, OffsetFloats: 3, ComponentCount: 3),
+            new VertexElement(VertexElementSemantic.UV, OffsetFloats: 6, ComponentCount: 2),
+            new VertexElement(VertexElementSemantic.Joints, OffsetFloats: 8, ComponentCount: 4),
+            new VertexElement(VertexElementSemantic.Weights, OffsetFloats: 9, ComponentCount: 4),
         });
 }
 
@@ -105,8 +79,8 @@ public enum VertexElementSemantic
     Color,
     Normal,
     UV,
-    Joints,     
-    Weights,    
+    Joints,
+    Weights,
 }
 
 public readonly record struct VertexElement(

@@ -23,11 +23,9 @@ public readonly struct Matrix4
     public Matrix4(float[] data)
     {
         ArgumentNullException.ThrowIfNull(data);
-        
+
         if (data.Length != 16)
-        {
             throw new ArgumentException("Matrix4 requires exactly 16 float elements.", nameof(data));
-        }
 
         _data = data;
     }

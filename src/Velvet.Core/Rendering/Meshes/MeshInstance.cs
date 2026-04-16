@@ -1,6 +1,5 @@
 namespace Velvet.Core.Rendering.Meshes;
 
-using System;
 using Velvet.Core.Math;
 using Velvet.Core.Rendering.Skinning;
 

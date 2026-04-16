@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using Velvet.Core.Rendering.Meshes;
 
 namespace Velvet.Core.Rendering.Batching;

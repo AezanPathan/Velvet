@@ -1,7 +1,5 @@
 namespace Velvet.Core.Scene;
 
-using System;
-using System.Collections.Generic;
 using Velvet.Core.Geometry;
 using Velvet.Core.Math;
 using Velvet.Core.Rendering.Bounds;
@@ -152,7 +150,7 @@ public sealed class SceneNode
         var resultW = matrix[3] * x + matrix[7] * y + matrix[11] * z + matrix[15] * w;
 
         // Apply homogeneous divide when transformed w differs from 1.
-        if (System.MathF.Abs(resultW - 1.0f) > float.Epsilon)
+        if (MathF.Abs(resultW - 1.0f) > float.Epsilon)
         {
             resultX /= resultW;
             resultY /= resultW;

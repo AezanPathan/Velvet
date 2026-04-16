@@ -14,10 +14,10 @@ public sealed class SkyboxGeometry : GeometryBase
 
     private static float[] CreateVertices()
     {
-        const float h = 1.0f; // Use size 1.0 for skybox
+        const float h = 1.0f;
 
-        var data = new List<float>(capacity: 36 * 3); 
-        
+        var data = new List<float>(capacity: 36 * 3);
+
         // Front (+Z) - viewed from inside
         AddFace(data,
             a: (-h, +h, +h),
@@ -61,9 +61,7 @@ public sealed class SkyboxGeometry : GeometryBase
             d: (-h, -h, -h));
 
         if (data.Count != 36 * 3)
-        {
             throw new InvalidOperationException($"SkyboxGeometry error: expected {36 * 3} floats, got {data.Count}.");
-        }
 
         return data.ToArray();
     }

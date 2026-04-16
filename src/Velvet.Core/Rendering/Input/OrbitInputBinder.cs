@@ -8,9 +8,9 @@ public class OrbitInputBinder
     private readonly OrbitController _orbit;
     private readonly Camera _camera;
 
-    private bool isDragging;
-    private int lastX;
-    private int lastY;
+    private bool _isDragging;
+    private int _lastX;
+    private int _lastY;
 
     public OrbitInputBinder(OrbitController orbit, Camera camera)
     {
@@ -24,31 +24,31 @@ public class OrbitInputBinder
 
     public void OnMouseDown(int x, int y)
     {
-        isDragging = true;
-        lastX = x;
-        lastY = y;
+        _isDragging = true;
+        _lastX = x;
+        _lastY = y;
     }
 
     public void OnMouseMove(int x, int y)
     {
-        if (!isDragging)
+        if (!_isDragging)
         {
             return;
         }
 
-        var dx = x - lastX;
-        var dy = y - lastY;
+        var dx = x - _lastX;
+        var dy = y - _lastY;
 
         _orbit.ApplyYaw(-dx * 0.005f);
         _orbit.ApplyPitch(dy * 0.005f);
 
-        lastX = x;
-        lastY = y;
+        _lastX = x;
+        _lastY = y;
     }
 
     public void OnMouseUp()
     {
-        isDragging = false;
+        _isDragging = false;
     }
 
     public void OnWheel(float delta)
