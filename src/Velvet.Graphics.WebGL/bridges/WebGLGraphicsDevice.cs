@@ -18,14 +18,9 @@ public class WebGLGraphicsDevice : IGraphicsDevice
 
     public virtual async Task<int> InitializeAsync()
     {
-        if (Canvas is string id)
-        {
-            RendererId = await Bridge.InitWithIdAsync(id);
-        }
-        else
-        {
-            RendererId = await Bridge.InitWithElementAsync(Canvas);
-        }
+        RendererId = Canvas is string id
+            ? await Bridge.InitWithIdAsync(id)
+            : await Bridge.InitWithElementAsync(Canvas);
 
         return RendererId;
     }

@@ -1,9 +1,7 @@
 namespace Velvet.Core.Math;
 
 /// <summary>
-/// Stateless 4x4 matrix utilities for the engine math layer.
-/// Column-major layout matches OpenGL/WebGL conventions while staying backend-agnostic; suitable for any renderer expecting column-major data.
-/// Static form keeps this code allocation-free and hot-path friendly for real-time rendering.
+/// Stateless 4x4 matrix utilities (column-major).
 /// </summary>
 public static class Matrix
 {
@@ -20,7 +18,6 @@ public static class Matrix
         var c = (float)System.Math.Cos(angle);
         var s = (float)System.Math.Sin(angle);
 
-        // Column-major
         return
         [
             1, 0, 0, 0,
@@ -35,7 +32,6 @@ public static class Matrix
         var c = (float)System.Math.Cos(angle);
         var s = (float)System.Math.Sin(angle);
 
-        // Column-major
         return
         [
             c, 0, -s, 0,
@@ -71,7 +67,6 @@ public static class Matrix
 
     /// <summary>
     /// Builds a column-major TRS matrix (T * R * S) using OpenGL/WebGL layout.
-    /// Quaternion is interpreted as (x, y, z, w) in glTF convention.
     /// </summary>
     public static float[] Trs(in Vector3 translation, in Quaternion rotation, in Vector3 scale)
     {
@@ -82,12 +77,6 @@ public static class Matrix
         var xy = q.X * q.Y; var xz = q.X * q.Z; var yz = q.Y * q.Z;
         var wx = q.W * q.X; var wy = q.W * q.Y; var wz = q.W * q.Z;
 
-        // Rotation matrix in row-major form (standard quaternion formula):
-        // [ 1-2(yy+zz)  2(xy-wz)   2(xz+wy) ]
-        // [ 2(xy+wz)    1-2(xx+zz) 2(yz-wx) ]
-        // [ 2(xz-wy)    2(yz+wx)   1-2(xx+yy) ]
-        //
-        // Converted to column-major for GPU upload:
         var m00 = 1f - 2f * (yy + zz);
         var m10 = 2f * (xy + wz);
         var m20 = 2f * (xz - wy);
@@ -100,7 +89,6 @@ public static class Matrix
         var m12 = 2f * (yz - wx);
         var m22 = 1f - 2f * (xx + yy);
 
-        // Apply scale to each basis column and append translation in the last column.
         return
         [
             m00 * scale.X, m10 * scale.X, m20 * scale.X, 0f,
@@ -112,28 +100,23 @@ public static class Matrix
 
     /// <summary>
     /// Compute the 3x3 normal matrix (inverse-transpose of the upper-left 3x3 of the model matrix).
-    /// Returns a float[9] in column-major order suitable for GLSL mat3 uniform upload.
     /// </summary>
     public static float[] NormalMatrix(float[] m)
     {
         if (m.Length != 16) throw new ArgumentException("Expected 4x4 matrix", nameof(m));
 
-        // Extract upper-left 3x3
         var a00 = m[0]; var a01 = m[4]; var a02 = m[8];
         var a10 = m[1]; var a11 = m[5]; var a12 = m[9];
         var a20 = m[2]; var a21 = m[6]; var a22 = m[10];
 
-        // Compute inverse of 3x3
         var b01 =  a22 * a11 - a12 * a21;
         var b11 = -a22 * a10 + a12 * a20;
         var b21 =  a21 * a10 - a11 * a20;
 
         var det = a00 * b01 + a01 * b11 + a02 * b21;
         if (det == 0f)
-        {
-            // Fallback to identity
             return [1,0,0, 0,1,0, 0,0,1];
-        }
+        
 
         var invDet = 1f / det;
 
@@ -149,7 +132,6 @@ public static class Matrix
         var c21 = (-a21 * a00 + a01 * a20) * invDet;
         var c22 = (a11 * a00 - a01 * a10) * invDet;
 
-        // Transpose (inverse transpose)
         return [
             c00, c10, c20,
             c01, c11, c21,
@@ -178,7 +160,6 @@ public static class Matrix
 
     /// <summary>
     /// Builds a right-handed perspective projection matrix with NDC Z in [-1, +1] (WebGL/OpenGL).
-    /// Inputs are in radians.
     /// </summary>
     public static float[] Perspective(float fovYRadians, float aspectRatio, float nearPlane, float farPlane)
     {

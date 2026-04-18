@@ -49,8 +49,6 @@ public sealed class SphereGeometry : GeometryBase
                 var y = ny * radius;
                 var z = nz * radius;
 
-                // Vertex color is currently unused by the default shader when materials are enabled,
-                // but keep it authored for completeness and future flexibility.
                 const float r = 1f, g = 1f, b = 1f;
 
                 data.Add(x);

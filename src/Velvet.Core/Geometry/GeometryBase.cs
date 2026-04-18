@@ -2,12 +2,10 @@ namespace Velvet.Core.Geometry;
 
 /// <summary>
 /// Base type for all geometry authored in C#.
-/// Geometry is data-only: it contains vertex/index arrays and a vertex layout.
 /// </summary>
 public abstract class GeometryBase
 {
     public float[] Vertices { get; }
-
     public uint[]? Indices { get; }
     public VertexLayout Layout { get; }
 

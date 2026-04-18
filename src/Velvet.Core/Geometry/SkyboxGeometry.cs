@@ -18,75 +18,24 @@ public sealed class SkyboxGeometry : GeometryBase
 
         var data = new List<float>(capacity: 36 * 3);
 
-        // Front (+Z) - viewed from inside
-        AddFace(data,
-            a: (-h, +h, +h),
-            b: (+h, +h, +h),
-            c: (+h, -h, +h),
-            d: (-h, -h, +h));
+        GeometryBuilder.AddFacePosition(data,
+            a: (-h, +h, +h), b: (+h, +h, +h), c: (+h, -h, +h), d: (-h, -h, +h));
 
-        // Back (-Z)
-        AddFace(data,
-            a: (+h, +h, -h),
-            b: (-h, +h, -h),
-            c: (-h, -h, -h),
-            d: (+h, -h, -h));
+        GeometryBuilder.AddFacePosition(data,
+            a: (+h, +h, -h), b: (-h, +h, -h), c: (-h, -h, -h), d: (+h, -h, -h));
 
-        // Top (+Y)
-        AddFace(data,
-            a: (-h, +h, -h),
-            b: (+h, +h, -h),
-            c: (+h, +h, +h),
-            d: (-h, +h, +h));
+        GeometryBuilder.AddFacePosition(data,
+            a: (-h, +h, -h), b: (+h, +h, -h), c: (+h, +h, +h), d: (-h, +h, +h));
 
-        // Bottom (-Y)
-        AddFace(data,
-            a: (-h, -h, +h),
-            b: (+h, -h, +h),
-            c: (+h, -h, -h),
-            d: (-h, -h, -h));
+        GeometryBuilder.AddFacePosition(data,
+            a: (-h, -h, +h), b: (+h, -h, +h), c: (+h, -h, -h), d: (-h, -h, -h));
 
-        // Right (+X)
-        AddFace(data,
-            a: (+h, +h, +h),
-            b: (+h, +h, -h),
-            c: (+h, -h, -h),
-            d: (+h, -h, +h));
+        GeometryBuilder.AddFacePosition(data,
+            a: (+h, +h, +h), b: (+h, +h, -h), c: (+h, -h, -h), d: (+h, -h, +h));
 
-        // Left (-X)
-        AddFace(data,
-            a: (-h, +h, -h),
-            b: (-h, +h, +h),
-            c: (-h, -h, +h),
-            d: (-h, -h, -h));
+        GeometryBuilder.AddFacePosition(data,
+            a: (-h, +h, -h), b: (-h, +h, +h), c: (-h, -h, +h), d: (-h, -h, -h));
 
-        if (data.Count != 36 * 3)
-            throw new InvalidOperationException($"SkyboxGeometry error: expected {36 * 3} floats, got {data.Count}.");
-
-        return data.ToArray();
-    }
-
-    private static void AddFace(
-        List<float> data,
-        (float x, float y, float z) a,
-        (float x, float y, float z) b,
-        (float x, float y, float z) c,
-        (float x, float y, float z) d)
-    {
-        // Two triangles: (a,b,c) and (a,c,d)
-        AddVertex(data, a);
-        AddVertex(data, b);
-        AddVertex(data, c);
-
-        AddVertex(data, a);
-        AddVertex(data, c);
-        AddVertex(data, d);
-    }
-
-    private static void AddVertex(List<float> data, (float x, float y, float z) p)
-    {
-        data.Add(p.x);
-        data.Add(p.y);
-        data.Add(p.z);
+        return [.. data];
     }
 }

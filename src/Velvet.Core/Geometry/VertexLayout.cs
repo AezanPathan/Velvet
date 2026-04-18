@@ -1,13 +1,12 @@
 namespace Velvet.Core.Geometry;
 
 /// <summary>
-/// Describes how vertex data is laid out in the <see cref="GeometryBase.Vertices"/> array.
-/// Offsets and stride are expressed in floats (not bytes) to match the engine's data-only intent.
+/// Describes how vertex data is structured within a float array.
+/// Offsets and stride are expressed in floats.
 /// </summary>
 public sealed class VertexLayout
 {
     public int StrideFloats { get; }
-
     public IReadOnlyList<VertexElement> Elements { get; }
 
     private VertexLayout(int strideFloats, IReadOnlyList<VertexElement> elements)
@@ -17,60 +16,41 @@ public sealed class VertexLayout
         Elements = elements ?? throw new ArgumentNullException(nameof(elements));
     }
 
-    /// <summary>
-    /// Layout: position only (x,y,z) per vertex.
-    /// Format: <c>[x, y, z]</c>
-    /// </summary>
+    /// <summary>Position only: [x, y, z]</summary>
     public static VertexLayout Position { get; } = new(
-        strideFloats: 3,
-        elements: new[]
-        {
-            new VertexElement(VertexElementSemantic.Position, OffsetFloats: 0, ComponentCount: 3),
-        });
+        3,
+        [
+            new VertexElement(VertexElementSemantic.Position, 0, 3),
+        ]);
 
-    /// <summary>
-    /// Layout: interleaved position (x,y,z) + color (r,g,b) + normal (nx,ny,nz) per vertex.
-    /// Format: <c>[x, y, z, r, g, b, nx, ny, nz]</c>
-    /// </summary>
+    /// <summary>Position + color + normal</summary>
     public static VertexLayout PositionColorNormal { get; } = new(
-        strideFloats: 9,
-        elements: new[]
-        {
-            new VertexElement(VertexElementSemantic.Position, OffsetFloats: 0, ComponentCount: 3),
-            new VertexElement(VertexElementSemantic.Color, OffsetFloats: 3, ComponentCount: 3),
-            new VertexElement(VertexElementSemantic.Normal, OffsetFloats: 6, ComponentCount: 3),
-        });
+        9,
+        [
+            new VertexElement(VertexElementSemantic.Position, 0, 3),
+            new VertexElement(VertexElementSemantic.Color, 3, 3),
+            new VertexElement(VertexElementSemantic.Normal, 6, 3),
+        ]);
 
-    /// <summary>
-    /// Canonical layout for textured models: position (x,y,z) + normal (nx,ny,nz) + uv (u,v) per vertex.
-    /// Format: <c>[x, y, z, nx, ny, nz, u, v]</c>
-    /// Stride: 8 floats (32 bytes per vertex)
-    /// </summary>
+    /// <summary>Position + normal + UV</summary>
     public static VertexLayout PositionNormalUV { get; } = new(
-        strideFloats: 8,
-        elements: new[]
-        {
-            new VertexElement(VertexElementSemantic.Position, OffsetFloats: 0, ComponentCount: 3),
-            new VertexElement(VertexElementSemantic.Normal, OffsetFloats: 3, ComponentCount: 3),
-            new VertexElement(VertexElementSemantic.UV, OffsetFloats: 6, ComponentCount: 2),
-        });
+        8,
+        [
+            new VertexElement(VertexElementSemantic.Position, 0, 3),
+            new VertexElement(VertexElementSemantic.Normal, 3, 3),
+            new VertexElement(VertexElementSemantic.UV, 6, 2),
+        ]);
 
-    /// <summary>
-    /// Layout for skinned (rigged) models: position (x,y,z) + normal (nx,ny,nz) + uv (u,v) + joints (4 uint8) + weights (4 floats).
-    /// Format: <c>[x, y, z, nx, ny, nz, u, v, j0, j1, j2, j3, w0, w1, w2, w3]</c>
-    /// Stride: 16 floats (64 bytes per vertex)
-    /// Note: Joints are stored as 4 bytes packed into 1 float slot (interpreted as uint8 in shader)
-    /// </summary>
+    /// <summary>Position + normal + UV + joints + weights</summary>
     public static VertexLayout PositionNormalUVSkinnedJointsWeights { get; } = new(
-        strideFloats: 16,
-        elements: new[]
-        {
-            new VertexElement(VertexElementSemantic.Position, OffsetFloats: 0, ComponentCount: 3),
-            new VertexElement(VertexElementSemantic.Normal, OffsetFloats: 3, ComponentCount: 3),
-            new VertexElement(VertexElementSemantic.UV, OffsetFloats: 6, ComponentCount: 2),
-            new VertexElement(VertexElementSemantic.Joints, OffsetFloats: 8, ComponentCount: 4),
-            new VertexElement(VertexElementSemantic.Weights, OffsetFloats: 9, ComponentCount: 4),
-        });
+        16,
+        [
+            new VertexElement(VertexElementSemantic.Position, 0, 3),
+            new VertexElement(VertexElementSemantic.Normal, 3, 3),
+            new VertexElement(VertexElementSemantic.UV, 6, 2),
+            new VertexElement(VertexElementSemantic.Joints, 8, 4),
+            new VertexElement(VertexElementSemantic.Weights, 12, 4),
+        ]);
 }
 
 public enum VertexElementSemantic

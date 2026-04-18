@@ -1,7 +1,6 @@
 using System.Text.Json;
 using SceneModel = Velvet.Core.Scene.Scene;
 using SceneNode = Velvet.Core.Scene.SceneNode;
-using Velvet.Core.Geometry;
 using Velvet.Core.Math;
 using Velvet.Core.Rendering.Meshes;
 using Velvet.Core.Rendering.Skinning;
