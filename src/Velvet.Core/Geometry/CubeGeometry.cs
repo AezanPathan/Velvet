@@ -81,10 +81,7 @@ public sealed class CubeGeometry : GeometryBase
             d: (-h, +h, -h),
             color: cyan);
 
-        if (data.Count != 36 * 9)
-            throw new InvalidOperationException($"CubeGeometry authoring error: expected {36 * 9} floats, got {data.Count}.");
-
-        return data.ToArray();
+        return [.. data];
     }
 
     private static void AddFace(
