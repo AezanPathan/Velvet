@@ -1,7 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Velvet.Core.Rendering.Core;
-using Velvet.Core.Rendering.Materials;
 
 namespace Velvet.Graphics.WebGL;
 
@@ -14,14 +14,13 @@ public sealed class ShaderProgram : IRenderProgram
 {
     private readonly IWebGLBridge _bridge;
     private readonly int _programId;
-    private readonly ShaderProgramMaterialBinder _materialBinder;
+    private readonly Dictionary<string, int> _textureCache = new();
     private bool _hasBonesSupport = false;
 
     private ShaderProgram(IWebGLBridge bridge, int programId, bool hasBonesSupport = false)
     {
         _bridge = bridge ?? throw new ArgumentNullException(nameof(bridge));
         _programId = programId;
-        _materialBinder = new ShaderProgramMaterialBinder(_bridge, _programId);
         _hasBonesSupport = hasBonesSupport;
     }
 
@@ -73,8 +72,29 @@ public sealed class ShaderProgram : IRenderProgram
     public Task SetUniform1fAsync(string name, float value)
         => _bridge.SetUniform1fAsync(_programId, name, value);
 
+    public Task SetUniform1iAsync(string name, int value)
+        => _bridge.SetUniform1iAsync(_programId, name, value);
+
     public Task SetUniform1bAsync(string name, bool value)
         => _bridge.SetUniform1bAsync(_programId, name, value);
+
+    public async Task BindTextureAsync(string samplerUniform, string textureUri, int textureUnit)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(samplerUniform);
+        ArgumentException.ThrowIfNullOrWhiteSpace(textureUri);
+        if (textureUnit < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(textureUnit), "Texture unit must be >= 0.");
+        }
+
+        if (!_textureCache.TryGetValue(textureUri, out var textureId))
+        {
+            textureId = await _bridge.CreateTextureFromUrlAsync(textureUri).ConfigureAwait(false);
+            _textureCache[textureUri] = textureId;
+        }
+
+        await _bridge.BindTextureAsync(_programId, samplerUniform, textureId, textureUnit).ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Sets an array of bone matrices for GPU skinning.
@@ -109,9 +129,6 @@ public sealed class ShaderProgram : IRenderProgram
         // Set bone count uniform
         await _bridge.SetUniform1iAsync(_programId, "uBoneCount", boneCount).ConfigureAwait(false);
     }
-
-    public Task SetMaterialAsync(Material material)
-        => _materialBinder.SetMaterialAsync(material);
 
     public Task DrawMeshAsync(int meshId, int rendererId)
         => _bridge.DrawMeshAsync(meshId, _programId, rendererId);

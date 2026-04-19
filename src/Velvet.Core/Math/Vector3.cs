@@ -2,7 +2,6 @@ namespace Velvet.Core.Math;
 
 /// <summary>
 /// Immutable 3D vector used across the engine math layer.
-/// Readonly struct keeps value-type semantics fast for real-time workloads and prevents accidental mutation of shared data.
 /// </summary>
 public readonly struct Vector3
 {

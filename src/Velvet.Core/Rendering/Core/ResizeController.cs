@@ -3,8 +3,7 @@ using Velvet.Core.Rendering.Cameras;
 namespace Velvet.Core.Rendering.Core;
 
 /// <summary>
-/// Engine-level resize state machine.
-/// Receives lightweight resize requests and applies them at frame boundaries.
+/// Manages viewport resize requests and applies them asynchronously to the rendering backend and camera.
 /// </summary>
 public sealed class ResizeController
 {
@@ -23,25 +22,10 @@ public sealed class ResizeController
 
     public void RequestResize(int width, int height, float dpr)
     {
-        if (width <= 0 || height <= 0 || dpr <= 0f)
-        {
-            return;
-        }
+        if (width <= 0 || height <= 0 || dpr <= 0f) return;
+        if (_hasPendingResize && _pendingWidth == width && _pendingHeight == height && MathF.Abs(_pendingDpr - dpr) < DprEpsilon) return;
+        if (_viewportWidth == width && _viewportHeight == height && MathF.Abs(_viewportDpr - dpr) < DprEpsilon) return;
 
-        if (_hasPendingResize
-            && _pendingWidth == width
-            && _pendingHeight == height
-            && MathF.Abs(_pendingDpr - dpr) < DprEpsilon)
-        {
-            return;
-        }
-
-        if (_viewportWidth == width
-            && _viewportHeight == height
-            && MathF.Abs(_viewportDpr - dpr) < DprEpsilon)
-        {
-            return;
-        }
 
         _pendingWidth = width;
         _pendingHeight = height;
@@ -49,17 +33,12 @@ public sealed class ResizeController
         _hasPendingResize = true;
     }
 
-    public async Task ApplyResizeAsync(
-        Func<int, int, Task> resizeBackendAsync,
-        Camera? camera,
-        CancellationToken cancellationToken = default)
+    public async Task ApplyResizeAsync(Func<int, int, Task> resizeBackendAsync, Camera? camera, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(resizeBackendAsync);
 
-        if (!_hasPendingResize)
-        {
-            return;
-        }
+        if (!_hasPendingResize) return;
+
 
         _hasPendingResize = false;
 
@@ -70,10 +49,7 @@ public sealed class ResizeController
         var pixelWidth = (int)(requestedWidth * requestedDpr);
         var pixelHeight = (int)(requestedHeight * requestedDpr);
 
-        if (pixelWidth <= 0 || pixelHeight <= 0)
-        {
-            return;
-        }
+        if (pixelWidth <= 0 || pixelHeight <= 0) return;
 
         cancellationToken.ThrowIfCancellationRequested();
         await resizeBackendAsync(pixelWidth, pixelHeight).ConfigureAwait(false);
@@ -87,10 +63,7 @@ public sealed class ResizeController
 
     public void ApplyViewportToCamera(Camera? camera)
     {
-        if (camera is null || _viewportHeight <= 0)
-        {
-            return;
-        }
+        if (camera is null || _viewportHeight <= 0) return;
 
         camera.AspectRatio = (float)_viewportWidth / _viewportHeight;
         camera.UpdateProjection();

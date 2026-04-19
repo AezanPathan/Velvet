@@ -3,8 +3,7 @@ using Velvet.Core.Math;
 namespace Velvet.Core.Rendering.Lighting;
 
 /// <summary>
-/// Simple engine-grade point light (single-instance friendly).
-/// Diffuse-only shading is expected (Lambert).
+/// Simple point light (single-instance.
 /// </summary>
 public sealed class PointLight
 {

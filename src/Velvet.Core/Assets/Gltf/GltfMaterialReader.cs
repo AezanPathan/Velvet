@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Velvet.Core.Math;
+using Velvet.Core.Rendering.Materials;
 using DataMaterial = Velvet.Core.Rendering.Materials.Material;
 
 namespace Velvet.Core.Assets.Gltf;
@@ -32,7 +33,7 @@ internal static class GltfMaterialReader
             }
         }
 
-        var material = new DataMaterial(
+        var material = new StandardMaterial(
             albedoColor: color,
             ambientStrength: 0.05f,
             diffuseStrength: 1.0f,

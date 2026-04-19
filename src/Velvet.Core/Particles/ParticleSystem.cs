@@ -78,11 +78,6 @@ public sealed class ParticleSystem
         }
     }
 
-    /// <summary>
-    /// Writes the current particle render data into <paramref name="buffer"/>.
-    /// Layout per particle: position.xyz, size, color.rgba (8 floats).
-    /// Returns the number of active particles written.
-    /// </summary>
     public int WriteRenderBuffer(float[] buffer)
     {
         if (buffer is null) throw new ArgumentNullException(nameof(buffer));

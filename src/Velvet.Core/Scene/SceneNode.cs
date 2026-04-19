@@ -1,6 +1,5 @@
 namespace Velvet.Core.Scene;
 
-using Velvet.Core.Geometry;
 using Velvet.Core.Math;
 using Velvet.Core.Rendering.Bounds;
 using Velvet.Core.Rendering.Meshes;
@@ -73,7 +72,7 @@ public sealed class SceneNode
 
         foreach (var mesh in Meshes)
         {
-            var meshBounds = ComputeMeshBounds(mesh, world);
+            var meshBounds = TransformBounds(mesh.LocalBounds, world);
             SceneBoundsAccumulator.Expand(ref bounds, meshBounds);
         }
 
@@ -89,52 +88,36 @@ public sealed class SceneNode
         return bounds;
     }
 
-    private static BoundingBox ComputeMeshBounds(Mesh mesh, float[] worldMatrix)
+    private static BoundingBox TransformBounds(in BoundingBox localBounds, float[] worldMatrix)
     {
-        var geometry = mesh.Geometry;
-        var vertices = geometry.Vertices;
-        var layout = geometry.Layout;
-        var stride = layout.StrideFloats;
+        var min = localBounds.Min;
+        var max = localBounds.Max;
 
-        var positionElement = FindPositionElement(layout);
-        if (positionElement == null)
-        {
-            return new BoundingBox(Vector3.Zero, Vector3.Zero);
-        }
+        var center = new Vector3(
+            (min.X + max.X) * 0.5f,
+            (min.Y + max.Y) * 0.5f,
+            (min.Z + max.Z) * 0.5f);
 
-        var positionOffset = positionElement.Value.OffsetFloats;
+        var extents = new Vector3(
+            (max.X - min.X) * 0.5f,
+            (max.Y - min.Y) * 0.5f,
+            (max.Z - min.Z) * 0.5f);
 
-        BoundingBox bounds = new();
-        bool firstVertex = true;
+        var worldCenter = TransformPoint(worldMatrix, center);
 
-        for (int i = 0; i < vertices.Length; i += stride)
-        {
-            var px = vertices[i + positionOffset];
-            var py = vertices[i + positionOffset + 1];
-            var pz = vertices[i + positionOffset + 2];
+        var ex = MathF.Abs(worldMatrix[0]) * extents.X
+               + MathF.Abs(worldMatrix[4]) * extents.Y
+               + MathF.Abs(worldMatrix[8]) * extents.Z;
+        var ey = MathF.Abs(worldMatrix[1]) * extents.X
+               + MathF.Abs(worldMatrix[5]) * extents.Y
+               + MathF.Abs(worldMatrix[9]) * extents.Z;
+        var ez = MathF.Abs(worldMatrix[2]) * extents.X
+               + MathF.Abs(worldMatrix[6]) * extents.Y
+               + MathF.Abs(worldMatrix[10]) * extents.Z;
 
-            var worldPos = TransformPoint(worldMatrix, new Vector3(px, py, pz));
+        var worldExtents = new Vector3(ex, ey, ez);
 
-            if (firstVertex)
-            {
-                bounds = BoundingBox.FromPoint(worldPos);
-                firstVertex = false;
-            }
-            else
-            {
-                bounds.Expand(worldPos);
-            }
-        }
-
-        return bounds;
-    }
-
-    private static VertexElement? FindPositionElement(VertexLayout layout)
-    {
-        foreach (var element in layout.Elements)
-            if (element.Semantic == VertexElementSemantic.Position) return element;
-
-        return null;
+        return new BoundingBox(worldCenter - worldExtents, worldCenter + worldExtents);
     }
 
     private static Vector3 TransformPoint(float[] matrix, Vector3 point)

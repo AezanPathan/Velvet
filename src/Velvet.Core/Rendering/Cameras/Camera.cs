@@ -16,9 +16,11 @@ public sealed class Camera
 
 	private bool _viewDirty = true;
 	private bool _projectionDirty = true;
+	private bool _viewProjectionDirty = true;
 
 	private float[] _view = Matrix4.Identity.Data;
 	private float[] _projection = Matrix4.Identity.Data;
+	private float[] _viewProjection = Matrix4.Identity.Data;
 
 	public Camera()
 	{
@@ -51,6 +53,7 @@ public sealed class Camera
 		{
 			_position = value;
 			_viewDirty = true;
+			_viewProjectionDirty = true;
 		}
 	}
 
@@ -61,6 +64,7 @@ public sealed class Camera
 		{
 			_target = value;
 			_viewDirty = true;
+			_viewProjectionDirty = true;
 		}
 	}
 
@@ -73,6 +77,7 @@ public sealed class Camera
 		{
 			_up = value;
 			_viewDirty = true;
+			_viewProjectionDirty = true;
 		}
 	}
 
@@ -86,6 +91,7 @@ public sealed class Camera
 
 			_fovYRadians = value;
 			_projectionDirty = true;
+			_viewProjectionDirty = true;
 		}
 	}
 
@@ -99,6 +105,7 @@ public sealed class Camera
 
 			_aspectRatio = value;
 			_projectionDirty = true;
+			_viewProjectionDirty = true;
 		}
 	}
 
@@ -114,6 +121,7 @@ public sealed class Camera
 
 			_nearPlane = value;
 			_projectionDirty = true;
+			_viewProjectionDirty = true;
 		}
 	}
 
@@ -129,6 +137,7 @@ public sealed class Camera
 
 			_farPlane = value;
 			_projectionDirty = true;
+			_viewProjectionDirty = true;
 		}
 	}
 
@@ -140,6 +149,7 @@ public sealed class Camera
 			{
 				_view = Matrix4.LookAt(_position, _target, _up).Data;
 				_viewDirty = false;
+				_viewProjectionDirty = true;
 			}
 
 			return _view;
@@ -159,9 +169,24 @@ public sealed class Camera
 					_farPlane).Data;
 
 				_projectionDirty = false;
+				_viewProjectionDirty = true;
 			}
 
 			return _projection;
+		}
+	}
+
+	public float[] ViewProjectionMatrix
+	{
+		get
+		{
+			if (_viewProjectionDirty)
+			{
+				_viewProjection = Matrix.Multiply(ProjectionMatrix, ViewMatrix);
+				_viewProjectionDirty = false;
+			}
+
+			return _viewProjection;
 		}
 	}
 
@@ -181,6 +206,7 @@ public sealed class Camera
 		_nearPlane = nearPlane;
 		_farPlane = farPlane;
 		_projectionDirty = true;
+		_viewProjectionDirty = true;
 	}
 
 	public void SetViewportSize(float width, float height)
@@ -194,6 +220,7 @@ public sealed class Camera
 	public void UpdateProjection()
 	{
 		_projectionDirty = true;
+		_viewProjectionDirty = true;
 	}
 
 	public void Frame(BoundingBox bounds, float frameMultiplier = 1.2f)

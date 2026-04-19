@@ -13,6 +13,7 @@ using Velvet.Core.Rendering.Batching;
 using Velvet.Core.Rendering.Cameras;
 using Velvet.Core.Rendering.Controllers;
 using Velvet.Core.Rendering.Core;
+using Velvet.Core.Rendering.Culling;
 using Velvet.Core.Rendering.Environment;
 using Velvet.Core.Rendering.Input;
 using Velvet.Core.Rendering.Lighting;
@@ -39,6 +40,10 @@ public sealed class VelvetHost
     private readonly List<(Scene Scene, int Start, int Count)> _sceneInstanceRanges = new();
     private List<RenderBatch>? _batches;
     private readonly Dictionary<Skin, float[]> _boneMatrixCache = new();
+    private readonly Frustum _frustum = new();
+    private int _lastFrameTotalMeshes;
+    private int _lastFrameCulledMeshes;
+    private int _lastFrameRenderedMeshes;
     
     // Particle system support
     private readonly List<Velvet.Core.Particles.ParticleSystem> _particleSystems = new();
@@ -111,6 +116,14 @@ public sealed class VelvetHost
 
     public ShaderProgram Program
         => _program ?? throw new InvalidOperationException("Shader program not configured. Provide a programFactory to CreateAsync(...). ");
+
+    public bool EnableFrustumCulling { get; set; } = true;
+
+    public int LastFrameTotalMeshes => _lastFrameTotalMeshes;
+
+    public int LastFrameCulledMeshes => _lastFrameCulledMeshes;
+
+    public int LastFrameRenderedMeshes => _lastFrameRenderedMeshes;
 
     /// <summary>
     /// Camera used for View and Projection matrices in the render loop.
@@ -286,9 +299,7 @@ public sealed class VelvetHost
             for (var i = 0; i < range.Count; i++)
             {
                 var source = currentInstances[i];
-                var destination = _instances[range.Start + i];
-                Array.Copy(source.ModelMatrix, destination.ModelMatrix, source.ModelMatrix.Length);
-                Array.Copy(source.NormalMatrix, destination.NormalMatrix, source.NormalMatrix.Length);
+                _instances[range.Start + i] = source;
             }
         }
 
@@ -488,7 +499,17 @@ public sealed class VelvetHost
         await _bridge.ClearAsync(_rendererId, 0.08f, 0.08f, 0.10f, 1.0f).ConfigureAwait(false);
         await RenderSkyboxAsync(camera).ConfigureAwait(false);
         await SetFrameUniformsAsync(program, camera).ConfigureAwait(false);
-        await RenderBatchesAsync(program, batches, callbacks.BeforeDrawMesh).ConfigureAwait(false);
+
+        _lastFrameTotalMeshes = 0;
+        _lastFrameCulledMeshes = 0;
+        _lastFrameRenderedMeshes = 0;
+
+        if (EnableFrustumCulling)
+        {
+            _frustum.UpdateFromMatrix(camera.ViewProjectionMatrix);
+        }
+
+        await RenderBatchesAsync(program, batches, callbacks.BeforeDrawMesh, EnableFrustumCulling).ConfigureAwait(false);
         await RenderParticlesAsync(camera).ConfigureAwait(false);
     }
 
@@ -568,14 +589,22 @@ public sealed class VelvetHost
         }
     }
 
-    private async Task RenderBatchesAsync(ShaderProgram program, List<RenderBatch> batches, Func<Mesh, Task>? beforeDrawMesh)
+    private async Task RenderBatchesAsync(ShaderProgram program, List<RenderBatch> batches, Func<Mesh, Task>? beforeDrawMesh, bool applyFrustumCulling)
     {
         foreach (var batch in batches)
         {
-            await program.SetMaterialAsync(batch.Key.Material).ConfigureAwait(false);
+            await batch.Key.Material.ApplyAsync(program).ConfigureAwait(false);
 
             foreach (var instance in batch.Instances)
             {
+                _lastFrameTotalMeshes++;
+
+                if (applyFrustumCulling && !_frustum.Intersects(instance.BoundingBox))
+                {
+                    _lastFrameCulledMeshes++;
+                    continue;
+                }
+
                 var mesh = instance.Mesh;
                 var meshId = mesh.Resources.VertexBufferId.Value;
                 mesh.Skin = instance.Skin;
@@ -593,6 +622,7 @@ public sealed class VelvetHost
                 await program.SetUniformMatrix4fvAsync("uModel", instance.ModelMatrix).ConfigureAwait(false);
                 await program.SetUniformMatrix3fvAsync("uNormalMatrix", instance.NormalMatrix).ConfigureAwait(false);
                 await program.DrawMeshAsync(meshId, _rendererId).ConfigureAwait(false);
+                _lastFrameRenderedMeshes++;
             }
         }
     }

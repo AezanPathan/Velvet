@@ -1,51 +1,16 @@
-using Velvet.Core.Math;
+using Velvet.Core.Rendering.Core;
 
 namespace Velvet.Core.Rendering.Materials;
 
 /// <summary>
-/// Minimal, data-only material used to decouple geometry from appearance.
-/// Authored in C# and sent to shaders via uniforms.
+/// Base material contract for all renderable materials.
 /// </summary>
-public sealed class Material
+public abstract class Material
 {
-    /// <summary>
-    /// Base surface color.
-    /// </summary>
-    public Vector3 AlbedoColor { get; set; }
-
-    /// <summary>
-    /// Ambient strength
-    /// </summary>
-    public float AmbientStrength { get; set; }
-
-    /// <summary>
-    /// Diffuse strength
-    /// </summary>
-    public float DiffuseStrength { get; set; }
-
-    /// <summary>
-    /// If true, lighting is bypassed and the material renders as a flat color.
-    /// </summary>
     public bool Unlit { get; set; }
 
-    /// <summary>
-    /// Optional base color texture URI (relative or data: URL).
-    /// If provided, the renderer will load and sample this texture.
-    /// </summary>
-    public string? BaseColorTextureUri { get; set; }
+    protected Task ApplyBaseAsync(IRenderProgram program)
+        => program.SetUniform1fAsync("uMaterialUnlit", Unlit ? 1f : 0f);
 
-    public Material(Vector3 albedoColor, float ambientStrength, float diffuseStrength, bool unlit = false)
-    {
-        AlbedoColor = albedoColor;
-        AmbientStrength = ambientStrength;
-        DiffuseStrength = diffuseStrength;
-        Unlit = unlit;
-    }
-
-    /// <summary>Default lit white material.</summary>
-    public static Material Default { get; } = new(
-        albedoColor: new Vector3(1.0f, 1.0f, 1.0f),
-        ambientStrength: 0.05f,
-        diffuseStrength: 1.0f,
-        unlit: false);
+    public abstract Task ApplyAsync(IRenderProgram program);
 }

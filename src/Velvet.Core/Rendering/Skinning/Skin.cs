@@ -1,44 +1,40 @@
 namespace Velvet.Core.Rendering.Skinning;
 
-/// <summary>Represents mesh skinning data (joints and inverse bind matrices).</summary>
+/// <summary>
+/// Holds skeletal data for a skinned mesh.
+/// </summary>
 public sealed class Skin
 {
-    /// <summary>Joint node indices, matching JOINTS_0 attribute indices.</summary>
+    /// <summary>Node indices that act as joints.</summary>
     public IReadOnlyList<int> JointNodeIndices { get; }
 
-    /// <summary>Joint names aligned with <see cref="JointNodeIndices"/>.</summary>
+    /// <summary>Optional joint names (for debugging/tools).</summary>
     public IReadOnlyList<string> JointNames { get; }
 
-    /// <summary>Inverse bind matrices, one 4x4 matrix per joint.</summary>
+    /// <summary>Inverse bind matrices (one per joint).</summary>
     public IReadOnlyList<float[]> InverseBindMatrices { get; }
 
-    /// <summary>Maximum joints per vertex.</summary>
+    /// <summary>Maximum joints influencing a vertex (usually 4).</summary>
     public int MaxJointsPerVertex { get; } = 4;
 
-    public Skin(IReadOnlyList<int> jointNodeIndices, IReadOnlyList<string> jointNames, IReadOnlyList<float[]> inverseBindMatrices)
+    public Skin(
+        IReadOnlyList<int> jointNodeIndices,
+        IReadOnlyList<string> jointNames,
+        IReadOnlyList<float[]> inverseBindMatrices)
     {
         ArgumentNullException.ThrowIfNull(jointNodeIndices);
-        ArgumentNullException.ThrowIfNull(jointNames);
         ArgumentNullException.ThrowIfNull(inverseBindMatrices);
 
-        if (jointNodeIndices.Count != inverseBindMatrices.Count)
-        {
-            throw new ArgumentException(
-                $"Joint node indices count ({jointNodeIndices.Count}) must match inverse bind matrices count ({inverseBindMatrices.Count}).",
-                nameof(inverseBindMatrices));
-        }
-
         if (jointNodeIndices.Count == 0)
-        {
-            throw new ArgumentException("Skin must have at least one joint.", nameof(jointNodeIndices));
-        }
+            throw new ArgumentException("Skin must contain joints.");
 
-        foreach (var matrix in inverseBindMatrices)
+        if (jointNodeIndices.Count != inverseBindMatrices.Count)
+            throw new ArgumentException("Joint count must match inverse bind matrices.");
+
+        foreach (var m in inverseBindMatrices)
         {
-            if (matrix?.Length != 16)
-            {
-                throw new ArgumentException("Each inverse bind matrix must be 4x4 (16 floats).", nameof(inverseBindMatrices));
-            }
+            if (m?.Length != 16)
+                throw new ArgumentException("Inverse bind matrix must be 4x4.");
         }
 
         JointNodeIndices = jointNodeIndices;
@@ -46,16 +42,13 @@ public sealed class Skin
         InverseBindMatrices = inverseBindMatrices;
     }
 
-    /// <summary>Gets the number of joints in this skin.</summary>
     public int JointCount => JointNodeIndices.Count;
 
-    /// <summary>Gets the inverse bind matrix for a joint index.</summary>
     public float[] GetInverseBindMatrix(int index)
     {
-        if (index < 0 || index >= InverseBindMatrices.Count)
-        {
+        if (index < 0 || index >= JointCount)
             throw new ArgumentOutOfRangeException(nameof(index));
-        }
+
         return (float[])InverseBindMatrices[index].Clone();
     }
 }

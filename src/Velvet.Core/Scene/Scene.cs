@@ -11,7 +11,7 @@ public sealed class Scene
     public Scene(IEnumerable<SceneNode> roots)
     {
         ArgumentNullException.ThrowIfNull(roots);
-        _roots = new List<SceneNode>(roots);
+        _roots = [.. roots];
     }
 
     public IReadOnlyList<SceneNode> Roots => _roots;
@@ -34,9 +34,8 @@ public sealed class Scene
         {
             var rootBounds = root.ComputeBoundsRecursive(Matrix4.Identity.Data);
             if (rootBounds.HasValue)
-            {
                 SceneBoundsAccumulator.Expand(ref bounds, rootBounds.Value);
-            }
+            
         }
 
         return bounds ?? new BoundingBox(Vector3.Zero, Vector3.Zero);

@@ -5,8 +5,8 @@ using DataMaterial = Velvet.Core.Rendering.Materials.Material;
 namespace Velvet.Core.Rendering.Batching;
 
 /// <summary>
-/// Identifies a unique rendering state for batching meshes together.
-/// Meshes with the same BatchKey can be rendered sequentially with minimal state changes.
+/// <summary>
+/// Key for grouping meshes that can be rendered together efficiently.
 /// </summary>
 public readonly struct BatchKey : IEquatable<BatchKey>
 {
@@ -20,31 +20,19 @@ public readonly struct BatchKey : IEquatable<BatchKey>
     /// <summary>
     /// Compatibility constructor for older object-based callers.
     /// </summary>
-    [System.Obsolete("Use BatchKey(IRenderProgram, Velvet.Core.Rendering.Materials.Material, VertexLayout) for type-safe batching contracts.")]
+    [Obsolete("Use BatchKey(IRenderProgram, Velvet.Core.Rendering.Materials.Material, VertexLayout) for type-safe batching contracts.")]
     public BatchKey(object shaderProgram, DataMaterial material, VertexLayout vertexLayout)
         : this(new ObjectRenderProgram(shaderProgram ?? throw new System.ArgumentNullException(nameof(shaderProgram))), material, vertexLayout)
     {
     }
 
-    /// <summary>
-    /// The backend render program used for this batch.
-    /// </summary>
     public IRenderProgram RenderProgram { get; }
 
-    /// <summary>
-    /// Backward-compatible alias for older callers.
-    /// </summary>
-    [System.Obsolete("Use RenderProgram.")]
+    [Obsolete("Use RenderProgram.")]
     public object ShaderProgram => RenderProgram;
 
-    /// <summary>
-    /// Material defining appearance (color, lighting properties).
-    /// </summary>
     public DataMaterial Material { get; }
 
-    /// <summary>
-    /// Vertex layout describing buffer structure.
-    /// </summary>
     public VertexLayout VertexLayout { get; }
 
     public bool Equals(BatchKey other)
@@ -82,4 +70,22 @@ internal sealed class ObjectRenderProgram : IRenderProgram, IEquatable<ObjectRen
 
     public override int GetHashCode()
         => _value.GetHashCode();
+
+    public Task SetUniformMatrix4fvAsync(string name, float[] matrix)
+        => throw new NotSupportedException("ObjectRenderProgram does not support uniform operations.");
+
+    public Task SetUniform3fAsync(string name, float x, float y, float z)
+        => throw new NotSupportedException("ObjectRenderProgram does not support uniform operations.");
+
+    public Task SetUniform1fAsync(string name, float value)
+        => throw new NotSupportedException("ObjectRenderProgram does not support uniform operations.");
+
+    public Task SetUniform1iAsync(string name, int value)
+        => throw new NotSupportedException("ObjectRenderProgram does not support uniform operations.");
+
+    public Task SetUniform1bAsync(string name, bool value)
+        => throw new NotSupportedException("ObjectRenderProgram does not support uniform operations.");
+
+    public Task BindTextureAsync(string samplerUniform, string textureUri, int textureUnit)
+        => throw new NotSupportedException("ObjectRenderProgram does not support texture binding.");
 }

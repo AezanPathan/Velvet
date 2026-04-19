@@ -1,8 +1,8 @@
-using Velvet.Core.Graphics;
+// using Velvet.Core.Graphics;
 
-namespace Velvet.Core.Rendering.Core;
+// namespace Velvet.Core.Rendering.Core;
 
-public interface IRenderable
-{
-    Task RenderAsync(IGraphicsDevice device);
-}
+// public interface IRenderable
+// {
+//     Task RenderAsync(IGraphicsDevice device);
+// }
