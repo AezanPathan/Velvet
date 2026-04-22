@@ -14,6 +14,7 @@ export class GLProgram implements IProgram {
   public readonly id: number;
   private programHandle: WebGLProgram | null = null;
   private linked = false;
+  private readonly uniformLocationCache = new Map<string, WebGLUniformLocation | null>();
 
   // Default, engine-wide attribute bindings.
   // These are applied before linking so meshes that use hard-coded locations render reliably.
@@ -100,6 +101,7 @@ export class GLProgram implements IProgram {
     }
 
     this.linked = true;
+    this.uniformLocationCache.clear();
   }
 
   /**
@@ -130,6 +132,7 @@ export class GLProgram implements IProgram {
       this.gl.deleteProgram(this.programHandle);
       this.programHandle = null;
       this.linked = false;
+      this.uniformLocationCache.clear();
     }
   }
 
@@ -154,6 +157,13 @@ export class GLProgram implements IProgram {
   public getUniformLocation(name: string): WebGLUniformLocation | null {
     if (!this.programHandle)
       throw new Error("GLProgram.getUniformLocation: program not available");
-    return this.gl.getUniformLocation(this.programHandle, name);
+
+    if (this.uniformLocationCache.has(name)) {
+      return this.uniformLocationCache.get(name) ?? null;
+    }
+
+    const location = this.gl.getUniformLocation(this.programHandle, name);
+    this.uniformLocationCache.set(name, location);
+    return location;
   }
 }

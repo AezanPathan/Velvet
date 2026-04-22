@@ -18,7 +18,11 @@ public abstract class JsRuntimeWebGLBridgeBase : IWebGLBridge
     protected IJSRuntime Js { get; }
 
     public abstract Task<int> InitWithElementAsync(object canvasElement);
-    public abstract Task<int> InitWithIdAsync(string canvasId);
+    public virtual Task<int> InitWithIdAsync(string canvasId)
+    {
+        ValidateRequiredText(canvasId, nameof(canvasId), "InitWithIdAsync requires a non-empty canvas id.");
+        return Js.InvokeAsync<int>("Velvet.initById", canvasId).AsTask();
+    }
 
     public Task<int> CreateShaderAsync(string source, string type)
     {

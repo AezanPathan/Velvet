@@ -6,6 +6,7 @@ import "./api/types";
  */
 (window as any).Velvet = {
     init: API.init,
+    initById: API.initById,
     createShader: API.createShader,
     createProgram: API.createProgram,
     attachShader: API.attachShader,

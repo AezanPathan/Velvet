@@ -56,6 +56,17 @@ export function init(canvas: string | HTMLCanvasElement): number {
   return rendererId;
 }
 
+export function initById(id: string): number {
+  const canvas = document.getElementById(id);
+  if (!canvas) {
+    throw new Error("Canvas not found: " + id);
+  }
+  if (!(canvas instanceof HTMLCanvasElement)) {
+    throw new Error("Element is not a canvas: " + id);
+  }
+  return init(canvas);
+}
+
 export function createShader(source: string, type: "vertex" | "fragment"): number {
   const gl = getContext().gl;
   const shaderId = ShaderManager.generateId();

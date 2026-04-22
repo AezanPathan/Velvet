@@ -30,8 +30,7 @@ public sealed class StaticWebGLBridge : JsRuntimeWebGLBridgeBase
     public override async Task<int> InitWithIdAsync(string canvasId)
     {
         if (string.IsNullOrWhiteSpace(canvasId)) throw new ArgumentNullException(nameof(canvasId));
-        // Call the Velvet.init(canvasId) convention in the demo (JS should accept either ID or element).
-        return await Js.InvokeAsync<int>("Velvet.init", canvasId).ConfigureAwait(false);
+        return await Js.InvokeAsync<int>("Velvet.initById", canvasId).ConfigureAwait(false);
     }
 
     /// <inheritdoc />

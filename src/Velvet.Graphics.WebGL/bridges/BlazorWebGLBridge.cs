@@ -1,4 +1,3 @@
-using System;
 using System.Threading.Tasks;
 using Microsoft.JSInterop;
 
@@ -42,10 +41,7 @@ public sealed class BlazorWebGLBridge : JsRuntimeWebGLBridgeBase
 
     /// <inheritdoc />
     public override Task<int> InitWithIdAsync(string canvasId)
-    {
-        // Blazor bridge intentionally does not support string id init.
-        throw new NotSupportedException("BlazorWebGLBridge does not support InitWithIdAsync. Use InitWithElementAsync with an ElementReference.");
-    }
+        => base.InitWithIdAsync(canvasId);
 
     #endregion
 

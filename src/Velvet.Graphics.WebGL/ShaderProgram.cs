@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.JSInterop;
 using Velvet.Core.Rendering.Core;
 
 namespace Velvet.Graphics.WebGL;
@@ -15,6 +16,7 @@ public sealed class ShaderProgram : IRenderProgram
     private readonly IWebGLBridge _bridge;
     private readonly int _programId;
     private readonly Dictionary<string, int> _textureCache = new();
+    private readonly HashSet<string> _missingUniforms = new(StringComparer.Ordinal);
     private bool _hasBonesSupport = false;
 
     private ShaderProgram(IWebGLBridge bridge, int programId, bool hasBonesSupport = false)
@@ -61,22 +63,22 @@ public sealed class ShaderProgram : IRenderProgram
         => CreateFromSourcesAsync(bridge, ShaderSources.SkyboxVertexShader, ShaderSources.SkyboxFragmentShader);
 
     public Task SetUniformMatrix4fvAsync(string name, float[] matrix)
-        => _bridge.SetUniformMatrix4fvAsync(_programId, name, matrix);
+        => SetUniformSafeAsync(name, () => _bridge.SetUniformMatrix4fvAsync(_programId, name, matrix));
 
     public Task SetUniformMatrix3fvAsync(string name, float[] matrix)
-        => _bridge.SetUniformMatrix3fvAsync(_programId, name, matrix);
+        => SetUniformSafeAsync(name, () => _bridge.SetUniformMatrix3fvAsync(_programId, name, matrix));
 
     public Task SetUniform3fAsync(string name, float x, float y, float z)
-        => _bridge.SetUniform3fAsync(_programId, name, x, y, z);
+        => SetUniformSafeAsync(name, () => _bridge.SetUniform3fAsync(_programId, name, x, y, z));
 
     public Task SetUniform1fAsync(string name, float value)
-        => _bridge.SetUniform1fAsync(_programId, name, value);
+        => SetUniformSafeAsync(name, () => _bridge.SetUniform1fAsync(_programId, name, value));
 
     public Task SetUniform1iAsync(string name, int value)
-        => _bridge.SetUniform1iAsync(_programId, name, value);
+        => SetUniformSafeAsync(name, () => _bridge.SetUniform1iAsync(_programId, name, value));
 
     public Task SetUniform1bAsync(string name, bool value)
-        => _bridge.SetUniform1bAsync(_programId, name, value);
+        => SetUniformSafeAsync(name, () => _bridge.SetUniform1bAsync(_programId, name, value));
 
     public async Task BindTextureAsync(string samplerUniform, string textureUri, int textureUnit)
     {
@@ -93,7 +95,9 @@ public sealed class ShaderProgram : IRenderProgram
             _textureCache[textureUri] = textureId;
         }
 
-        await _bridge.BindTextureAsync(_programId, samplerUniform, textureId, textureUnit).ConfigureAwait(false);
+        await SetUniformSafeAsync(
+            samplerUniform,
+            () => _bridge.BindTextureAsync(_programId, samplerUniform, textureId, textureUnit)).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -127,9 +131,30 @@ public sealed class ShaderProgram : IRenderProgram
         }
 
         // Set bone count uniform
-        await _bridge.SetUniform1iAsync(_programId, "uBoneCount", boneCount).ConfigureAwait(false);
+        await SetUniformSafeAsync("uBoneCount", () => _bridge.SetUniform1iAsync(_programId, "uBoneCount", boneCount))
+            .ConfigureAwait(false);
     }
 
     public Task DrawMeshAsync(int meshId, int rendererId)
         => _bridge.DrawMeshAsync(meshId, _programId, rendererId);
+
+    private async Task SetUniformSafeAsync(string uniformName, Func<Task> setter)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(uniformName);
+        ArgumentNullException.ThrowIfNull(setter);
+
+        if (_missingUniforms.Contains(uniformName))
+        {
+            return;
+        }
+
+        try
+        {
+            await setter().ConfigureAwait(false);
+        }
+        catch (JSException ex) when (ex.Message.Contains("not found", StringComparison.OrdinalIgnoreCase))
+        {
+            _missingUniforms.Add(uniformName);
+        }
+    }
 }

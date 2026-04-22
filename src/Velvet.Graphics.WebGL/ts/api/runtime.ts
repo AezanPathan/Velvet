@@ -45,10 +45,6 @@ export function withOptionalUniformLocation(
   const location = program.getUniformLocation(name);
 
   if (location === null) {
-    console.warn(
-      `Velvet.withOptionalUniformLocation: uniform '${name}' not found on program id=${programId}. ` +
-      "This may happen when the uniform is optimized out or the name is incorrect."
-    );
     return;
   }
 
