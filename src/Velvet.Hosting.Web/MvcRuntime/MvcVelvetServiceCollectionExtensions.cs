@@ -16,6 +16,7 @@ public static class MvcVelvetServiceCollectionExtensions
         services.AddServerSideBlazor();
 
         services.TryAddSingleton<MvcVelvetRuntimeAccessor>();
+        services.TryAddSingleton<MvcVelvetHostRegistry>();
         services.TryAddSingleton<MvcVelvetSceneRegistry>();
         services.TryAddSingleton<MvcVelvetSceneRuntime>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<CircuitHandler, MvcVelvetCircuitHandler>());

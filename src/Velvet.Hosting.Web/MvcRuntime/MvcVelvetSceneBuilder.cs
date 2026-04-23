@@ -1,4 +1,5 @@
 using Microsoft.JSInterop;
+using Microsoft.Extensions.DependencyInjection;
 using Velvet.Graphics.WebGL;
 
 namespace Velvet.Hosting.Web.MvcRuntime;
@@ -46,6 +47,13 @@ public sealed class MvcVelvetSceneBuilder
     public Task StartAsync()
     {
         var host = Host;
-        return host.StartAsync(_onFrame);
+        var hostRegistry = _startupContext.Services.GetRequiredService<MvcVelvetHostRegistry>();
+        return StartCoreAsync(host, hostRegistry);
+    }
+
+    private async Task StartCoreAsync(MvcVelvetHost host, MvcVelvetHostRegistry hostRegistry)
+    {
+        await hostRegistry.ReplaceHostAsync(_startupContext.CanvasId, host).ConfigureAwait(false);
+        await host.StartAsync(_onFrame).ConfigureAwait(false);
     }
 }
