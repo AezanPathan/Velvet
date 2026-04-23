@@ -18,8 +18,9 @@ public static class RenderBatcher
     {
         var batchMap = new Dictionary<BatchKey, RenderBatch>();
 
-        foreach (var instance in instances)
+        for (var i = 0; i < instances.Count; i++)
         {
+            var instance = instances[i];
             var material = instance.Mesh.Material ?? StandardMaterial.Default;
             var vertexLayout = instance.Mesh.Geometry.Layout;
 
@@ -31,7 +32,7 @@ public static class RenderBatcher
                 batchMap[key] = batch;
             }
 
-            batch.Add(instance);
+            batch.AddInstanceIndex(i);
         }
 
         return [.. batchMap.Values];

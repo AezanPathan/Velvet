@@ -7,13 +7,21 @@
     <Nullable>enable</Nullable>
     <AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
     <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+    <EnableMvcRuntime Condition="'$(EnableMvcRuntime)' == ''">true</EnableMvcRuntime>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Velvet.Core\Velvet.Core.csproj" />
     <ProjectReference Include="..\Velvet.Graphics.WebGL\Velvet.Graphics.WebGL.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.Components" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(EnableMvcRuntime)' == 'true' and '$(RuntimeIdentifier)' != 'browser-wasm'">
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(EnableMvcRuntime)' != 'true' or '$(RuntimeIdentifier)' == 'browser-wasm'">
+    <Compile Remove="MvcRuntime\**\*.cs" />
   </ItemGroup>
 
 </Project>

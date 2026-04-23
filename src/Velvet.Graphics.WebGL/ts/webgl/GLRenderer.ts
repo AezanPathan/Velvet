@@ -38,6 +38,9 @@ export class GLRenderer implements IRenderer {
    */
   public clear(r: number, g: number, b: number, a: number): void {
     const gl = this.gl;
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthFunc(gl.LEQUAL);
+    gl.depthMask(true);
     gl.clearColor(r, g, b, a);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   }

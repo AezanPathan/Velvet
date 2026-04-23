@@ -281,9 +281,6 @@ public sealed class VelvetHost
     {
         ArgumentNullException.ThrowIfNull(scene);
 
-        var currentInstances = new List<MeshInstance>();
-        scene.CollectMeshes(currentInstances);
-
         foreach (var range in _sceneInstanceRanges)
         {
             if (!ReferenceEquals(range.Scene, scene))
@@ -291,31 +288,8 @@ public sealed class VelvetHost
                 continue;
             }
 
-            if (currentInstances.Count != range.Count)
-            {
-                throw new InvalidOperationException("Mesh instance count mismatch while updating transforms.");
-            }
-
-            for (var i = 0; i < range.Count; i++)
-            {
-                var source = currentInstances[i];
-                _instances[range.Start + i] = source;
-            }
-        }
-
-        foreach (var instance in currentInstances)
-        {
-            var skin = instance.Skin;
-            if (skin is null)
-            {
-                continue;
-            }
-
-            if (!_boneMatrixCache.ContainsKey(skin))
-            {
-                var boneMatrices = BoneMatrixCalculator.ComputeBoneMatrices(skin, scene.Roots);
-                _boneMatrixCache[skin] = boneMatrices;
-            }
+            UpdateSceneInstances(scene, range.Start, range.Count);
+            UpdateBoneMatrices(scene, range.Start, range.Count);
         }
     }
 
@@ -454,6 +428,68 @@ public sealed class VelvetHost
         {
             await instance.Mesh.UploadAsync(_meshUploader, cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    private void UpdateSceneInstances(Scene scene, int startIndex, int instanceCount)
+    {
+        var nextIndex = startIndex;
+        var endIndex = startIndex + instanceCount;
+
+        foreach (var root in scene.Roots)
+        {
+            UpdateSceneNode(root, Matrix4.Identity.Data, ref nextIndex, endIndex);
+        }
+
+        if (nextIndex != endIndex)
+        {
+            throw new InvalidOperationException("Mesh instance count mismatch while updating transforms.");
+        }
+    }
+
+    private void UpdateSceneNode(SceneNode node, float[] parentWorld, ref int nextIndex, int endIndex)
+    {
+        var world = Matrix4.Multiply(parentWorld, node.LocalTransform).Data;
+
+        foreach (var mesh in node.Meshes)
+        {
+            if (nextIndex >= endIndex)
+            {
+                throw new InvalidOperationException("Mesh instance count mismatch while updating transforms.");
+            }
+
+            ApplyInstanceTransform(nextIndex, world);
+            nextIndex++;
+        }
+
+        foreach (var child in node.Children)
+        {
+            UpdateSceneNode(child, world, ref nextIndex, endIndex);
+        }
+    }
+
+    private void UpdateBoneMatrices(Scene scene, int startIndex, int instanceCount)
+    {
+        var endIndex = startIndex + instanceCount;
+        var preparedSkins = new HashSet<Skin>();
+
+        for (var i = startIndex; i < endIndex; i++)
+        {
+            var skin = _instances[i].Skin;
+            if (skin is null || !preparedSkins.Add(skin))
+            {
+                continue;
+            }
+
+            _boneMatrixCache[skin] = BoneMatrixCalculator.ComputeBoneMatrices(skin, scene.Roots);
+        }
+    }
+
+    private void ApplyInstanceTransform(int index, float[] world)
+    {
+        var instance = _instances[index];
+
+        var normalMatrix = Matrix.NormalMatrix(world);
+        _instances[index] = new MeshInstance(instance.Mesh, world, normalMatrix, instance.Skin);
     }
 
     private async Task InitializeParticleRenderersAsync()
@@ -595,8 +631,14 @@ public sealed class VelvetHost
         {
             await batch.Key.Material.ApplyAsync(program).ConfigureAwait(false);
 
-            foreach (var instance in batch.Instances)
+            foreach (var instanceIndex in batch.InstanceIndices)
             {
+                if ((uint)instanceIndex >= (uint)_instances.Count)
+                {
+                    continue;
+                }
+
+                var instance = _instances[instanceIndex];
                 _lastFrameTotalMeshes++;
 
                 if (applyFrustumCulling && !_frustum.Intersects(instance.BoundingBox))

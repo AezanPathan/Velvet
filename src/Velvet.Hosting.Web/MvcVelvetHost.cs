@@ -5,6 +5,7 @@ using Velvet.Core.Geometry;
 using Velvet.Core.Math;
 using Velvet.Core.Rendering;
 using Velvet.Core.Rendering.Batching;
+using Velvet.Core.Rendering.Bounds;
 using Velvet.Core.Rendering.Cameras;
 using Velvet.Core.Rendering.Controllers;
 using Velvet.Core.Rendering.Core;
@@ -33,10 +34,14 @@ public sealed class MvcVelvetHost
     private int _isRunning;
 
     private readonly List<MeshInstance> _instances = new();
+    private readonly List<BoundingBox> _instanceBounds = new();
     private readonly List<(Scene Scene, int Start, int Count)> _sceneInstanceRanges = new();
     private readonly Dictionary<Skin, float[]> _boneMatrixCache = new();
+    private readonly Dictionary<Skin, long> _bonePreparedFrame = new();
+    private readonly Dictionary<Scene, long> _scenePreparedFrame = new();
     private readonly Frustum _frustum = new();
     private List<RenderBatch>? _batches;
+    private long _frameIndex;
 
     private ShaderProgram? _program;
     private ShaderProgram? _skyboxProgram;
@@ -198,6 +203,7 @@ public sealed class MvcVelvetHost
         foreach (var instance in sceneInstances)
         {
             _instances.Add(instance);
+            _instanceBounds.Add(instance.BoundingBox);
         }
 
         _sceneInstanceRanges.Add((scene, start, sceneInstances.Count));
@@ -207,41 +213,7 @@ public sealed class MvcVelvetHost
     {
         ArgumentNullException.ThrowIfNull(scene);
 
-        var currentInstances = new List<MeshInstance>();
-        scene.CollectMeshes(currentInstances);
-
-        foreach (var range in _sceneInstanceRanges)
-        {
-            if (!ReferenceEquals(range.Scene, scene))
-            {
-                continue;
-            }
-
-            if (currentInstances.Count != range.Count)
-            {
-                throw new InvalidOperationException("Mesh instance count mismatch while updating transforms.");
-            }
-
-            for (var i = 0; i < range.Count; i++)
-            {
-                _instances[range.Start + i] = currentInstances[i];
-            }
-        }
-
-        foreach (var instance in currentInstances)
-        {
-            var skin = instance.Skin;
-            if (skin is null)
-            {
-                continue;
-            }
-
-            if (!_boneMatrixCache.ContainsKey(skin))
-            {
-                var boneMatrices = BoneMatrixCalculator.ComputeBoneMatrices(skin, scene.Roots);
-                _boneMatrixCache[skin] = boneMatrices;
-            }
-        }
+        PrepareSceneForFrame(scene, _frameIndex);
     }
 
     public async Task StartAsync(Func<float, Task>? onFrame = null)
@@ -365,7 +337,7 @@ public sealed class MvcVelvetHost
         {
             var program = _program ?? throw new InvalidOperationException("Shader program not configured.");
             var camera = _camera ?? throw new InvalidOperationException("Camera not configured. Assign a Camera before StartAsync().");
-            var batches = _batches ?? throw new InvalidOperationException("Batches not built.");
+            _ = _batches ?? throw new InvalidOperationException("Batches not built.");
 
             foreach (var instance in _instances)
             {
@@ -383,8 +355,8 @@ public sealed class MvcVelvetHost
                 var nowSeconds = (float)stopwatch.Elapsed.TotalSeconds;
                 var deltaSeconds = nowSeconds - lastSeconds;
                 lastSeconds = nowSeconds;
-
-                _boneMatrixCache.Clear();
+                _frameIndex++;
+                var frameIndex = _frameIndex;
 
                 if (onFrame is not null)
                 {
@@ -392,6 +364,12 @@ public sealed class MvcVelvetHost
                 }
 
                 _orbitBinder?.Update();
+
+                PrepareAllScenesForFrame(frameIndex);
+                var batches = _batches ?? throw new InvalidOperationException("Batches not built.");
+
+                await _bridge.SetBlendModeAsync(_rendererId, "off").ConfigureAwait(false);
+                await _bridge.SetDepthMaskAsync(_rendererId, true).ConfigureAwait(false);
 
                 await _bridge.ClearAsync(_rendererId, 0.08f, 0.08f, 0.10f, 1.0f).ConfigureAwait(false);
                 await RenderSkyboxAsync(camera).ConfigureAwait(false);
@@ -504,13 +482,19 @@ public sealed class MvcVelvetHost
         {
             await batch.Key.Material.ApplyAsync(program).ConfigureAwait(false);
 
-            foreach (var instance in batch.Instances)
+            foreach (var instanceIndex in batch.InstanceIndices)
             {
-                if (EnableFrustumCulling && !_frustum.Intersects(instance.BoundingBox))
+                if ((uint)instanceIndex >= (uint)_instances.Count)
                 {
                     continue;
                 }
 
+                if (EnableFrustumCulling && !_frustum.Intersects(_instanceBounds[instanceIndex]))
+                {
+                    continue;
+                }
+
+                var instance = _instances[instanceIndex];
                 var mesh = instance.Mesh;
                 var meshId = mesh.Resources.VertexBufferId.Value;
                 mesh.Skin = instance.Skin;
@@ -525,6 +509,168 @@ public sealed class MvcVelvetHost
                 await program.DrawMeshAsync(meshId, _rendererId).ConfigureAwait(false);
             }
         }
+    }
+
+    private void PrepareAllScenesForFrame(long frameIndex)
+    {
+        foreach (var range in _sceneInstanceRanges)
+        {
+            PrepareSceneForFrame(range.Scene, frameIndex);
+        }
+    }
+
+    private void PrepareSceneForFrame(Scene scene, long frameIndex)
+    {
+        if (_scenePreparedFrame.TryGetValue(scene, out var preparedFrame) && preparedFrame == frameIndex)
+        {
+            return;
+        }
+
+        foreach (var range in _sceneInstanceRanges)
+        {
+            if (!ReferenceEquals(range.Scene, scene))
+            {
+                continue;
+            }
+
+            UpdateSceneInstances(scene, range.Start, range.Count);
+            UpdateBoneMatrices(scene, range.Start, range.Count, frameIndex);
+        }
+
+        _scenePreparedFrame[scene] = frameIndex;
+    }
+
+    private void UpdateSceneInstances(Scene scene, int startIndex, int instanceCount)
+    {
+        var nextIndex = startIndex;
+        var endIndex = startIndex + instanceCount;
+
+        foreach (var root in scene.Roots)
+        {
+            UpdateSceneNode(root, Matrix4.Identity.Data, ref nextIndex, endIndex);
+        }
+
+        if (nextIndex != endIndex)
+        {
+            throw new InvalidOperationException("Mesh instance count mismatch while updating transforms.");
+        }
+    }
+
+    private void UpdateSceneNode(
+        SceneNode node,
+        float[] parentWorld,
+        ref int nextIndex,
+        int endIndex)
+    {
+        var world = Matrix4.Multiply(parentWorld, node.LocalTransform).Data;
+
+        foreach (var mesh in node.Meshes)
+        {
+            if (nextIndex >= endIndex)
+            {
+                throw new InvalidOperationException("Mesh instance count mismatch while updating transforms.");
+            }
+
+            ApplyInstanceTransform(nextIndex, mesh, world);
+            nextIndex++;
+        }
+
+        foreach (var child in node.Children)
+        {
+            UpdateSceneNode(child, world, ref nextIndex, endIndex);
+        }
+    }
+
+    private void UpdateBoneMatrices(Scene scene, int startIndex, int instanceCount, long frameIndex)
+    {
+        var endIndex = startIndex + instanceCount;
+        var preparedSkins = new HashSet<Skin>();
+
+        for (var i = startIndex; i < endIndex; i++)
+        {
+            var skin = _instances[i].Skin;
+            if (skin is null)
+            {
+                continue;
+            }
+
+            if (!preparedSkins.Add(skin))
+            {
+                continue;
+            }
+
+            if (_bonePreparedFrame.TryGetValue(skin, out var preparedFrame) && preparedFrame == frameIndex)
+            {
+                continue;
+            }
+
+            _boneMatrixCache[skin] = BoneMatrixCalculator.ComputeBoneMatrices(skin, scene.Roots);
+            _bonePreparedFrame[skin] = frameIndex;
+        }
+    }
+
+    private void ApplyInstanceTransform(int index, Mesh mesh, float[] world)
+    {
+        var instance = _instances[index];
+
+        Array.Copy(world, instance.ModelMatrix, instance.ModelMatrix.Length);
+        var normalMatrix = Matrix.NormalMatrix(world);
+        Array.Copy(normalMatrix, instance.NormalMatrix, instance.NormalMatrix.Length);
+
+        _instanceBounds[index] = ComputeBounds(mesh.LocalBounds, world);
+    }
+
+    private static BoundingBox ComputeBounds(in BoundingBox localBounds, float[] worldMatrix)
+    {
+        var min = localBounds.Min;
+        var max = localBounds.Max;
+
+        var center = new Vector3(
+            (min.X + max.X) * 0.5f,
+            (min.Y + max.Y) * 0.5f,
+            (min.Z + max.Z) * 0.5f);
+
+        var extents = new Vector3(
+            (max.X - min.X) * 0.5f,
+            (max.Y - min.Y) * 0.5f,
+            (max.Z - min.Z) * 0.5f);
+
+        var worldCenter = TransformPoint(worldMatrix, center);
+
+        var ex = MathF.Abs(worldMatrix[0]) * extents.X
+               + MathF.Abs(worldMatrix[4]) * extents.Y
+               + MathF.Abs(worldMatrix[8]) * extents.Z;
+        var ey = MathF.Abs(worldMatrix[1]) * extents.X
+               + MathF.Abs(worldMatrix[5]) * extents.Y
+               + MathF.Abs(worldMatrix[9]) * extents.Z;
+        var ez = MathF.Abs(worldMatrix[2]) * extents.X
+               + MathF.Abs(worldMatrix[6]) * extents.Y
+               + MathF.Abs(worldMatrix[10]) * extents.Z;
+
+        var worldExtents = new Vector3(ex, ey, ez);
+        return new BoundingBox(worldCenter - worldExtents, worldCenter + worldExtents);
+    }
+
+    private static Vector3 TransformPoint(float[] matrix, Vector3 point)
+    {
+        var x = point.X;
+        var y = point.Y;
+        var z = point.Z;
+        var w = 1.0f;
+
+        var resultX = matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12] * w;
+        var resultY = matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13] * w;
+        var resultZ = matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14] * w;
+        var resultW = matrix[3] * x + matrix[7] * y + matrix[11] * z + matrix[15] * w;
+
+        if (MathF.Abs(resultW - 1.0f) > float.Epsilon && resultW != 0f)
+        {
+            resultX /= resultW;
+            resultY /= resultW;
+            resultZ /= resultW;
+        }
+
+        return new Vector3(resultX, resultY, resultZ);
     }
 
     private void ThrowIfRunning()

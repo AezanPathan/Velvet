@@ -1,6 +1,7 @@
 (function () {
-    let started = false;
-    let startPromise = null;
+    const startedCanvases = new Set();
+    const startPromises = new Map();
+    let blazorStartPromise = null;
 
     if (!window.Velvet) {
         window.Velvet = {};
@@ -15,20 +16,12 @@
         return message.toLowerCase().includes("blazor has already started");
     }
 
-    window.Velvet.start = function (canvasId) {
-        if (started) {
-            return Promise.resolve();
+    function ensureBlazorStarted() {
+        if (blazorStartPromise) {
+            return blazorStartPromise;
         }
 
-        if (!canvasId || typeof canvasId !== "string") {
-            return Promise.reject(new Error("Velvet.start(canvasId) requires a non-empty canvas id."));
-        }
-
-        if (startPromise) {
-            return startPromise;
-        }
-
-        startPromise = Promise.resolve()
+        blazorStartPromise = Promise.resolve()
             .then(() => {
                 if (!window.Blazor || typeof window.Blazor.start !== "function") {
                     throw new Error("Blazor runtime not loaded. Include /_framework/blazor.server.js before Velvet.start().");
@@ -51,14 +44,38 @@
                     throw error;
                 }
             })
-            .then(() => DotNet.invokeMethodAsync("Velvet.Hosting.Web", "Start", canvasId))
-            .then(() => {
-                started = true;
-            })
             .catch((error) => {
-                startPromise = null;
+                blazorStartPromise = null;
                 throw error;
             });
+
+        return blazorStartPromise;
+    }
+
+    window.Velvet.start = function (canvasId) {
+        if (startedCanvases.has(canvasId)) {
+            return Promise.resolve();
+        }
+
+        if (!canvasId || typeof canvasId !== "string") {
+            return Promise.reject(new Error("Velvet.start(canvasId) requires a non-empty canvas id."));
+        }
+
+        if (startPromises.has(canvasId)) {
+            return startPromises.get(canvasId);
+        }
+
+        const startPromise = ensureBlazorStarted()
+            .then(() => DotNet.invokeMethodAsync("Velvet.Hosting.Web", "Start", canvasId))
+            .then(() => {
+                startedCanvases.add(canvasId);
+            })
+            .catch((error) => {
+                startPromises.delete(canvasId);
+                throw error;
+            });
+
+        startPromises.set(canvasId, startPromise);
 
         return startPromise;
     };
