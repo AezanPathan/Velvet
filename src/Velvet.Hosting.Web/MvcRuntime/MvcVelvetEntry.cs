@@ -31,8 +31,13 @@ public static class MvcVelvetEntry
         }
         catch
         {
-            _startupTasks.TryRemove(canvasId, out _);
             throw;
+        }
+        finally
+        {
+            // A Razor view can tear down and recreate the canvas (same id) during subsequent renders.
+            // Keep Start(...) re-entrant across those lifecycles by allowing a fresh startup attempt.
+            _startupTasks.TryRemove(canvasId, out _);
         }
     }
 
