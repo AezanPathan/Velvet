@@ -1,7 +1,10 @@
 const canvasResizeBindings = new Map();
 const canvasOrbitBindings = new Map();
+const canvasAnimationLoops = new Map();
+const canvasDebugOverlays = new Map();
 let nextResizeBindingId = 1;
 let nextOrbitBindingId = 1;
+let nextAnimationLoopId = 1;
 
 window.CanvasHelpers = {
     bindResizeTracking: function (canvas, dotNetRef, methodName) {
@@ -117,5 +120,102 @@ window.CanvasHelpers = {
         binding.canvas.removeEventListener("mouseleave", binding.onMouseLeave);
         binding.canvas.removeEventListener("wheel", binding.onWheel);
         canvasOrbitBindings.delete(bindingId);
+    },
+
+    startAnimationLoopById: function (canvasId, dotNetRef, methodName) {
+        const canvas = document.getElementById(canvasId);
+        if (!(canvas instanceof HTMLCanvasElement)) {
+            throw new Error("CanvasHelpers.startAnimationLoopById: canvas not found or not a canvas: " + canvasId);
+        }
+
+        if (!dotNetRef || typeof dotNetRef.invokeMethodAsync !== "function") {
+            throw new Error("CanvasHelpers.startAnimationLoopById: dotNetRef is invalid");
+        }
+
+        const bindingId = `raf-${nextAnimationLoopId++}`;
+        const loopState = {
+            isRunning: true,
+            rafId: 0
+        };
+
+        const tick = (timestampMs) => {
+            if (!loopState.isRunning) {
+                return;
+            }
+
+            Promise
+                .resolve(dotNetRef.invokeMethodAsync(methodName, timestampMs))
+                .catch(() => { })
+                .finally(() => {
+                    if (!loopState.isRunning) {
+                        return;
+                    }
+
+                    loopState.rafId = window.requestAnimationFrame(tick);
+                });
+        };
+
+        loopState.rafId = window.requestAnimationFrame(tick);
+        canvasAnimationLoops.set(bindingId, loopState);
+        return bindingId;
+    },
+
+    stopAnimationLoop: function (bindingId) {
+        const loopState = canvasAnimationLoops.get(bindingId);
+        if (!loopState) {
+            return;
+        }
+
+        loopState.isRunning = false;
+        if (loopState.rafId) {
+            window.cancelAnimationFrame(loopState.rafId);
+        }
+
+        canvasAnimationLoops.delete(bindingId);
+    },
+
+    setDebugOverlayById: function (canvasId, text) {
+        const canvas = document.getElementById(canvasId);
+        if (!(canvas instanceof HTMLCanvasElement)) {
+            return;
+        }
+
+        const id = `velvet-debug-${canvasId}`;
+        let overlay = canvasDebugOverlays.get(id);
+
+        if (!overlay) {
+            overlay = document.createElement("div");
+            overlay.id = id;
+            overlay.style.position = "fixed";
+            overlay.style.zIndex = "2147483647";
+            overlay.style.pointerEvents = "none";
+            overlay.style.background = "rgba(0, 0, 0, 0.65)";
+            overlay.style.color = "#b8ffb8";
+            overlay.style.fontFamily = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+            overlay.style.fontSize = "12px";
+            overlay.style.lineHeight = "1.35";
+            overlay.style.padding = "8px 10px";
+            overlay.style.border = "1px solid rgba(184, 255, 184, 0.35)";
+            overlay.style.borderRadius = "6px";
+            overlay.style.whiteSpace = "pre";
+            document.body.appendChild(overlay);
+            canvasDebugOverlays.set(id, overlay);
+        }
+
+        const rect = canvas.getBoundingClientRect();
+        overlay.style.left = `${Math.round(rect.left + 10)}px`;
+        overlay.style.top = `${Math.round(rect.top + 10)}px`;
+        overlay.textContent = String(text ?? "");
+    },
+
+    clearDebugOverlayById: function (canvasId) {
+        const id = `velvet-debug-${canvasId}`;
+        const overlay = canvasDebugOverlays.get(id);
+        if (!overlay) {
+            return;
+        }
+
+        overlay.remove();
+        canvasDebugOverlays.delete(id);
     }
 };

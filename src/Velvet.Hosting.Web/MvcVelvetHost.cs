@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Threading;
 using Microsoft.JSInterop;
 using Velvet.Core.Geometry;
@@ -25,10 +24,14 @@ namespace Velvet.Hosting.Web;
 /// </summary>
 public sealed class MvcVelvetHost
 {
+    private static int s_nextHostId;
+
     private readonly IJSRuntime _js;
     private readonly IWebGLBridge _bridge;
     private readonly IMeshUploader _meshUploader;
     private readonly int _rendererId;
+    private readonly int _hostId;
+    private readonly string _canvasId;
     private readonly ResizeController _resizeController = new();
     private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
     private int _isRunning;
@@ -37,7 +40,6 @@ public sealed class MvcVelvetHost
     private readonly List<BoundingBox> _instanceBounds = new();
     private readonly List<(Scene Scene, int Start, int Count)> _sceneInstanceRanges = new();
     private readonly Dictionary<Skin, float[]> _boneMatrixCache = new();
-    private readonly Dictionary<Skin, long> _bonePreparedFrame = new();
     private readonly Dictionary<Scene, long> _scenePreparedFrame = new();
     private readonly Frustum _frustum = new();
     private List<RenderBatch>? _batches;
@@ -52,6 +54,7 @@ public sealed class MvcVelvetHost
     private DotNetObjectReference<MvcVelvetHost>? _callbackRef;
     private string? _resizeBindingId;
     private string? _orbitInputBindingId;
+    private string? _animationLoopBindingId;
 
     private DirectionalLight? _directionalLight;
     private PointLight? _pointLight;
@@ -59,15 +62,22 @@ public sealed class MvcVelvetHost
     private bool _directionalEnabled = true;
     private bool _pointEnabled = true;
 
-    private CancellationTokenSource? _loopCts;
+    private readonly SemaphoreSlim _frameGate = new(1, 1);
+    private Func<float, Task>? _onFrame;
+    private double _lastFrameTimestampMs = -1;
+    private TaskCompletionSource<object?>? _loopTcs;
     private Task? _loopTask;
 
-    private MvcVelvetHost(IJSRuntime js, IWebGLBridge bridge, int rendererId)
+    public bool EnableDebugOverlay { get; set; } = true;
+
+    private MvcVelvetHost(IJSRuntime js, IWebGLBridge bridge, int rendererId, string canvasId)
     {
         _js = js;
         _bridge = bridge;
         _meshUploader = new WebGLMeshUploader(bridge);
         _rendererId = rendererId;
+        _hostId = Interlocked.Increment(ref s_nextHostId);
+        _canvasId = canvasId;
     }
 
     public static async Task<MvcVelvetHost> CreateAsync(
@@ -83,7 +93,7 @@ public sealed class MvcVelvetHost
         var resolvedBridge = bridge ?? new StaticWebGLBridge(js);
         var rendererId = await resolvedBridge.InitWithIdAsync(canvasId).ConfigureAwait(false);
 
-        var app = new MvcVelvetHost(js, resolvedBridge, rendererId)
+        var app = new MvcVelvetHost(js, resolvedBridge, rendererId, canvasId)
         {
             _program = await programFactory(resolvedBridge).ConfigureAwait(false)
         };
@@ -107,7 +117,7 @@ public sealed class MvcVelvetHost
         return app;
     }
 
-    public bool EnableFrustumCulling { get; set; } = true;
+    public bool EnableFrustumCulling { get; set; } = false;
 
     public Camera? Camera
     {
@@ -237,16 +247,34 @@ public sealed class MvcVelvetHost
                 return;
             }
 
-            _batches = RenderBatcher.BuildBatches(_instances, program);
-            _loopCts = new CancellationTokenSource();
-            _loopTask = RunLoopAsync(onFrame, _loopCts.Token);
-            _ = _loopTask.ContinueWith(t =>
+            foreach (var instance in _instances)
             {
-                if (t.IsFaulted && t.Exception is not null)
-                {
-                    Console.WriteLine($"[Velvet MVC] Render loop faulted: {t.Exception}");
-                }
-            }, TaskScheduler.Default);
+                await instance.Mesh.UploadAsync(_meshUploader).ConfigureAwait(false);
+            }
+
+            _batches = RenderBatcher.BuildBatches(_instances, program);
+            _onFrame = onFrame;
+            _lastFrameTimestampMs = -1;
+            var loopTcs = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _loopTcs = loopTcs;
+            _loopTask = loopTcs.Task;
+
+            try
+            {
+                _animationLoopBindingId = await _js.InvokeAsync<string>(
+                    "CanvasHelpers.startAnimationLoopById",
+                    _canvasId,
+                    _callbackRef,
+                    nameof(OnAnimationFrameFromJs)).AsTask().ConfigureAwait(false);
+            }
+            catch
+            {
+                _loopTask = null;
+                _loopTcs = null;
+                _onFrame = null;
+                Volatile.Write(ref _isRunning, 0);
+                throw;
+            }
         }
         finally
         {
@@ -256,16 +284,20 @@ public sealed class MvcVelvetHost
 
     public async Task StopAsync()
     {
-        CancellationTokenSource? cts;
+        TaskCompletionSource<object?>? loopTcs;
         Task? task;
+        string? animationLoopBindingId;
 
         await _lifecycleGate.WaitAsync().ConfigureAwait(false);
         try
         {
-            cts = _loopCts;
             task = _loopTask;
-            _loopCts = null;
+            loopTcs = _loopTcs;
+            animationLoopBindingId = _animationLoopBindingId;
+            _animationLoopBindingId = null;
             _loopTask = null;
+            _loopTcs = null;
+            _onFrame = null;
             Volatile.Write(ref _isRunning, 0);
         }
         finally
@@ -273,20 +305,27 @@ public sealed class MvcVelvetHost
             _lifecycleGate.Release();
         }
 
-        if (cts is not null && task is not null)
+        if (!string.IsNullOrWhiteSpace(animationLoopBindingId))
         {
-            cts.Cancel();
             try
             {
-                await task.ConfigureAwait(false);
+                await _js.InvokeVoidAsync("CanvasHelpers.stopAnimationLoop", animationLoopBindingId).AsTask().ConfigureAwait(false);
             }
-            catch (OperationCanceledException)
+            catch (JSDisconnectedException)
             {
             }
-            finally
+            catch (ObjectDisposedException)
             {
-                cts.Dispose();
             }
+        }
+
+        await _frameGate.WaitAsync().ConfigureAwait(false);
+        _frameGate.Release();
+
+        loopTcs?.TrySetResult(null);
+        if (task is not null)
+        {
+            await task.ConfigureAwait(false);
         }
 
         await CleanupInteropAsync().ConfigureAwait(false);
@@ -327,69 +366,104 @@ public sealed class MvcVelvetHost
         return Task.CompletedTask;
     }
 
+    [JSInvokable]
+    public Task OnAnimationFrameFromJs(double timestampMs)
+    {
+        return RenderFrameAsync(timestampMs);
+    }
+
     public void SetDirectionalEnabled(bool enabled) => _directionalEnabled = enabled;
 
     public void SetPointEnabled(bool enabled) => _pointEnabled = enabled;
 
-    private async Task RunLoopAsync(Func<float, Task>? onFrame, CancellationToken cancellationToken)
+    private async Task RenderFrameAsync(double timestampMs)
     {
+        if (Volatile.Read(ref _isRunning) == 0)
+        {
+            return;
+        }
+
+        if (!await _frameGate.WaitAsync(0).ConfigureAwait(false))
+        {
+            return;
+        }
+
         try
         {
             var program = _program ?? throw new InvalidOperationException("Shader program not configured.");
             var camera = _camera ?? throw new InvalidOperationException("Camera not configured. Assign a Camera before StartAsync().");
-            _ = _batches ?? throw new InvalidOperationException("Batches not built.");
+            var batches = _batches ?? throw new InvalidOperationException("Batches not built.");
 
-            foreach (var instance in _instances)
+            if (Volatile.Read(ref _isRunning) == 0)
             {
-                await instance.Mesh.UploadAsync(_meshUploader, cancellationToken).ConfigureAwait(false);
+                return;
             }
 
-            using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(16));
-            var stopwatch = Stopwatch.StartNew();
-            var lastSeconds = 0f;
+            await ApplyPendingResizeAsync(camera).ConfigureAwait(false);
 
-            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+            float deltaSeconds;
+            if (_lastFrameTimestampMs < 0)
             {
-                await ApplyPendingResizeAsync(camera, cancellationToken).ConfigureAwait(false);
-
-                var nowSeconds = (float)stopwatch.Elapsed.TotalSeconds;
-                var deltaSeconds = nowSeconds - lastSeconds;
-                lastSeconds = nowSeconds;
-                _frameIndex++;
-                var frameIndex = _frameIndex;
-
-                if (onFrame is not null)
+                deltaSeconds = 0f;
+            }
+            else
+            {
+                var deltaMs = timestampMs - _lastFrameTimestampMs;
+                if (deltaMs < 0)
                 {
-                    await onFrame(deltaSeconds).ConfigureAwait(false);
+                    deltaMs = 0;
                 }
 
-                _orbitBinder?.Update();
-
-                PrepareAllScenesForFrame(frameIndex);
-                var batches = _batches ?? throw new InvalidOperationException("Batches not built.");
-
-                await _bridge.SetBlendModeAsync(_rendererId, "off").ConfigureAwait(false);
-                await _bridge.SetDepthMaskAsync(_rendererId, true).ConfigureAwait(false);
-
-                await _bridge.ClearAsync(_rendererId, 0.08f, 0.08f, 0.10f, 1.0f).ConfigureAwait(false);
-                await RenderSkyboxAsync(camera).ConfigureAwait(false);
-                await SetFrameUniformsAsync(program, camera).ConfigureAwait(false);
-
-                if (EnableFrustumCulling)
+                deltaSeconds = (float)(deltaMs / 1000.0);
+                if (deltaSeconds > 0.25f)
                 {
-                    _frustum.UpdateFromMatrix(camera.ViewProjectionMatrix);
+                    deltaSeconds = 0.25f;
                 }
+            }
 
-                await RenderBatchesAsync(program, batches).ConfigureAwait(false);
+            _lastFrameTimestampMs = timestampMs;
+            _frameIndex++;
+            var frameIndex = _frameIndex;
+
+            var onFrame = _onFrame;
+            if (onFrame is not null)
+            {
+                await onFrame(deltaSeconds).ConfigureAwait(false);
+            }
+
+            _orbitBinder?.Update();
+
+            PrepareAllScenesForFrame(frameIndex);
+            await _bridge.SetBlendModeAsync(_rendererId, "off");
+            await _bridge.SetDepthMaskAsync(_rendererId, true);
+            await _bridge.ClearAsync(_rendererId, 0.08f, 0.08f, 0.10f, 1.0f).ConfigureAwait(false);
+            await RenderSkyboxAsync(camera).ConfigureAwait(false);
+            await SetFrameUniformsAsync(program, camera).ConfigureAwait(false);
+
+            if (EnableFrustumCulling)
+            {
+                _frustum.UpdateFromMatrix(camera.ViewProjectionMatrix);
+            }
+
+            var stats = await RenderBatchesAsync(program, batches).ConfigureAwait(false);
+            await UpdateDebugOverlayAsync(frameIndex, deltaSeconds, batches.Count, stats).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            if (Volatile.Read(ref _isRunning) == 1)
+            {
+                Volatile.Write(ref _isRunning, 0);
+                _loopTcs?.TrySetException(ex);
+                Console.WriteLine($"[Velvet MVC] Frame render faulted: {ex}");
             }
         }
         finally
         {
-            Volatile.Write(ref _isRunning, 0);
+            _frameGate.Release();
         }
     }
 
-    private async Task ApplyPendingResizeAsync(Camera camera, CancellationToken cancellationToken)
+    private async Task ApplyPendingResizeAsync(Camera camera)
     {
         if (!_resizeController.HasPendingResize)
         {
@@ -397,7 +471,7 @@ public sealed class MvcVelvetHost
         }
 
         await _resizeController
-            .ApplyResizeAsync((pixelWidth, pixelHeight) => _bridge.ResizeAsync(pixelWidth, pixelHeight), camera, cancellationToken)
+            .ApplyResizeAsync((pixelWidth, pixelHeight) => _bridge.ResizeAsync(pixelWidth, pixelHeight), camera, CancellationToken.None)
             .ConfigureAwait(false);
     }
 
@@ -476,8 +550,14 @@ public sealed class MvcVelvetHost
         }
     }
 
-    private async Task RenderBatchesAsync(ShaderProgram program, List<RenderBatch> batches)
+    private async Task<FrameRenderStats> RenderBatchesAsync(ShaderProgram program, List<RenderBatch> batches)
     {
+        var totalInstances = 0;
+        var renderedInstances = 0;
+        var culledInstances = 0;
+        var skinnedInstances = 0;
+        var boneCacheMisses = 0;
+
         foreach (var batch in batches)
         {
             await batch.Key.Material.ApplyAsync(program).ConfigureAwait(false);
@@ -489,25 +569,97 @@ public sealed class MvcVelvetHost
                     continue;
                 }
 
-                if (EnableFrustumCulling && !_frustum.Intersects(_instanceBounds[instanceIndex]))
+                totalInstances++;
+                var instance = _instances[instanceIndex];
+                if (EnableFrustumCulling && !_frustum.Intersects(instance.BoundingBox))
                 {
+                    culledInstances++;
                     continue;
                 }
 
-                var instance = _instances[instanceIndex];
                 var mesh = instance.Mesh;
                 var meshId = mesh.Resources.VertexBufferId.Value;
-                mesh.Skin = instance.Skin;
+                // mesh.Skin = instance.Skin;
+                var skin = instance.Skin;
 
-                if (mesh.Skin is not null && _boneMatrixCache.TryGetValue(mesh.Skin, out var boneMatrices))
+                if (skin is not null && _boneMatrixCache.TryGetValue(skin, out var boneMatrices))
                 {
-                    await program.SetBoneMatricesAsync(boneMatrices, mesh.Skin.JointCount).ConfigureAwait(false);
+                    await program.SetBoneMatricesAsync(boneMatrices, skin.JointCount);
+                }
+                else if (skin is not null)
+                {
+                    // fallback → identity bones
+                    var jointCount = skin.JointCount;
+                    var identityBones = new float[jointCount * 16];
+
+                    for (int i = 0; i < jointCount; i++)
+                    {
+                        int o = i * 16;
+                        identityBones[o + 0] = 1;
+                        identityBones[o + 5] = 1;
+                        identityBones[o + 10] = 1;
+                        identityBones[o + 15] = 1;
+                    }
+
+                    await program.SetBoneMatricesAsync(identityBones, jointCount);
+                }
+                // if (skin is not null)
+                // {
+                //     var boneMatrices = _boneMatrixCache[skin];
+                //     await program.SetBoneMatricesAsync(boneMatrices, skin.JointCount);
+                // }
+
+
+                // if (mesh.Skin is not null && _boneMatrixCache.TryGetValue(mesh.Skin, out var boneMatrices))
+                // {
+                //     skinnedInstances++;
+                //     await program.SetBoneMatricesAsync(boneMatrices, mesh.Skin.JointCount).ConfigureAwait(false);
+                // }
+                else if (mesh.Skin is not null)
+                {
+                    boneCacheMisses++;
                 }
 
                 await program.SetUniformMatrix4fvAsync("uModel", instance.ModelMatrix).ConfigureAwait(false);
                 await program.SetUniformMatrix3fvAsync("uNormalMatrix", instance.NormalMatrix).ConfigureAwait(false);
                 await program.DrawMeshAsync(meshId, _rendererId).ConfigureAwait(false);
+                renderedInstances++;
             }
+        }
+
+        return new FrameRenderStats(totalInstances, renderedInstances, culledInstances, skinnedInstances, boneCacheMisses);
+    }
+
+    private async Task UpdateDebugOverlayAsync(long frameIndex, float deltaSeconds, int batchCount, FrameRenderStats stats)
+    {
+        if (!EnableDebugOverlay)
+        {
+            return;
+        }
+
+        if (frameIndex % 8 != 0)
+        {
+            return;
+        }
+
+        var text =
+            $"Velvet MVC Debug\n" +
+            $"host={_hostId} renderer={_rendererId}\n" +
+            $"frame={frameIndex} dt={deltaSeconds * 1000f:F1}ms\n" +
+            $"batches={batchCount} instances={stats.TotalInstances}\n" +
+            $"rendered={stats.RenderedInstances} culled={stats.CulledInstances}\n" +
+            $"skinned={stats.SkinnedInstances} boneMiss={stats.BoneCacheMisses}\n" +
+            $"boneCache={_boneMatrixCache.Count} scenes={_sceneInstanceRanges.Count}";
+
+        try
+        {
+            await _js.InvokeVoidAsync("CanvasHelpers.setDebugOverlayById", _canvasId, text).AsTask().ConfigureAwait(false);
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (ObjectDisposedException)
+        {
         }
     }
 
@@ -562,7 +714,9 @@ public sealed class MvcVelvetHost
         ref int nextIndex,
         int endIndex)
     {
-        var world = Matrix4.Multiply(parentWorld, node.LocalTransform).Data;
+        var worldMat = Matrix4.Multiply(parentWorld, node.LocalTransform);
+        var world = (float[])worldMat.Data.Clone(); // FORCE COPY
+                                                    //  var world = Matrix4.Multiply(parentWorld, node.LocalTransform).Data;
 
         foreach (var mesh in node.Meshes)
         {
@@ -581,6 +735,37 @@ public sealed class MvcVelvetHost
         }
     }
 
+    // private void UpdateBoneMatrices(Scene scene, int startIndex, int instanceCount, long frameIndex)
+    // {
+    //     var endIndex = startIndex + instanceCount;
+    //     var preparedSkins = new HashSet<Skin>();
+
+    //     for (var i = startIndex; i < endIndex; i++)
+    //     {
+    //         var skin = _instances[i].Skin;
+    //         if (skin is null)
+    //         {
+    //             continue;
+    //         }
+
+    //         if (!preparedSkins.Add(skin))
+    //         {
+    //             continue;
+    //         }
+
+    //         // if (_bonePreparedFrame.TryGetValue(skin, out var preparedFrame) && preparedFrame == frameIndex)
+    //         // {
+    //         //     continue;
+    //         // }
+    //         if (!_boneMatrixCache.ContainsKey(skin))
+    //         {
+    //             Console.WriteLine("Bone cache MISS — this should never happen");
+    //             throw new InvalidOperationException("Bone cache MISS — this should never happen.");
+    //         }
+    //         _boneMatrixCache[skin] = BoneMatrixCalculator.ComputeBoneMatrices(skin, scene.Roots);
+    //         _bonePreparedFrame[skin] = frameIndex;
+    //     }
+    // }
     private void UpdateBoneMatrices(Scene scene, int startIndex, int instanceCount, long frameIndex)
     {
         var endIndex = startIndex + instanceCount;
@@ -589,34 +774,22 @@ public sealed class MvcVelvetHost
         for (var i = startIndex; i < endIndex; i++)
         {
             var skin = _instances[i].Skin;
-            if (skin is null)
-            {
-                continue;
-            }
-
-            if (!preparedSkins.Add(skin))
-            {
-                continue;
-            }
-
-            if (_bonePreparedFrame.TryGetValue(skin, out var preparedFrame) && preparedFrame == frameIndex)
+            if (skin is null || !preparedSkins.Add(skin))
             {
                 continue;
             }
 
             _boneMatrixCache[skin] = BoneMatrixCalculator.ComputeBoneMatrices(skin, scene.Roots);
-            _bonePreparedFrame[skin] = frameIndex;
         }
     }
+
 
     private void ApplyInstanceTransform(int index, Mesh mesh, float[] world)
     {
         var instance = _instances[index];
 
-        Array.Copy(world, instance.ModelMatrix, instance.ModelMatrix.Length);
         var normalMatrix = Matrix.NormalMatrix(world);
-        Array.Copy(normalMatrix, instance.NormalMatrix, instance.NormalMatrix.Length);
-
+        _instances[index] = MeshInstance.CreateOwned(instance.Mesh, world, normalMatrix, instance.Skin);
         _instanceBounds[index] = ComputeBounds(mesh.LocalBounds, world);
     }
 
@@ -683,10 +856,26 @@ public sealed class MvcVelvetHost
 
     private async Task CleanupInteropAsync()
     {
+        var animationLoopBindingId = _animationLoopBindingId;
+        _animationLoopBindingId = null;
         var resizeBindingId = _resizeBindingId;
         _resizeBindingId = null;
         var orbitBindingId = _orbitInputBindingId;
         _orbitInputBindingId = null;
+
+        if (!string.IsNullOrWhiteSpace(animationLoopBindingId))
+        {
+            try
+            {
+                await _js.InvokeVoidAsync("CanvasHelpers.stopAnimationLoop", animationLoopBindingId).AsTask().ConfigureAwait(false);
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+        }
 
         if (!string.IsNullOrWhiteSpace(resizeBindingId))
         {
@@ -716,7 +905,28 @@ public sealed class MvcVelvetHost
             }
         }
 
+        if (!string.IsNullOrWhiteSpace(_canvasId))
+        {
+            try
+            {
+                await _js.InvokeVoidAsync("CanvasHelpers.clearDebugOverlayById", _canvasId).AsTask().ConfigureAwait(false);
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+        }
+
         _callbackRef?.Dispose();
         _callbackRef = null;
     }
+
+    private readonly record struct FrameRenderStats(
+        int TotalInstances,
+        int RenderedInstances,
+        int CulledInstances,
+        int SkinnedInstances,
+        int BoneCacheMisses);
 }

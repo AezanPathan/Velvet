@@ -10,15 +10,26 @@ using Velvet.Core.Rendering.Skinning;
 public readonly struct MeshInstance
 {
     public MeshInstance(Mesh mesh, float[] modelMatrix, Skin? skin = null)
-        : this(mesh, modelMatrix, Matrix.NormalMatrix(modelMatrix), skin)
+        : this(mesh, modelMatrix, Matrix.NormalMatrix(modelMatrix), skin, copyMatrices: true)
     {
     }
 
     public MeshInstance(Mesh mesh, float[] modelMatrix, float[] normalMatrix, Skin? skin = null)
+        : this(mesh, modelMatrix, normalMatrix, skin, copyMatrices: true)
+    {
+    }
+
+    internal static MeshInstance CreateOwned(Mesh mesh, float[] modelMatrix, float[] normalMatrix, Skin? skin = null)
+        => new(mesh, modelMatrix, normalMatrix, skin, copyMatrices: false);
+
+    private MeshInstance(Mesh mesh, float[] modelMatrix, float[] normalMatrix, Skin? skin, bool copyMatrices)
     {
         Mesh = mesh ?? throw new ArgumentNullException(nameof(mesh));
-        ModelMatrix = (float[])(modelMatrix ?? throw new ArgumentNullException(nameof(modelMatrix))).Clone();
-        NormalMatrix = (float[])(normalMatrix ?? throw new ArgumentNullException(nameof(normalMatrix))).Clone();
+        ArgumentNullException.ThrowIfNull(modelMatrix);
+        ArgumentNullException.ThrowIfNull(normalMatrix);
+
+        ModelMatrix = copyMatrices ? (float[])modelMatrix.Clone() : modelMatrix;
+        NormalMatrix = copyMatrices ? (float[])normalMatrix.Clone() : normalMatrix;
         Skin = skin;
 
         if (ModelMatrix.Length != 16) throw new ArgumentException("Model matrix must be 4x4.", nameof(modelMatrix));

@@ -11,8 +11,17 @@ internal sealed class MvcVelvetHostRegistry
         ArgumentException.ThrowIfNullOrWhiteSpace(canvasId);
         ArgumentNullException.ThrowIfNull(host);
 
-        var previous = _hosts.AddOrUpdate(canvasId, host, (_, _) => host);
-        if (ReferenceEquals(previous, host))
+        MvcVelvetHost? previous = null;
+        _hosts.AddOrUpdate(
+            canvasId,
+            _ => host,
+            (_, existing) =>
+            {
+                previous = existing;
+                return host;
+            });
+
+        if (previous is null || ReferenceEquals(previous, host))
         {
             return;
         }

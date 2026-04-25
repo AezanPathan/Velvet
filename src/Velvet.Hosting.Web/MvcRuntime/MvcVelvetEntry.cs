@@ -29,6 +29,11 @@ public static class MvcVelvetEntry
         {
             await lazyTask.Value.ConfigureAwait(false);
         }
+        catch (JSDisconnectedException)
+        {
+            // Page refresh/teardown can disconnect the circuit while startup is in flight.
+            // Treat as a benign transient; a subsequent start on the new circuit will re-run.
+        }
         catch
         {
             throw;
@@ -68,7 +73,7 @@ public static class MvcVelvetEntry
                 "No active Blazor circuit runtime yet. Retry start after connection is established.");
         }
 
-        var bridge = services.GetRequiredService<IWebGLBridge>();
+        var bridge = new StaticWebGLBridge(js);
         var context = MvcVelvetStartupContext.Create(canvasId, services, js, bridge);
 
         if (sceneRegistry.TryGet(canvasId, out var sceneStartup) && sceneStartup is not null)

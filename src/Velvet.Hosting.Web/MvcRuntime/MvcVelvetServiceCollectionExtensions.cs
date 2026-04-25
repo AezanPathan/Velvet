@@ -20,13 +20,6 @@ public static class MvcVelvetServiceCollectionExtensions
         services.TryAddSingleton<MvcVelvetSceneRegistry>();
         services.TryAddSingleton<MvcVelvetSceneRuntime>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<CircuitHandler, MvcVelvetCircuitHandler>());
-        services.TryAddSingleton<IWebGLBridge>(sp =>
-        {
-            var runtimeAccessor = sp.GetRequiredService<MvcVelvetRuntimeAccessor>();
-            var js = runtimeAccessor.Current
-                ?? throw new InvalidOperationException("No active JS runtime available while creating MVC WebGL bridge.");
-            return new StaticWebGLBridge(js);
-        });
 
         var options = new MvcVelvetStartupOptions();
         configure(options);

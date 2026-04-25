@@ -16,6 +16,13 @@
         return message.toLowerCase().includes("blazor has already started");
     }
 
+    function isCircuitDisconnectedError(error) {
+        const message = errorMessage(error).toLowerCase();
+        return message.includes("jsdisconnectedexception") ||
+            message.includes("circuit has disconnected") ||
+            message.includes("being disposed");
+    }
+
     function ensureBlazorStarted() {
         if (blazorStartPromise) {
             return blazorStartPromise;
@@ -71,6 +78,13 @@
                 startedCanvases.add(canvasId);
             })
             .catch((error) => {
+                if (isCircuitDisconnectedError(error)) {
+                    // Hard refresh/navigation can tear down the circuit during startup.
+                    // Ignore this transient and allow subsequent starts on the new circuit.
+                    startPromises.delete(canvasId);
+                    return;
+                }
+
                 startPromises.delete(canvasId);
                 throw error;
             });

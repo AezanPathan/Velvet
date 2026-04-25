@@ -54,9 +54,10 @@ public sealed class SceneNode
         ArgumentNullException.ThrowIfNull(parentWorld);
 
         var world = Matrix4.Multiply(parentWorld, _localTransform).Data;
+        var normalMatrix = Matrix.NormalMatrix(world);
 
         foreach (var mesh in Meshes)
-            output.Add(new MeshInstance(mesh, world, Skin));
+            output.Add(MeshInstance.CreateOwned(mesh, world, normalMatrix, Skin));
 
         foreach (var child in Children)
             child.CollectMeshes(output, world);
