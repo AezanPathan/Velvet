@@ -1,17 +1,27 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Version>0.1.0</Version>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+    <EnableRazorRuntime Condition="'$(EnableRazorRuntime)' == ''">true</EnableRazorRuntime>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Velvet.Core\Velvet.Core.csproj" />
     <ProjectReference Include="..\Velvet.Graphics.WebGL\Velvet.Graphics.WebGL.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.Components" Version="10.0.0" />
-    <PackageReference Include="Microsoft.JSInterop" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(EnableRazorRuntime)' == 'true' and '$(RuntimeIdentifier)' != 'browser-wasm'">
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(EnableRazorRuntime)' != 'true' or '$(RuntimeIdentifier)' == 'browser-wasm'">
+    <Compile Remove="Razor\**\*.cs" />
   </ItemGroup>
 
 </Project>

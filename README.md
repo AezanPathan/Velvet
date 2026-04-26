@@ -55,3 +55,12 @@ await app.StopAsync();
 cd Velvet
 dotnet run --project Velvet-Site/Velvet-Site.csproj
 ```
+
+⚠️ Razor (SSR) Host Status
+
+The Razor-based hosting mode is currently experimental.
+
+Due to the stateless nature of SSR and lifecycle limitations,
+full runtime persistence (like continuous rendering loops) is not yet stable.
+
+For production or demos, Blazor hosting is recommended.

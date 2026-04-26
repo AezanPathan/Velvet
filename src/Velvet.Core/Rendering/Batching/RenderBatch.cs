@@ -1,5 +1,3 @@
-using Velvet.Core.Rendering.Meshes;
-
 namespace Velvet.Core.Rendering.Batching;
 
 /// <summary>
@@ -7,7 +5,7 @@ namespace Velvet.Core.Rendering.Batching;
 /// </summary>
 public sealed class RenderBatch
 {
-    private readonly List<MeshInstance> _instances = [];
+    private readonly List<int> _instanceIndices = [];
 
     public RenderBatch(BatchKey key)
     {
@@ -16,10 +14,10 @@ public sealed class RenderBatch
 
     public BatchKey Key { get; }
 
-    public IReadOnlyList<MeshInstance> Instances => _instances;
+    public IReadOnlyList<int> InstanceIndices => _instanceIndices;
 
-    internal void Add(MeshInstance instance)
+    internal void AddInstanceIndex(int instanceIndex)
     {
-        _instances.Add(instance);
+        _instanceIndices.Add(instanceIndex);
     }
 }

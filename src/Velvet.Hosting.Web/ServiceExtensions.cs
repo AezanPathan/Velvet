@@ -26,9 +26,9 @@ public static class ServiceExtensions
     }
 
     /// <summary>
-    /// Creates a <see cref="VelvetHost"/> from DI services for a canvas.
+    /// Creates a <see cref="BlazorVelvetHost"/> from DI services for a canvas.
     /// </summary>
-    public static Task<VelvetHost> CreateVelvetHostAsync(
+    public static Task<BlazorVelvetHost> CreateVelvetHostAsync(
         this IServiceProvider services,
         ElementReference canvas,
         Func<IWebGLBridge, Task<ShaderProgram>>? programFactory = null)
@@ -39,7 +39,7 @@ public static class ServiceExtensions
         var defaults = services.GetService<VelvetHostServices>();
         var selectedFactory = programFactory ?? defaults?.ProgramFactory;
 
-        return VelvetHost.CreateAsync(canvas, js, selectedFactory);
+        return BlazorVelvetHost.CreateAsync(canvas, js, selectedFactory);
     }
 
     private sealed class VelvetHostServices
