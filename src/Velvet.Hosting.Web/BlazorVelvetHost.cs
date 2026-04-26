@@ -275,7 +275,7 @@ public sealed class BlazorVelvetHost : VelvetHostCore
 
     private Task StartAsyncCore(FrameCallbacks callbacks)
     {
-        var program = Program;
+        var program = Program!;
         if (Instances.Count == 0 && _particleSystems.Count == 0)
         {
             throw new InvalidOperationException("No meshes or particle systems added. Call Add(scene) or Add(particleSystem) before StartAsync().");
@@ -294,7 +294,7 @@ public sealed class BlazorVelvetHost : VelvetHostCore
 
     private async Task RunLoopAsync(FrameCallbacks callbacks, CancellationToken cancellationToken)
     {
-        var program = Program;
+        var program = Program!;
         var camera = Camera ?? throw new InvalidOperationException("Camera not configured. Assign a Camera before starting.");
         var batches = Batches ?? throw new InvalidOperationException("Batches not built.");
 
