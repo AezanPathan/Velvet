@@ -1,6 +1,12 @@
 import { MeshManager, ProgramManager, RendererManager } from "../core/resource/Managers";
 import { getContext } from "./runtime";
 
+/**
+ * Rendering entry points.
+ * These functions are thin wrappers that route calls
+ * from interop → renderer instance.
+ */
+
 export function drawMesh(meshId: number, programId: number, rendererId: number): void {
   const mesh = MeshManager.get(meshId);
   const program = ProgramManager.get(programId);

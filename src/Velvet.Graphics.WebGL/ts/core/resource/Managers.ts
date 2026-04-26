@@ -1,13 +1,13 @@
 import { ResourceManager } from "./ResourceManager";
-import { GLShader } from "../../webgl/GLShader";
-import { GLProgram } from "../../webgl/GLProgram";
-import { GLBuffer } from "../../webgl/GLBuffer";
-import { GLMesh } from "../../webgl/GLMesh";
-import { GLRenderer } from "../../webgl/GLRenderer";
+import { GLShader } from "../../platform/webgl/GLShader";
+import { GLProgram } from "../../platform/webgl/GLProgram";
+import { GLBuffer } from "../../platform/webgl/GLBuffer";
+import { GLMesh } from "../../platform/webgl/GLMesh";
+import { GLRenderer } from "../../platform/webgl/GLRenderer";
 
 /**
- * Global resource managers for the engine backend.
- * These handle ID → Resource mapping.
+ * Global engine resource registries.
+ * Each manager maps ID → WebGL resource.
  */
 
 export const ShaderManager = new ResourceManager<GLShader>();

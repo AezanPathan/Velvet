@@ -1,8 +1,12 @@
-import { GLBuffer } from "../webgl/GLBuffer";
-import { GLMesh } from "../webgl/GLMesh";
-import { VertexAttribute } from "../webgl/GLMesh";
+import { GLBuffer } from "../platform/webgl/GLBuffer";
+import { GLMesh, VertexAttribute } from "../platform/webgl/GLMesh";
 import { BufferManager, MeshManager } from "../core/resource/Managers";
 import { ensureFloat32Array, ensureUint32Array, getContext } from "./runtime";
+
+/**
+ * Mesh creation and update utilities.
+ * Handles vertex buffers, index buffers, and attribute layout.
+ */
 
 type LayoutAttribute = Readonly<{
   location: number;
@@ -98,7 +102,7 @@ export function createMesh(
   BufferManager.register(vertexBufferId, vb);
 
   let ib: GLBuffer | undefined;
-  let count = 0;
+  let drawCount = 0;
 
   if (indices && indices.length > 0) {
     const indexData = ensureUint32Array(indices);
@@ -106,7 +110,7 @@ export function createMesh(
     ib = new GLBuffer(gl, indexBufferId, gl.ELEMENT_ARRAY_BUFFER);
     ib.setData(indexData);
     BufferManager.register(indexBufferId, ib);
-    count = indexData.length;
+    drawCount = indexData.length;
   }
 
   const meshId = MeshManager.generateId();
@@ -114,12 +118,12 @@ export function createMesh(
   const effectiveStride = vertexStrideFloats && vertexStrideFloats > 0 ? vertexStrideFloats : 0;
   const layout = resolveLayout(vertexData.length, effectiveStride);
   if (!layout) {
-    throw new Error(`Unsupported vertex layout: ${vertexData.length} floats (expected stride 3, 6, 8, 9, 11, or 16)`);
+    throw new Error(`Unsupported vertex layout (${vertexData.length} floats). Expected stride: 3, 6, 8, 9, 11, or 16`);
   }
 
-  count = indices ? count : vertexData.length / layout.strideFloats;
+  drawCount = indices ? drawCount : vertexData.length / layout.strideFloats;
   mesh.setAttributes(buildAttributes(gl, layout));
-  mesh.setCount(count);
+  mesh.setCount(drawCount);
   MeshManager.register(meshId, mesh);
   return meshId;
 }
@@ -151,14 +155,14 @@ export function createParticleMesh(capacity: number): number {
 export function updateMeshVertices(meshId: number, vertices: Float32Array, vertexCount: number): void {
   const mesh = MeshManager.get(meshId);
   const vertexData = ensureFloat32Array(vertices);
-  const count = Math.max(0, vertexCount | 0);
+  const drawCount = Math.max(0, vertexCount | 0);
 
-  if (count === 0) {
+  if (drawCount === 0) {
     mesh.setCount(0);
     return;
   }
 
-  const required = count * 8;
+  const required = drawCount * 8;
   const data = vertexData.length > required ? vertexData.subarray(0, required) : vertexData;
-  mesh.updateVertexData(data, count);
+  mesh.updateVertexData(data, drawCount);
 }

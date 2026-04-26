@@ -1,7 +1,12 @@
-import { WebGLContext } from "../webgl/WebGLContext";
-import { clearAllManagers } from "../core/resource/Managers";
-import { GLProgram } from "../webgl/GLProgram";
-import { ProgramManager } from "../core/resource/Managers";
+import { WebGLContext } from "../platform/webgl/WebGLContext";
+import { GLProgram } from "../platform/webgl/GLProgram";
+import { clearAllManagers, ProgramManager } from "../core/resource/Managers";
+
+/**
+ * Global WebGL runtime state.
+ * Holds the active context and shared helpers.
+ */
+
 
 let context: WebGLContext | null = null;
 

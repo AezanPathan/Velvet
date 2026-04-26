@@ -1,7 +1,7 @@
-import { WebGLContext } from "../webgl/WebGLContext";
-import { GLRenderer } from "../webgl/GLRenderer";
-import { GLShader } from "../webgl/GLShader";
-import { GLProgram } from "../webgl/GLProgram";
+import { WebGLContext } from "../platform/webgl/WebGLContext";
+import { GLRenderer } from "../platform/webgl/GLRenderer";
+import { GLShader } from "../platform/webgl/GLShader";
+import { GLProgram } from "../platform/webgl/GLProgram";
 import { ProgramManager, RendererManager, ShaderManager } from "../core/resource/Managers";
 import { getContext, setContext } from "./runtime";
 import {
@@ -28,9 +28,15 @@ export { createMesh, createParticleMesh, updateMeshVertices };
 export { loadTexture, createTextureFromUrl, bindTextureById, createCubemapTexture, bindCubemapTextureById, bindTexture };
 export { drawMesh, setBlendMode, clear, resize, setDepthMask };
 
+/**
+ * Public Velvet API (JS side).
+ * Internally maps calls → engine systems.
+ */
+
 export function init(canvas: string | HTMLCanvasElement): number {
   let canvasElement: HTMLCanvasElement;
 
+  // Allow passing canvas id or actual element
   if (typeof canvas === "string") {
     const element = document.getElementById(canvas);
     if (!element) {

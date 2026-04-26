@@ -1,5 +1,10 @@
 import { ensureFloat32Array, withOptionalUniformLocation } from "./runtime";
 
+/**
+ * Uniform helpers.
+ * Automatically resolves uniform location and applies value.
+ */
+
 export function setUniformMatrix4fv(programId: number, name: string, matrix: Float32Array): void {
   withOptionalUniformLocation(programId, name, (gl, location) => {
     gl.uniformMatrix4fv(location, false, ensureFloat32Array(matrix));

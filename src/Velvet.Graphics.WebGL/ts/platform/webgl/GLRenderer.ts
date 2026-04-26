@@ -1,24 +1,21 @@
-import { BlendMode, IRenderer } from "../core/renderer/IRenderer";
-import { IMesh } from "../core/mesh/IMesh";
-import { IProgram } from "../core/program/IProgram";
+import { BlendMode, IRenderer } from "../../core/renderer/IRenderer";
+import { IMesh } from "../../core/mesh/IMesh";
+import { IProgram } from "../../core/program/IProgram";
 
 /**
- * GLRenderer
- * ----------
- * Backend implementation of IRenderer for WebGL2.
+ * Core renderer.
  *
- * Responsibilities:
- *  - Manage the WebGL2RenderingContext
- *  - Clear screen
- *  - Resize viewport
- *  - Bind a program and draw meshes
+ * Responsible for:
+ * - GPU state setup
+ * - clearing
+ * - draw execution
  *
- * This is the central component used by VelvetAPI for all draw operations.
+ * Does NOT manage scene logic.
  */
+
 export class GLRenderer implements IRenderer {
   public readonly gl: WebGL2RenderingContext;
 
-  /** Unique Velvet renderer ID (not used yet, for future resource management) */
   public readonly id: number;
 
   constructor(gl: WebGL2RenderingContext, id: number) {
@@ -33,9 +30,6 @@ export class GLRenderer implements IRenderer {
     this.gl.cullFace(this.gl.BACK);
   }
 
-  /**
-   * Clears the framebuffer with a given color.
-   */
   public clear(r: number, g: number, b: number, a: number): void {
     const gl = this.gl;
     gl.enable(gl.DEPTH_TEST);
@@ -45,9 +39,6 @@ export class GLRenderer implements IRenderer {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   }
 
-  /**
-   * Resizes the viewport to match the canvas.
-   */
   public resize(width: number, height: number): void {
     this.gl.viewport(0, 0, width, height);
   }
@@ -68,28 +59,18 @@ export class GLRenderer implements IRenderer {
     }
   }
 
-  /**
-   * Enable or disable depth buffer writes.
-   */
   public setDepthMask(enabled: boolean): void {
     this.gl.depthMask(enabled);
   }
 
-  /**
-   * Draws a mesh with a specific program.
-   */
   public drawMesh(mesh: IMesh, program: IProgram): void {
     const gl = this.gl;
 
-    // Ensure program is ready
     if (!program.isLinked()) {
       throw new Error(`GLRenderer.drawMesh: program (id=${program.id}) is not linked`);
     }
 
-    // Activate program
     program.use();
-
-    // Mesh handles buffer binding + attribute setup internally
     mesh.draw();
   }
 }

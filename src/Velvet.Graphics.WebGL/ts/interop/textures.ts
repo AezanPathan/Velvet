@@ -1,6 +1,11 @@
 import { TextureManager } from "../core/resource/Managers";
 import { getContext, getRequiredUniformLocation, withOptionalUniformLocation } from "./runtime";
 
+/**
+ * Texture loading and binding utilities.
+ * Handles both 2D textures and cubemaps.
+ */
+
 export async function loadTexture(imageUrl: string): Promise<WebGLTexture | null> {
   const context = getContext();
 
