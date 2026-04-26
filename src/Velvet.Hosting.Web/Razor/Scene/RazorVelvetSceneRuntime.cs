@@ -1,10 +1,10 @@
-namespace Velvet.Hosting.Web.MvcRuntime;
+namespace Velvet.Hosting.Web.Razor.Scene;
 
-public sealed class MvcVelvetSceneRuntime
+public sealed class RazorVelvetSceneRuntime
 {
-    private readonly MvcVelvetSceneRegistry _sceneRegistry;
+    private readonly RazorVelvetSceneRegistry _sceneRegistry;
 
-    public MvcVelvetSceneRuntime(MvcVelvetSceneRegistry sceneRegistry)
+    public RazorVelvetSceneRuntime(RazorVelvetSceneRegistry sceneRegistry)
     {
         _sceneRegistry = sceneRegistry;
     }
@@ -13,14 +13,14 @@ public sealed class MvcVelvetSceneRuntime
     /// Registers a scene startup pipeline for a specific canvas id.
     /// The pipeline is executed by the engine runtime when JS invokes Start(canvasId).
     /// </summary>
-    public Task StartScene(string canvasId, Func<MvcVelvetSceneBuilder, Task> build)
+    public Task StartScene(string canvasId, Func<RazorVelvetSceneBuilder, Task> build)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(canvasId);
         ArgumentNullException.ThrowIfNull(build);
 
         _sceneRegistry.RegisterOrReplace(canvasId, async startupContext =>
         {
-            var builder = new MvcVelvetSceneBuilder(startupContext);
+            var builder = new RazorVelvetSceneBuilder(startupContext);
             await build(builder).ConfigureAwait(false);
             await builder.StartAsync().ConfigureAwait(false);
         });

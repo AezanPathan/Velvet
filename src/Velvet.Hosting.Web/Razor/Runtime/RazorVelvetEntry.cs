@@ -3,10 +3,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Velvet.Graphics.WebGL;
 using System.Collections.Concurrent;
 using System.Threading;
+using Velvet.Hosting.Web.Razor.Scene;
+using Velvet.Hosting.Web.Razor.Setup;
 
-namespace Velvet.Hosting.Web.MvcRuntime;
+namespace Velvet.Hosting.Web.Razor.Runtime;
 
-public static class MvcVelvetEntry
+public static class RazorVelvetEntry
 {
     private static IServiceProvider? _services;
     private static readonly ConcurrentDictionary<string, Lazy<Task>> _startupTasks = new(StringComparer.Ordinal);
@@ -49,11 +51,11 @@ public static class MvcVelvetEntry
     private static async Task StartCoreAsync(string canvasId)
     {
         var services = _services ?? throw new InvalidOperationException(
-            "MVC Velvet runtime is not configured. Call app.UseMvcVelvetRuntime() at startup.");
+              "Razor Velvet runtime is not configured. Call app.UseRazorVelvetRuntime() at startup.");
 
-        var options = services.GetRequiredService<MvcVelvetStartupOptions>();
-        var runtimeAccessor = services.GetRequiredService<MvcVelvetRuntimeAccessor>();
-        var sceneRegistry = services.GetRequiredService<MvcVelvetSceneRegistry>();
+        var options = services.GetRequiredService<RazorVelvetStartupOptions>();
+        var runtimeAccessor = services.GetRequiredService<RazorVelvetRuntimeAccessor>();
+        var sceneRegistry = services.GetRequiredService<RazorVelvetSceneRegistry>();
 
         IJSRuntime? js = null;
         for (var i = 0; i < 100; i++)
@@ -74,7 +76,7 @@ public static class MvcVelvetEntry
         }
 
         var bridge = new StaticWebGLBridge(js);
-        var context = MvcVelvetStartupContext.Create(canvasId, services, js, bridge);
+        var context = RazorVelvetStartupContext.Create(canvasId, services, js, bridge);
 
         if (sceneRegistry.TryGet(canvasId, out var sceneStartup) && sceneStartup is not null)
         {

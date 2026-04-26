@@ -1,17 +1,17 @@
 using System.Collections.Concurrent;
 
-namespace Velvet.Hosting.Web.MvcRuntime;
+namespace Velvet.Hosting.Web.Razor.Hosting;
 
-internal sealed class MvcVelvetHostRegistry
+internal sealed class RazorVelvetHostRegistry
 {
-    private readonly ConcurrentDictionary<string, MvcVelvetHost> _hosts = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, RazorVelvetHost> _hosts = new(StringComparer.Ordinal);
 
-    public async Task ReplaceHostAsync(string canvasId, MvcVelvetHost host)
+    public async Task ReplaceHostAsync(string canvasId, RazorVelvetHost host)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(canvasId);
         ArgumentNullException.ThrowIfNull(host);
 
-        MvcVelvetHost? previous = null;
+        RazorVelvetHost? previous = null;
         _hosts.AddOrUpdate(
             canvasId,
             _ => host,

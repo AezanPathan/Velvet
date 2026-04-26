@@ -1,14 +1,14 @@
 using Microsoft.AspNetCore.Components.Server.Circuits;
 using Microsoft.JSInterop;
 
-namespace Velvet.Hosting.Web.MvcRuntime;
+namespace Velvet.Hosting.Web.Razor.Runtime;
 
-internal sealed class MvcVelvetCircuitHandler : CircuitHandler
+internal sealed class RazorVelvetCircuitHandler : CircuitHandler
 {
-    private readonly MvcVelvetRuntimeAccessor _runtimeAccessor;
+    private readonly RazorVelvetRuntimeAccessor _runtimeAccessor;
     private readonly IJSRuntime _jsRuntime;
 
-    public MvcVelvetCircuitHandler(MvcVelvetRuntimeAccessor runtimeAccessor, IJSRuntime jsRuntime)
+    public RazorVelvetCircuitHandler(RazorVelvetRuntimeAccessor runtimeAccessor, IJSRuntime jsRuntime)
     {
         _runtimeAccessor = runtimeAccessor;
         _jsRuntime = jsRuntime;

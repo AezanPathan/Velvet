@@ -1,11 +1,11 @@
 using Microsoft.JSInterop;
 using Velvet.Graphics.WebGL;
 
-namespace Velvet.Hosting.Web.MvcRuntime;
+namespace Velvet.Hosting.Web.Razor.Setup;
 
-public sealed class MvcVelvetStartupContext
+public sealed class RazorVelvetStartupContext
 {
-    private MvcVelvetStartupContext(
+    private RazorVelvetStartupContext(
         string canvasId,
         IServiceProvider services,
         IJSRuntime jsRuntime,
@@ -25,7 +25,7 @@ public sealed class MvcVelvetStartupContext
 
     public IWebGLBridge Bridge { get; }
 
-    public static MvcVelvetStartupContext Create(
+    public static RazorVelvetStartupContext Create(
         string canvasId,
         IServiceProvider services,
         IJSRuntime jsRuntime,
@@ -35,6 +35,6 @@ public sealed class MvcVelvetStartupContext
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(jsRuntime);
         ArgumentNullException.ThrowIfNull(bridge);
-        return new MvcVelvetStartupContext(canvasId, services, jsRuntime, bridge);
+        return new RazorVelvetStartupContext(canvasId, services, jsRuntime, bridge);
     }
 }

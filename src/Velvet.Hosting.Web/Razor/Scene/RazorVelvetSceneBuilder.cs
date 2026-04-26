@@ -1,25 +1,27 @@
 using Microsoft.JSInterop;
 using Microsoft.Extensions.DependencyInjection;
 using Velvet.Graphics.WebGL;
+using Velvet.Hosting.Web.Razor.Hosting;
+using Velvet.Hosting.Web.Razor.Setup;
 
-namespace Velvet.Hosting.Web.MvcRuntime;
+namespace Velvet.Hosting.Web.Razor.Scene;
 
-public sealed class MvcVelvetSceneBuilder
+public sealed class RazorVelvetSceneBuilder
 {
-    private readonly MvcVelvetStartupContext _startupContext;
+    private readonly RazorVelvetStartupContext _startupContext;
     private Func<float, Task>? _onFrame;
 
-    internal MvcVelvetSceneBuilder(MvcVelvetStartupContext startupContext)
+    internal RazorVelvetSceneBuilder(RazorVelvetStartupContext startupContext)
     {
         _startupContext = startupContext;
     }
 
-    public MvcVelvetHost Host
+    public RazorVelvetHost Host
         => _host ?? throw new InvalidOperationException("Host not created. Call CreateHostAsync(...) first.");
 
-    private MvcVelvetHost? _host;
+    private RazorVelvetHost? _host;
 
-    public async Task<MvcVelvetHost> CreateHostAsync(
+    public async Task<RazorVelvetHost> CreateHostAsync(
         Func<IWebGLBridge, Task<ShaderProgram>> programFactory)
     {
         ArgumentNullException.ThrowIfNull(programFactory);
@@ -29,7 +31,7 @@ public sealed class MvcVelvetSceneBuilder
             return _host;
         }
 
-        _host = await MvcVelvetHost.CreateAsync(
+        _host = await RazorVelvetHost.CreateAsync(
             _startupContext.CanvasId,
             _startupContext.JsRuntime,
             programFactory,
@@ -47,11 +49,11 @@ public sealed class MvcVelvetSceneBuilder
     public Task StartAsync()
     {
         var host = Host;
-        var hostRegistry = _startupContext.Services.GetRequiredService<MvcVelvetHostRegistry>();
+        var hostRegistry = _startupContext.Services.GetRequiredService<RazorVelvetHostRegistry>();
         return StartCoreAsync(host, hostRegistry);
     }
 
-    private async Task StartCoreAsync(MvcVelvetHost host, MvcVelvetHostRegistry hostRegistry)
+    private async Task StartCoreAsync(RazorVelvetHost host, RazorVelvetHostRegistry hostRegistry)
     {
         await hostRegistry.ReplaceHostAsync(_startupContext.CanvasId, host).ConfigureAwait(false);
         await host.StartAsync(_onFrame).ConfigureAwait(false);

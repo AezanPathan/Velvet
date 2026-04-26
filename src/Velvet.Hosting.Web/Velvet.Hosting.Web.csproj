@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
     <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
-    <EnableMvcRuntime Condition="'$(EnableMvcRuntime)' == ''">true</EnableMvcRuntime>
+    <EnableRazorRuntime Condition="'$(EnableRazorRuntime)' == ''">true</EnableRazorRuntime>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,12 +16,12 @@
     <PackageReference Include="Microsoft.AspNetCore.Components" Version="10.0.0" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(EnableMvcRuntime)' == 'true' and '$(RuntimeIdentifier)' != 'browser-wasm'">
+  <ItemGroup Condition="'$(EnableRazorRuntime)' == 'true' and '$(RuntimeIdentifier)' != 'browser-wasm'">
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(EnableMvcRuntime)' != 'true' or '$(RuntimeIdentifier)' == 'browser-wasm'">
-    <Compile Remove="MvcRuntime\**\*.cs" />
+  <ItemGroup Condition="'$(EnableRazorRuntime)' != 'true' or '$(RuntimeIdentifier)' == 'browser-wasm'">
+    <Compile Remove="Razor\**\*.cs" />
   </ItemGroup>
 
 </Project>

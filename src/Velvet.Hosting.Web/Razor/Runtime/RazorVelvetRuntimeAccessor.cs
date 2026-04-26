@@ -1,8 +1,8 @@
 using Microsoft.JSInterop;
 
-namespace Velvet.Hosting.Web.MvcRuntime;
+namespace Velvet.Hosting.Web.Razor.Runtime;
 
-internal sealed class MvcVelvetRuntimeAccessor
+internal sealed class RazorVelvetRuntimeAccessor
 {
     private readonly object _sync = new();
     private IJSRuntime? _current;

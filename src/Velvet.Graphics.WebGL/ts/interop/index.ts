@@ -45,4 +45,23 @@ import * as API from "./VelvetAPI";
     resize: API.resize
 };
 
+window.addEventListener("load", () => {
+    const velvet = (window as any).Velvet;
+    if (!velvet || typeof velvet.start !== "function") {
+        return;
+    }
+
+    const canvas = document.querySelector("canvas") as HTMLCanvasElement | null;
+    if (!canvas || !canvas.id) {
+        return;
+    }
+
+    if (canvas.dataset.velvetStarted === "true") {
+        return;
+    }
+
+    canvas.dataset.velvetStarted = "true";
+    velvet.start(canvas.id);
+});
+
 export const Velvet = (window as any).Velvet;
