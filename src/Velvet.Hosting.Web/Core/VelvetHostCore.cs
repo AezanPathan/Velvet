@@ -1,11 +1,8 @@
-using System;
-using System.Collections.Generic;
 using Velvet.Core.Geometry;
 using Velvet.Core.Math;
 using Velvet.Core.Rendering;
 using Velvet.Core.Rendering.Batching;
 using Velvet.Core.Rendering.Cameras;
-using Velvet.Core.Rendering.Core;
 using Velvet.Core.Rendering.Culling;
 using Velvet.Core.Rendering.Environment;
 using Velvet.Core.Rendering.Lighting;

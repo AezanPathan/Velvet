@@ -1,12 +1,7 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using Velvet.Core.Particles;
-using Velvet.Core.Rendering;
 using Velvet.Core.Rendering.Batching;
 using Velvet.Core.Rendering.Cameras;
 using Velvet.Core.Rendering.Controllers;
@@ -15,7 +10,6 @@ using Velvet.Core.Rendering.Environment;
 using Velvet.Core.Rendering.Input;
 using Velvet.Core.Rendering.Lighting;
 using Velvet.Core.Rendering.Meshes;
-using Velvet.Core.Scene;
 using Velvet.Graphics.WebGL;
 using Velvet.Hosting.Web.Core;
 
@@ -35,6 +29,7 @@ public sealed class BlazorVelvetHost : VelvetHostCore
     private readonly List<ParticleRenderer> _particleRenderers = new();
 
     private OrbitInputBinder? _orbitBinder;
+    private TouchOrbitBinder? _touchOrbitBinder;
 
     private DotNetObjectReference<BlazorVelvetHost>? _resizeCallbackRef;
     private string? _resizeBindingId;
@@ -76,7 +71,9 @@ public sealed class BlazorVelvetHost : VelvetHostCore
             nameof(OnOrbitMouseDownFromJs),
             nameof(OnOrbitMouseMoveFromJs),
             nameof(OnOrbitMouseUpFromJs),
-            nameof(OnOrbitWheelFromJs)).AsTask().ConfigureAwait(false);
+            nameof(OnOrbitWheelFromJs),
+            nameof(OnTouchRotate),
+            nameof(OnTouchZoom)).AsTask().ConfigureAwait(false);
 
         if (programFactory is not null)
         {
@@ -128,6 +125,7 @@ public sealed class BlazorVelvetHost : VelvetHostCore
         }
 
         _orbitBinder = new OrbitInputBinder(controller, Camera);
+        _touchOrbitBinder = new TouchOrbitBinder(controller, Camera);
     }
 
     /// <summary>
@@ -252,6 +250,20 @@ public sealed class BlazorVelvetHost : VelvetHostCore
     public Task OnOrbitWheelFromJs(double delta)
     {
         _orbitBinder?.OnWheel((float)delta);
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnTouchRotate(double dx, double dy)
+    {
+        _touchOrbitBinder?.OnTouchRotate((float)dx, (float)dy);
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnTouchZoom(double delta)
+    {
+        _touchOrbitBinder?.OnTouchZoom((float)delta);
         return Task.CompletedTask;
     }
 

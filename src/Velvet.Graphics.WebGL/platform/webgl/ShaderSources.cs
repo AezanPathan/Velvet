@@ -1,5 +1,3 @@
-using System;
-
 namespace Velvet.Graphics.WebGL;
 
 /// <summary>

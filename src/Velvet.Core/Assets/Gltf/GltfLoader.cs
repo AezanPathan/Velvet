@@ -1,6 +1,5 @@
 using SceneModel = Velvet.Core.Scene.Scene;
 using Velvet.Core.Animation;
-using Velvet.Core.Geometry;
 using Velvet.Core.Rendering.Meshes;
 
 namespace Velvet.Core.Assets.Gltf;

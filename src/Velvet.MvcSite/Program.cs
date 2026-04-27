@@ -1,4 +1,3 @@
-using Velvet.Hosting.Web.Razor.Runtime;
 using Velvet.Hosting.Web.Razor.Setup;
 
 var builder = WebApplication.CreateBuilder(args);

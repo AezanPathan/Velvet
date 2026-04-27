@@ -2,7 +2,6 @@ using Microsoft.JSInterop;
 using Microsoft.Extensions.DependencyInjection;
 using Velvet.Graphics.WebGL;
 using System.Collections.Concurrent;
-using System.Threading;
 using Velvet.Hosting.Web.Razor.Scene;
 using Velvet.Hosting.Web.Razor.Setup;
 
