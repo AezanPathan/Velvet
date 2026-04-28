@@ -39,9 +39,8 @@ packages/
 *.log
 
 # Publish output
-**/wwwroot/
-!src/Velvet.WebGL/wwwroot/
-**/dist/
+**/wwwroot/dist/
+**/wwwroot/build/
 
 # Generated files
 project.lock.json
@@ -78,4 +77,4 @@ coverage/
 mds/
 
 # Mvc project
-Velvet.MvcSite/
+# Velvet.MvcSite/
