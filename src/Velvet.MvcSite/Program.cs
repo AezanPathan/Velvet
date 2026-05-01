@@ -10,6 +10,10 @@ builder.Services.AddRazorVelvetHost(options =>
     options.Configure(_ => Task.CompletedTask);
 });
 
+// Provide HttpClient for components that inject it (server prerendering)
+builder.Services.AddHttpClient();
+builder.Services.AddScoped(sp => sp.GetRequiredService<System.Net.Http.IHttpClientFactory>().CreateClient());
+
 var app = builder.Build();
 app.UseRazorVelvetRuntime();
 

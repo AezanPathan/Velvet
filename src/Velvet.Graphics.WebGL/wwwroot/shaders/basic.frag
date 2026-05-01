@@ -34,10 +34,6 @@ uniform float uSpotLightLinear;
 uniform float uSpotLightQuadratic;
 
 void main() {
-    // Debug: output UV coordinates as color (R=U, G=V, B=0)
-    outColor = vec4(vUV, 0.0, 1.0);
-    return;
-
     if (uMaterialUnlit > 0.5) {
         outColor = vec4(uMaterialColor, 1.0);
         return;
@@ -64,9 +60,8 @@ void main() {
     vec3 spotDir = normalize(uSpotLightDirection);
     vec3 fromLight = (distS > 0.0001) ? normalize(vWorldPos - uSpotLightPosition) : vec3(0.0, 0.0, 0.0);
     float theta = dot(fromLight, spotDir);
-    float innerCos = cos(uSpotLightCutoff);
-    float outerCos = cos(uSpotLightOuterCutoff);
-    float cone = smoothstep(outerCos, innerCos, theta);
+    float epsilon = max(uSpotLightCutoff - uSpotLightOuterCutoff, 0.0001);
+    float cone = clamp((theta - uSpotLightOuterCutoff) / epsilon, 0.0, 1.0);
 
     vec3 spotDiffuse = uMaterialColor * uSpotLightColor * diffS * uSpotLightIntensity * attenuationS * cone * uMaterialDiffuse;
 

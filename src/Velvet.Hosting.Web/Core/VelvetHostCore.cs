@@ -252,44 +252,146 @@ public abstract class VelvetHostCore
     /// <summary>
     /// Sets lighting uniforms for the frame.
     /// </summary>
-    protected async Task SetFrameLightsAsync(ShaderProgram program)
+  protected async Task SetFrameLightsAsync(ShaderProgram program)
+{
+    // ==============================
+    // DEFAULTS (VERY IMPORTANT)
+    // ==============================
+
+    // Directional (off by default)
+    await program.SetUniform3fAsync("uLightDirection", 0f, -1f, 0f);
+    await program.SetUniform3fAsync("uLightColor", 0f, 0f, 0f);
+    await program.SetUniform1fAsync("uLightIntensity", 0f);
+
+    // Point (off by default)
+    await program.SetUniform3fAsync("uPointLightPosition", 0f, 0f, 0f);
+    await program.SetUniform3fAsync("uPointLightColor", 0f, 0f, 0f);
+    await program.SetUniform1fAsync("uPointLightIntensity", 0f);
+    await program.SetUniform1fAsync("uPointLightConstant", 1f);
+    await program.SetUniform1fAsync("uPointLightLinear", 0f);
+    await program.SetUniform1fAsync("uPointLightQuadratic", 0f);
+
+    // Spot (off by default)
+    await program.SetUniform3fAsync("uSpotLightPosition", 0f, 0f, 0f);
+    await program.SetUniform3fAsync("uSpotLightDirection", 0f, -1f, 0f);
+    await program.SetUniform3fAsync("uSpotLightColor", 0f, 0f, 0f);
+    await program.SetUniform1fAsync("uSpotLightIntensity", 0f);
+    await program.SetUniform1fAsync("uSpotLightCutoff", 0f);
+    await program.SetUniform1fAsync("uSpotLightOuterCutoff", 0f);
+    await program.SetUniform1fAsync("uSpotLightConstant", 1f);
+    await program.SetUniform1fAsync("uSpotLightLinear", 0f);
+    await program.SetUniform1fAsync("uSpotLightQuadratic", 0f);
+
+
+    // ==============================
+    // DIRECTIONAL LIGHT
+    // ==============================
+    // if (DirectionalLight is not null && DirectionalEnabled)
+    // {
+    //     var dir = DirectionalLight.Direction;
+    //     var normalizedDir = dir.LengthSquared > 0.000001f
+    //         ? dir.Normalized()
+    //         : new Vector3(0f, -1f, 0f);
+
+    //     await program.SetUniform3fAsync("uLightDirection",
+    //         normalizedDir.X, normalizedDir.Y, normalizedDir.Z);
+
+    //     await program.SetUniform3fAsync("uLightColor",
+    //         DirectionalLight.Color.X,
+    //         DirectionalLight.Color.Y,
+    //         DirectionalLight.Color.Z);
+
+    //     await program.SetUniform1fAsync("uLightIntensity",
+    //         DirectionalLight.Intensity);
+    // }
+    if (DirectionalLight is not null && DirectionalEnabled)
     {
-        if (DirectionalLight is not null)
-        {
-            var dir = DirectionalLight.Direction;
-            var dirLenSq = dir.LengthSquared;
-            var normalizedDir = dirLenSq > 0.000001f ? dir.Normalized() : new Vector3(0f, -1f, 0f);
-            var directionalColor = DirectionalEnabled
-                ? DirectionalLight.Color * DirectionalLight.Intensity
-                : Vector3.Zero;
-            await program.SetUniform3fAsync("uLightDirection", normalizedDir.X, normalizedDir.Y, normalizedDir.Z).ConfigureAwait(false);
-            await program.SetUniform3fAsync("uLightColor", directionalColor.X, directionalColor.Y, directionalColor.Z).ConfigureAwait(false);
-        }
+        var dir = DirectionalLight.Direction;
+        var normalizedDir = dir.LengthSquared > 0.000001f
+            ? dir.Normalized()
+            : new Vector3(0f, -1f, 0f);
 
-        if (PointLight is not null)
-        {
-            var intensity = PointEnabled ? PointLight.Intensity : 0f;
-            await program.SetUniform3fAsync("uPointLightPosition", PointLight.Position.X, PointLight.Position.Y, PointLight.Position.Z).ConfigureAwait(false);
-            await program.SetUniform3fAsync("uPointLightColor", PointLight.Color.X, PointLight.Color.Y, PointLight.Color.Z).ConfigureAwait(false);
-            await program.SetUniform1fAsync("uPointLightIntensity", intensity).ConfigureAwait(false);
-            await program.SetUniform1fAsync("uPointLightConstant", PointLight.Constant).ConfigureAwait(false);
-            await program.SetUniform1fAsync("uPointLightLinear", PointLight.Linear).ConfigureAwait(false);
-            await program.SetUniform1fAsync("uPointLightQuadratic", PointLight.Quadratic).ConfigureAwait(false);
-        }
-
-        if (SpotLight is not null)
-        {
-            await program.SetUniform3fAsync("uSpotLightPosition", SpotLight.Position.X, SpotLight.Position.Y, SpotLight.Position.Z).ConfigureAwait(false);
-            await program.SetUniform3fAsync("uSpotLightDirection", SpotLight.Direction.X, SpotLight.Direction.Y, SpotLight.Direction.Z).ConfigureAwait(false);
-            await program.SetUniform3fAsync("uSpotLightColor", SpotLight.Color.X, SpotLight.Color.Y, SpotLight.Color.Z).ConfigureAwait(false);
-            await program.SetUniform1fAsync("uSpotLightIntensity", SpotLight.Intensity).ConfigureAwait(false);
-            await program.SetUniform1fAsync("uSpotLightCutoff", SpotLight.Cutoff).ConfigureAwait(false);
-            await program.SetUniform1fAsync("uSpotLightOuterCutoff", SpotLight.OuterCutoff).ConfigureAwait(false);
-            await program.SetUniform1fAsync("uSpotLightConstant", SpotLight.Constant).ConfigureAwait(false);
-            await program.SetUniform1fAsync("uSpotLightLinear", SpotLight.Linear).ConfigureAwait(false);
-            await program.SetUniform1fAsync("uSpotLightQuadratic", SpotLight.Quadratic).ConfigureAwait(false);
-        }
+        await program.SetUniform3fAsync("uLightDirection", normalizedDir.X, normalizedDir.Y, normalizedDir.Z);
+        await program.SetUniform3fAsync("uLightColor",
+            DirectionalLight.Color.X, DirectionalLight.Color.Y, DirectionalLight.Color.Z);
+        await program.SetUniform1fAsync("uLightIntensity", DirectionalLight.Intensity);
     }
+
+
+
+    // ==============================
+    // POINT LIGHT
+    // ==============================
+    if (PointLight is not null && PointEnabled)
+    {
+        await program.SetUniform3fAsync("uPointLightPosition",
+            PointLight.Position.X,
+            PointLight.Position.Y,
+            PointLight.Position.Z);
+
+        await program.SetUniform3fAsync("uPointLightColor",
+            PointLight.Color.X,
+            PointLight.Color.Y,
+            PointLight.Color.Z);
+
+        await program.SetUniform1fAsync("uPointLightIntensity",
+            PointLight.Intensity);
+
+        await program.SetUniform1fAsync("uPointLightConstant",
+            PointLight.Constant);
+
+        await program.SetUniform1fAsync("uPointLightLinear",
+            PointLight.Linear);
+
+        await program.SetUniform1fAsync("uPointLightQuadratic",
+            PointLight.Quadratic);
+    }
+
+
+    // ==============================
+    // SPOT LIGHT
+    // ==============================
+    if (SpotLight is not null)
+    {
+        var dir = SpotLight.Direction;
+        var normalizedDir = dir.LengthSquared > 0.000001f
+            ? dir.Normalized()
+            : new Vector3(0f, -1f, 0f);
+
+        await program.SetUniform3fAsync("uSpotLightPosition",
+            SpotLight.Position.X,
+            SpotLight.Position.Y,
+            SpotLight.Position.Z);
+
+        await program.SetUniform3fAsync("uSpotLightDirection",
+            normalizedDir.X,
+            normalizedDir.Y,
+            normalizedDir.Z);
+
+        await program.SetUniform3fAsync("uSpotLightColor",
+            SpotLight.Color.X,
+            SpotLight.Color.Y,
+            SpotLight.Color.Z);
+
+        await program.SetUniform1fAsync("uSpotLightIntensity",
+            SpotLight.Intensity);
+
+        await program.SetUniform1fAsync("uSpotLightCutoff",
+            SpotLight.Cutoff);
+
+        await program.SetUniform1fAsync("uSpotLightOuterCutoff",
+            SpotLight.OuterCutoff);
+
+        await program.SetUniform1fAsync("uSpotLightConstant",
+            SpotLight.Constant);
+
+        await program.SetUniform1fAsync("uSpotLightLinear",
+            SpotLight.Linear);
+
+        await program.SetUniform1fAsync("uSpotLightQuadratic",
+            SpotLight.Quadratic);
+    }
+}
 
     /// <summary>
     /// Renders all batches with frustum culling support.

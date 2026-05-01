@@ -17,6 +17,8 @@ public partial class FoxScene : ComponentBase, IAsyncDisposable
     [Inject] private IJSRuntime JS { get; set; } = default!;
     [Inject] private HttpClient Http { get; set; } = default!;
 
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+
     private ElementReference canvasRef;
     private BlazorVelvetHost? app;
     private EngineScene? scene;
@@ -64,7 +66,9 @@ public partial class FoxScene : ComponentBase, IAsyncDisposable
             linear: 0.09f,
             quadratic: 0.032f);
 
-        var bytes = await Http.GetByteArrayAsync("models/Fox.glb");
+        // Ensure we request an absolute URI (HttpClient on server requires BaseAddress or absolute URI)
+        var foxUri = Navigation.ToAbsoluteUri("models/Fox.glb");
+        var bytes = await Http.GetByteArrayAsync(foxUri);
         var loadResult = await GltfLoader.LoadSceneWithAnimations(bytes, "models");
         scene = loadResult.Scene;
 

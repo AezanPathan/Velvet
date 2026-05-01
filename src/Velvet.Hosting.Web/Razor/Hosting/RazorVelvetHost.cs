@@ -45,7 +45,7 @@ public sealed class RazorVelvetHost : VelvetHostCore
     private TaskCompletionSource<object?>? _loopTcs;
     private Task? _loopTask;
 
-    public bool EnableDebugOverlay { get; set; } = true;
+    public bool EnableDebugOverlay { get; set; } = false;
 
     private RazorVelvetHost(IJSRuntime js, IWebGLBridge bridge, int rendererId, string canvasId)
         : base(bridge, rendererId)

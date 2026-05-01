@@ -594,6 +594,8 @@ public sealed class VelvetHost
                 : Vector3.Zero;
             await program.SetUniform3fAsync("uLightDirection", normalizedDir.X, normalizedDir.Y, normalizedDir.Z).ConfigureAwait(false);
             await program.SetUniform3fAsync("uLightColor", directionalColor.X, directionalColor.Y, directionalColor.Z).ConfigureAwait(false);
+            // Preserve legacy behavior where directional intensity is already baked into uLightColor.
+            await program.SetUniform1fAsync("uLightIntensity", 1.0f).ConfigureAwait(false);
         }
 
         if (_pointLight is not null)
