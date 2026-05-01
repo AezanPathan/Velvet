@@ -112,48 +112,6 @@ public static class ShaderSources
         "    gl_Position = uProjection * uView * uModel * vec4(finalPosition, 1.0);\n" +
         "}\n";
 
-    /// <summary>
-    /// Standard fragment shader (used by both skinned and non-skinned variants).
-    /// 
-    /// Handles:
-    /// - Minimal Lambert-style lighting (ambient + directional diffuse)
-    /// - Optional base color texture sampling
-    /// - Material base color and unlit toggle
-    /// </summary>
-    // public const string StandardFragmentShader = "#version 300 es\n" +
-    //     "precision highp float;\n" +
-    //     "\n" +
-    //     "in vec2 vUV;\n" +
-    //     "in vec3 vNormal;\n" +
-    //     "in vec3 vPosition;\n" +
-    //     "out vec4 outColor;\n" +
-    //     "\n" +
-    //     "uniform vec3 uBaseColor;\n" +
-    //     "uniform float uAmbientStrength;\n" +
-    //     "uniform float uMaterialUnlit;\n" +
-    //     "uniform sampler2D uBaseColorTex;\n" +
-    //     "uniform bool uHasTexture;\n" +
-    //     "\n" +
-    //     "uniform vec3 uLightDirection;\n" +
-    //     "uniform vec3 uLightColor;\n" +
-    //     "\n" +
-    //     "void main() {\n" +
-    //     "    vec3 textureColor = uHasTexture ? texture(uBaseColorTex, vUV).rgb : vec3(1.0);\n" +
-    //     "    vec3 baseColor = uBaseColor * textureColor;\n" +
-    //     "    if (uMaterialUnlit > 0.5) {\n" +
-    //     "        outColor = vec4(baseColor, 1.0);\n" +
-    //     "        return;\n" +
-    //     "    }\n" +
-    //     "    vec3 N = normalize(vNormal);\n" +
-    //     "    vec3 lightDir = -uLightDirection;\n" +
-    //     "    float lightLen = length(lightDir);\n" +
-    //     "    vec3 L = lightLen > 0.0001 ? (lightDir / lightLen) : vec3(0.0, 1.0, 0.0);\n" +
-    //     "    float NdotL = max(dot(N, L), 0.0);\n" +
-    //     "    vec3 ambient = baseColor * uAmbientStrength;\n" +
-    //     "    vec3 diffuse = baseColor * NdotL * uLightColor;\n" +
-    //     "    vec3 result = ambient + diffuse;\n" +
-    //     "    outColor = vec4(result, 1.0);\n" +
-    //     "}\n";
     public const string StandardFragmentShader = "#version 300 es\n" +
         "precision highp float;\n" +
         "\n" +

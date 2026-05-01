@@ -584,35 +584,50 @@ public sealed class VelvetHost
 
     private async Task SetFrameLightsAsync(ShaderProgram program)
     {
-        if (_directionalLight is not null)
+        if (_directionalLight is not null && _directionalEnabled)
         {
-            var dir = _directionalLight.Direction;
-            var dirLenSq = dir.LengthSquared;
-            var normalizedDir = dirLenSq > 0.000001f ? dir.Normalized() : new Vector3(0f, -1f, 0f);
-            var directionalColor = _directionalEnabled
-                ? _directionalLight.Color * _directionalLight.Intensity
-                : Vector3.Zero;
-            await program.SetUniform3fAsync("uLightDirection", normalizedDir.X, normalizedDir.Y, normalizedDir.Z).ConfigureAwait(false);
-            await program.SetUniform3fAsync("uLightColor", directionalColor.X, directionalColor.Y, directionalColor.Z).ConfigureAwait(false);
-            // Preserve legacy behavior where directional intensity is already baked into uLightColor.
-            await program.SetUniform1fAsync("uLightIntensity", 1.0f).ConfigureAwait(false);
+            // Normalize direction to ensure consistent lighting calculations
+            var direction = _directionalLight.Direction.LengthSquared > 0.000001f 
+                ? _directionalLight.Direction.Normalized() 
+                : new Vector3(0f, -1f, 0f);
+            await program.SetUniform3fAsync("uLightDirection", direction.X, direction.Y, direction.Z).ConfigureAwait(false);
+            await program.SetUniform3fAsync("uLightColor", _directionalLight.Color.X, _directionalLight.Color.Y, _directionalLight.Color.Z).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uLightIntensity", _directionalLight.Intensity).ConfigureAwait(false);
+        }
+        else
+        {
+            await program.SetUniform3fAsync("uLightDirection", 0f, -1f, 0f).ConfigureAwait(false);
+            await program.SetUniform3fAsync("uLightColor", 0f, 0f, 0f).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uLightIntensity", 0f).ConfigureAwait(false);
         }
 
-        if (_pointLight is not null)
+        if (_pointLight is not null && _pointEnabled)
         {
-            var intensity = _pointEnabled ? _pointLight.Intensity : 0f;
             await program.SetUniform3fAsync("uPointLightPosition", _pointLight.Position.X, _pointLight.Position.Y, _pointLight.Position.Z).ConfigureAwait(false);
             await program.SetUniform3fAsync("uPointLightColor", _pointLight.Color.X, _pointLight.Color.Y, _pointLight.Color.Z).ConfigureAwait(false);
-            await program.SetUniform1fAsync("uPointLightIntensity", intensity).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uPointLightIntensity", _pointLight.Intensity).ConfigureAwait(false);
             await program.SetUniform1fAsync("uPointLightConstant", _pointLight.Constant).ConfigureAwait(false);
             await program.SetUniform1fAsync("uPointLightLinear", _pointLight.Linear).ConfigureAwait(false);
             await program.SetUniform1fAsync("uPointLightQuadratic", _pointLight.Quadratic).ConfigureAwait(false);
         }
+        else
+        {
+            await program.SetUniform3fAsync("uPointLightPosition", 0f, 0f, 0f).ConfigureAwait(false);
+            await program.SetUniform3fAsync("uPointLightColor", 0f, 0f, 0f).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uPointLightIntensity", 0f).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uPointLightConstant", 1f).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uPointLightLinear", 0f).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uPointLightQuadratic", 0f).ConfigureAwait(false);
+        }
 
         if (_spotLight is not null)
         {
+            // Normalize direction for consistent cone calculations
+            var direction = _spotLight.Direction.LengthSquared > 0.000001f 
+                ? _spotLight.Direction.Normalized() 
+                : new Vector3(0f, -1f, 0f);
             await program.SetUniform3fAsync("uSpotLightPosition", _spotLight.Position.X, _spotLight.Position.Y, _spotLight.Position.Z).ConfigureAwait(false);
-            await program.SetUniform3fAsync("uSpotLightDirection", _spotLight.Direction.X, _spotLight.Direction.Y, _spotLight.Direction.Z).ConfigureAwait(false);
+            await program.SetUniform3fAsync("uSpotLightDirection", direction.X, direction.Y, direction.Z).ConfigureAwait(false);
             await program.SetUniform3fAsync("uSpotLightColor", _spotLight.Color.X, _spotLight.Color.Y, _spotLight.Color.Z).ConfigureAwait(false);
             await program.SetUniform1fAsync("uSpotLightIntensity", _spotLight.Intensity).ConfigureAwait(false);
             await program.SetUniform1fAsync("uSpotLightCutoff", _spotLight.Cutoff).ConfigureAwait(false);
@@ -620,6 +635,18 @@ public sealed class VelvetHost
             await program.SetUniform1fAsync("uSpotLightConstant", _spotLight.Constant).ConfigureAwait(false);
             await program.SetUniform1fAsync("uSpotLightLinear", _spotLight.Linear).ConfigureAwait(false);
             await program.SetUniform1fAsync("uSpotLightQuadratic", _spotLight.Quadratic).ConfigureAwait(false);
+        }
+        else
+        {
+            await program.SetUniform3fAsync("uSpotLightPosition", 0f, 0f, 0f).ConfigureAwait(false);
+            await program.SetUniform3fAsync("uSpotLightDirection", 0f, -1f, 0f).ConfigureAwait(false);
+            await program.SetUniform3fAsync("uSpotLightColor", 0f, 0f, 0f).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uSpotLightIntensity", 0f).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uSpotLightCutoff", 0f).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uSpotLightOuterCutoff", 0f).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uSpotLightConstant", 1f).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uSpotLightLinear", 0f).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uSpotLightQuadratic", 0f).ConfigureAwait(false);
         }
     }
 
