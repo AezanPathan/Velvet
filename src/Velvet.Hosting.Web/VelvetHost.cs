@@ -556,6 +556,18 @@ public sealed class VelvetHost
         await _skyboxProgram.SetUniformMatrix4fvAsync("uView", camera.ViewMatrix).ConfigureAwait(false);
         await _skyboxProgram.SetUniformMatrix4fvAsync("uProjection", camera.ProjectionMatrix).ConfigureAwait(false);
 
+        // Set skybox colors for gradient rendering
+        await _skyboxProgram.SetUniform3fAsync(
+            "u_HorizonColor", 
+            _skybox.HorizonColor.X, 
+            _skybox.HorizonColor.Y, 
+            _skybox.HorizonColor.Z).ConfigureAwait(false);
+        await _skyboxProgram.SetUniform3fAsync(
+            "u_ZenithColor", 
+            _skybox.ZenithColor.X, 
+            _skybox.ZenithColor.Y, 
+            _skybox.ZenithColor.Z).ConfigureAwait(false);
+
         if (_skybox.CubemapTextureId.HasValue)
         {
             await _bridge.BindCubemapTextureAsync(

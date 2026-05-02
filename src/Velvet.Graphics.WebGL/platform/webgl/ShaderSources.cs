@@ -249,7 +249,7 @@ public static class ShaderSources
 
     /// <summary>
     /// Skybox fragment shader.
-    /// Supports both cubemap textures and gradient fallback.
+    /// Supports both cubemap textures and gradient fallback with customizable colors.
     /// </summary>
     public const string SkyboxFragmentShader = "#version 300 es\n" +
         "precision mediump float;\n" +
@@ -259,22 +259,20 @@ public static class ShaderSources
         "\n" +
         "uniform samplerCube u_Skybox;\n" +
         "uniform bool u_HasCubemap;\n" +
+        "uniform vec3 u_HorizonColor;\n" +
+        "uniform vec3 u_ZenithColor;\n" +
         "\n" +
         "void main() {\n" +
         "    if (u_HasCubemap) {\n" +
         "        // Sample cubemap texture\n" +
         "        outColor = texture(u_Skybox, vDirection);\n" +
         "    } else {\n" +
-        "        // Simple gradient: blend between horizon and zenith colors based on y\n" +
+        "        // Gradient: blend between horizon and zenith colors based on y\n" +
         "        vec3 dir = normalize(vDirection);\n" +
         "        float t = dir.y * 0.5 + 0.5; // Map -1..1 to 0..1\n" +
         "        \n" +
-        "        // Horizon color (bottom): light blue-gray\n" +
-        "        vec3 horizonColor = vec3(0.5, 0.7, 0.9);\n" +
-        "        // Zenith color (top): deeper blue\n" +
-        "        vec3 zenithColor = vec3(0.2, 0.4, 0.8);\n" +
-        "        \n" +
-        "        vec3 color = mix(horizonColor, zenithColor, t);\n" +
+        "        // Interpolate between horizon and zenith colors\n" +
+        "        vec3 color = mix(u_HorizonColor, u_ZenithColor, t);\n" +
         "        outColor = vec4(color, 1.0);\n" +
         "    }\n" +
         "}\n";
