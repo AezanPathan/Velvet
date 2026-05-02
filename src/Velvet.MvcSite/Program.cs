@@ -1,4 +1,3 @@
-using Velvet.Hosting.Web.Razor.Runtime;
 using Velvet.Hosting.Web.Razor.Setup;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,6 +9,10 @@ builder.Services.AddRazorVelvetHost(options =>
     // Optional global fallback. Page-level scenes should be registered via RazorVelvetSceneRuntime.
     options.Configure(_ => Task.CompletedTask);
 });
+
+// Provide HttpClient for components that inject it (server prerendering)
+builder.Services.AddHttpClient();
+builder.Services.AddScoped(sp => sp.GetRequiredService<System.Net.Http.IHttpClientFactory>().CreateClient());
 
 var app = builder.Build();
 app.UseRazorVelvetRuntime();

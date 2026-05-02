@@ -1,12 +1,26 @@
 using SceneModel = Velvet.Core.Scene.Scene;
 using Velvet.Core.Animation;
-using Velvet.Core.Geometry;
 using Velvet.Core.Rendering.Meshes;
 
 namespace Velvet.Core.Assets.Gltf;
 
 public static class GltfLoader
 {
+    public static async Task<(SceneModel Scene, List<AnimationClip> Animations)> LoadFromUrl(
+    HttpClient http,
+    string url)
+    {
+        ArgumentNullException.ThrowIfNull(http);
+        ArgumentException.ThrowIfNullOrWhiteSpace(url);
+
+        var bytes = await http.GetByteArrayAsync(url);
+
+        // Extract base path for textures
+        var baseUrl = Path.GetDirectoryName(url)?.Replace("\\", "/");
+
+        return await LoadSceneWithAnimations(bytes, baseUrl);
+    }
+
     public static async Task<SceneModel> LoadScene(byte[] data, string? baseUrl = null)
     {
         ArgumentNullException.ThrowIfNull(data);

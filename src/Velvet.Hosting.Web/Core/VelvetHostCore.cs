@@ -1,11 +1,8 @@
-using System;
-using System.Collections.Generic;
 using Velvet.Core.Geometry;
 using Velvet.Core.Math;
 using Velvet.Core.Rendering;
 using Velvet.Core.Rendering.Batching;
 using Velvet.Core.Rendering.Cameras;
-using Velvet.Core.Rendering.Core;
 using Velvet.Core.Rendering.Culling;
 using Velvet.Core.Rendering.Environment;
 using Velvet.Core.Rendering.Lighting;
@@ -223,6 +220,18 @@ public abstract class VelvetHostCore
         await SkyboxProgram.SetUniformMatrix4fvAsync("uView", camera.ViewMatrix).ConfigureAwait(false);
         await SkyboxProgram.SetUniformMatrix4fvAsync("uProjection", camera.ProjectionMatrix).ConfigureAwait(false);
 
+        // Set skybox colors for gradient rendering
+        await SkyboxProgram.SetUniform3fAsync(
+            "u_HorizonColor",
+            Skybox.HorizonColor.X,
+            Skybox.HorizonColor.Y,
+            Skybox.HorizonColor.Z).ConfigureAwait(false);
+        await SkyboxProgram.SetUniform3fAsync(
+            "u_ZenithColor",
+            Skybox.ZenithColor.X,
+            Skybox.ZenithColor.Y,
+            Skybox.ZenithColor.Z).ConfigureAwait(false);
+
         if (Skybox.CubemapTextureId.HasValue)
         {
             await Bridge.BindCubemapTextureAsync(
@@ -257,33 +266,50 @@ public abstract class VelvetHostCore
     /// </summary>
     protected async Task SetFrameLightsAsync(ShaderProgram program)
     {
-        if (DirectionalLight is not null)
+        if (DirectionalLight is not null && DirectionalEnabled)
         {
-            var dir = DirectionalLight.Direction;
-            var dirLenSq = dir.LengthSquared;
-            var normalizedDir = dirLenSq > 0.000001f ? dir.Normalized() : new Vector3(0f, -1f, 0f);
-            var directionalColor = DirectionalEnabled
-                ? DirectionalLight.Color * DirectionalLight.Intensity
-                : Vector3.Zero;
-            await program.SetUniform3fAsync("uLightDirection", normalizedDir.X, normalizedDir.Y, normalizedDir.Z).ConfigureAwait(false);
-            await program.SetUniform3fAsync("uLightColor", directionalColor.X, directionalColor.Y, directionalColor.Z).ConfigureAwait(false);
+            // Normalize direction to ensure consistent lighting calculations
+            var direction = DirectionalLight.Direction.LengthSquared > 0.000001f 
+                ? DirectionalLight.Direction.Normalized() 
+                : new Vector3(0f, -1f, 0f);
+            await program.SetUniform3fAsync("uLightDirection", direction.X, direction.Y, direction.Z).ConfigureAwait(false);
+            await program.SetUniform3fAsync("uLightColor", DirectionalLight.Color.X, DirectionalLight.Color.Y, DirectionalLight.Color.Z).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uLightIntensity", DirectionalLight.Intensity).ConfigureAwait(false);
+        }
+        else
+        {
+            await program.SetUniform3fAsync("uLightDirection", 0f, -1f, 0f).ConfigureAwait(false);
+            await program.SetUniform3fAsync("uLightColor", 0f, 0f, 0f).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uLightIntensity", 0f).ConfigureAwait(false);
         }
 
-        if (PointLight is not null)
+        if (PointLight is not null && PointEnabled)
         {
-            var intensity = PointEnabled ? PointLight.Intensity : 0f;
             await program.SetUniform3fAsync("uPointLightPosition", PointLight.Position.X, PointLight.Position.Y, PointLight.Position.Z).ConfigureAwait(false);
             await program.SetUniform3fAsync("uPointLightColor", PointLight.Color.X, PointLight.Color.Y, PointLight.Color.Z).ConfigureAwait(false);
-            await program.SetUniform1fAsync("uPointLightIntensity", intensity).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uPointLightIntensity", PointLight.Intensity).ConfigureAwait(false);
             await program.SetUniform1fAsync("uPointLightConstant", PointLight.Constant).ConfigureAwait(false);
             await program.SetUniform1fAsync("uPointLightLinear", PointLight.Linear).ConfigureAwait(false);
             await program.SetUniform1fAsync("uPointLightQuadratic", PointLight.Quadratic).ConfigureAwait(false);
         }
+        else
+        {
+            await program.SetUniform3fAsync("uPointLightPosition", 0f, 0f, 0f).ConfigureAwait(false);
+            await program.SetUniform3fAsync("uPointLightColor", 0f, 0f, 0f).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uPointLightIntensity", 0f).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uPointLightConstant", 1f).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uPointLightLinear", 0f).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uPointLightQuadratic", 0f).ConfigureAwait(false);
+        }
 
         if (SpotLight is not null)
         {
+            // Normalize direction for consistent cone calculations
+            var direction = SpotLight.Direction.LengthSquared > 0.000001f 
+                ? SpotLight.Direction.Normalized() 
+                : new Vector3(0f, -1f, 0f);
             await program.SetUniform3fAsync("uSpotLightPosition", SpotLight.Position.X, SpotLight.Position.Y, SpotLight.Position.Z).ConfigureAwait(false);
-            await program.SetUniform3fAsync("uSpotLightDirection", SpotLight.Direction.X, SpotLight.Direction.Y, SpotLight.Direction.Z).ConfigureAwait(false);
+            await program.SetUniform3fAsync("uSpotLightDirection", direction.X, direction.Y, direction.Z).ConfigureAwait(false);
             await program.SetUniform3fAsync("uSpotLightColor", SpotLight.Color.X, SpotLight.Color.Y, SpotLight.Color.Z).ConfigureAwait(false);
             await program.SetUniform1fAsync("uSpotLightIntensity", SpotLight.Intensity).ConfigureAwait(false);
             await program.SetUniform1fAsync("uSpotLightCutoff", SpotLight.Cutoff).ConfigureAwait(false);
@@ -291,6 +317,18 @@ public abstract class VelvetHostCore
             await program.SetUniform1fAsync("uSpotLightConstant", SpotLight.Constant).ConfigureAwait(false);
             await program.SetUniform1fAsync("uSpotLightLinear", SpotLight.Linear).ConfigureAwait(false);
             await program.SetUniform1fAsync("uSpotLightQuadratic", SpotLight.Quadratic).ConfigureAwait(false);
+        }
+        else
+        {
+            await program.SetUniform3fAsync("uSpotLightPosition", 0f, 0f, 0f).ConfigureAwait(false);
+            await program.SetUniform3fAsync("uSpotLightDirection", 0f, -1f, 0f).ConfigureAwait(false);
+            await program.SetUniform3fAsync("uSpotLightColor", 0f, 0f, 0f).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uSpotLightIntensity", 0f).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uSpotLightCutoff", 0f).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uSpotLightOuterCutoff", 0f).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uSpotLightConstant", 1f).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uSpotLightLinear", 0f).ConfigureAwait(false);
+            await program.SetUniform1fAsync("uSpotLightQuadratic", 0f).ConfigureAwait(false);
         }
     }
 

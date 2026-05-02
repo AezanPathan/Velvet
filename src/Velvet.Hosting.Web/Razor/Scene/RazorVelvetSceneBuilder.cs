@@ -1,4 +1,3 @@
-using Microsoft.JSInterop;
 using Microsoft.Extensions.DependencyInjection;
 using Velvet.Graphics.WebGL;
 using Velvet.Hosting.Web.Razor.Hosting;

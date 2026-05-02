@@ -1,7 +1,5 @@
 namespace Velvet.Core.Animation;
 
-using Velvet.Core.Math;
-
 public static class SamplerEvaluator
 {
     public static float[] Evaluate(AnimationSampler sampler, float time)

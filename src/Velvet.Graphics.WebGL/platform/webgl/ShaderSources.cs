@@ -1,5 +1,3 @@
-using System;
-
 namespace Velvet.Graphics.WebGL;
 
 /// <summary>
@@ -114,14 +112,6 @@ public static class ShaderSources
         "    gl_Position = uProjection * uView * uModel * vec4(finalPosition, 1.0);\n" +
         "}\n";
 
-    /// <summary>
-    /// Standard fragment shader (used by both skinned and non-skinned variants).
-    /// 
-    /// Handles:
-    /// - Minimal Lambert-style lighting (ambient + directional diffuse)
-    /// - Optional base color texture sampling
-    /// - Material base color and unlit toggle
-    /// </summary>
     public const string StandardFragmentShader = "#version 300 es\n" +
         "precision highp float;\n" +
         "\n" +
@@ -135,28 +125,68 @@ public static class ShaderSources
         "uniform float uMaterialUnlit;\n" +
         "uniform sampler2D uBaseColorTex;\n" +
         "uniform bool uHasTexture;\n" +
-        "\n" +
         "uniform vec3 uLightDirection;\n" +
         "uniform vec3 uLightColor;\n" +
+        "uniform float uLightIntensity;\n" +
+        "uniform vec3 uPointLightPosition;\n" +
+        "uniform vec3 uPointLightColor;\n" +
+        "uniform float uPointLightIntensity;\n" +
+        "uniform float uPointLightConstant;\n" +
+        "uniform float uPointLightLinear;\n" +
+        "uniform float uPointLightQuadratic;\n" +
+        "uniform vec3 uSpotLightPosition;\n" +
+        "uniform vec3 uSpotLightDirection;\n" +
+        "uniform vec3 uSpotLightColor;\n" +
+        "uniform float uSpotLightIntensity;\n" +
+        "uniform float uSpotLightCutoff;\n" +
+        "uniform float uSpotLightOuterCutoff;\n" +
+        "uniform float uSpotLightConstant;\n" +
+        "uniform float uSpotLightLinear;\n" +
+        "uniform float uSpotLightQuadratic;\n" +
         "\n" +
         "void main() {\n" +
         "    vec3 textureColor = uHasTexture ? texture(uBaseColorTex, vUV).rgb : vec3(1.0);\n" +
         "    vec3 baseColor = uBaseColor * textureColor;\n" +
+        "\n" +
         "    if (uMaterialUnlit > 0.5) {\n" +
         "        outColor = vec4(baseColor, 1.0);\n" +
         "        return;\n" +
         "    }\n" +
+        "\n" +
         "    vec3 N = normalize(vNormal);\n" +
+        "    vec3 ambient = baseColor * uAmbientStrength;\n" +
+        "\n" +
         "    vec3 lightDir = -uLightDirection;\n" +
         "    float lightLen = length(lightDir);\n" +
         "    vec3 L = lightLen > 0.0001 ? (lightDir / lightLen) : vec3(0.0, 1.0, 0.0);\n" +
         "    float NdotL = max(dot(N, L), 0.0);\n" +
-        "    vec3 ambient = baseColor * uAmbientStrength;\n" +
-        "    vec3 diffuse = baseColor * NdotL * uLightColor;\n" +
-        "    vec3 result = ambient + diffuse;\n" +
+        "    vec3 directional = baseColor * NdotL * uLightColor * uLightIntensity;\n" +
+        "\n" +
+        "    vec3 pointVec = uPointLightPosition - vPosition;\n" +
+        "    float pointDist = length(pointVec);\n" +
+        "    vec3 Lp = pointDist > 0.0001 ? (pointVec / pointDist) : vec3(0.0, 1.0, 0.0);\n" +
+        "    float pointDenom = max(uPointLightConstant + uPointLightLinear * pointDist + uPointLightQuadratic * pointDist * pointDist, 0.0001);\n" +
+        "    float pointAttenuation = 1.0 / pointDenom;\n" +
+        "    float NdotLp = max(dot(N, Lp), 0.0);\n" +
+        "    vec3 point = baseColor * NdotLp * uPointLightColor * uPointLightIntensity * pointAttenuation;\n" +
+        "\n" +
+        "    vec3 spotVec = uSpotLightPosition - vPosition;\n" +
+        "    float spotDist = length(spotVec);\n" +
+        "    vec3 Ls = spotDist > 0.0001 ? (spotVec / spotDist) : vec3(0.0, 1.0, 0.0);\n" +
+        "    vec3 spotAxis = normalize(-uSpotLightDirection);\n" +
+        "    float theta = dot(Ls, spotAxis);\n" +
+        "    float innerCos = cos(uSpotLightCutoff);\n" +
+        "    float outerCos = cos(uSpotLightOuterCutoff);\n" +
+        "    float epsilon = max(innerCos - outerCos, 0.0001);\n" +
+        "    float spotFactor = clamp((theta - outerCos) / epsilon, 0.0, 1.0);\n" +
+        "    float spotDenom = max(uSpotLightConstant + uSpotLightLinear * spotDist + uSpotLightQuadratic * spotDist * spotDist, 0.0001);\n" +
+        "    float spotAttenuation = 1.0 / spotDenom;\n" +
+        "    float NdotLs = max(dot(N, Ls), 0.0);\n" +
+        "    vec3 spot = baseColor * NdotLs * uSpotLightColor * uSpotLightIntensity * spotFactor * spotAttenuation;\n" +
+        "\n" +
+        "    vec3 result = ambient + directional + point + spot;\n" +
         "    outColor = vec4(result, 1.0);\n" +
         "}\n";
-
     /// <summary>
     /// Particle vertex shader.
     /// Inputs: position (vec3), size (float), color (vec4)
@@ -219,7 +249,7 @@ public static class ShaderSources
 
     /// <summary>
     /// Skybox fragment shader.
-    /// Supports both cubemap textures and gradient fallback.
+    /// Supports both cubemap textures and gradient fallback with customizable colors.
     /// </summary>
     public const string SkyboxFragmentShader = "#version 300 es\n" +
         "precision mediump float;\n" +
@@ -229,22 +259,20 @@ public static class ShaderSources
         "\n" +
         "uniform samplerCube u_Skybox;\n" +
         "uniform bool u_HasCubemap;\n" +
+        "uniform vec3 u_HorizonColor;\n" +
+        "uniform vec3 u_ZenithColor;\n" +
         "\n" +
         "void main() {\n" +
         "    if (u_HasCubemap) {\n" +
         "        // Sample cubemap texture\n" +
         "        outColor = texture(u_Skybox, vDirection);\n" +
         "    } else {\n" +
-        "        // Simple gradient: blend between horizon and zenith colors based on y\n" +
+        "        // Gradient: blend between horizon and zenith colors based on y\n" +
         "        vec3 dir = normalize(vDirection);\n" +
         "        float t = dir.y * 0.5 + 0.5; // Map -1..1 to 0..1\n" +
         "        \n" +
-        "        // Horizon color (bottom): light blue-gray\n" +
-        "        vec3 horizonColor = vec3(0.5, 0.7, 0.9);\n" +
-        "        // Zenith color (top): deeper blue\n" +
-        "        vec3 zenithColor = vec3(0.2, 0.4, 0.8);\n" +
-        "        \n" +
-        "        vec3 color = mix(horizonColor, zenithColor, t);\n" +
+        "        // Interpolate between horizon and zenith colors\n" +
+        "        vec3 color = mix(u_HorizonColor, u_ZenithColor, t);\n" +
         "        outColor = vec4(color, 1.0);\n" +
         "    }\n" +
         "}\n";

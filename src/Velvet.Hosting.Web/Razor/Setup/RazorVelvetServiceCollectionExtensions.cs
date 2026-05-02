@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Components.Server.Circuits;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Velvet.Graphics.WebGL;
 using Microsoft.Extensions.DependencyInjection;
 using Velvet.Hosting.Web.Razor.Hosting;
 using Velvet.Hosting.Web.Razor.Runtime;

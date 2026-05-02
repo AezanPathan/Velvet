@@ -240,8 +240,8 @@ public sealed class Camera
 		var forward = Forward;
 		Position = _target - (forward * distance);
 
-		var nearPlane = MathF.Max(0.01f, distance * 0.01f);
-		var farPlane = distance * 10f;
+		var nearPlane = MathF.Max(0.1f, bounds.Radius * 0.2f);
+		var farPlane = bounds.Radius * 6f;
 
 		SetPerspective(_fovYRadians, _aspectRatio, nearPlane, farPlane);
 	}

@@ -54,7 +54,7 @@ window.CanvasHelpers = {
         canvasResizeBindings.delete(bindingId);
     },
 
-    bindOrbitInput: function (canvas, dotNetRef, mouseDownMethod, mouseMoveMethod, mouseUpMethod, wheelMethod) {
+    bindOrbitInput: function (canvas, dotNetRef, mouseDownMethod, mouseMoveMethod, mouseUpMethod, wheelMethod, touchRotateMethod, touchZoomMethod) {
         if (!(canvas instanceof HTMLCanvasElement)) {
             throw new Error("CanvasHelpers.bindOrbitInput: provided element is not a canvas");
         }
@@ -80,11 +80,91 @@ window.CanvasHelpers = {
             dotNetRef.invokeMethodAsync(wheelMethod, event.deltaY).catch(() => { });
         };
 
+        const getTouchDistance = (touchA, touchB) => {
+            const dx = touchA.clientX - touchB.clientX;
+            const dy = touchA.clientY - touchB.clientY;
+            return Math.hypot(dx, dy);
+        };
+
+        let lastTouchX = 0;
+        let lastTouchY = 0;
+        let isDraggingTouch = false;
+        let lastPinchDistance = 0;
+        let isPinching = false;
+
+        const onTouchStart = (event) => {
+            if (event.touches.length === 1) {
+                const touch = event.touches[0];
+                isDraggingTouch = true;
+                isPinching = false;
+                lastTouchX = touch.clientX;
+                lastTouchY = touch.clientY;
+                return;
+            }
+
+            if (event.touches.length === 2) {
+                isDraggingTouch = false;
+                isPinching = true;
+                lastPinchDistance = getTouchDistance(event.touches[0], event.touches[1]);
+            }
+        };
+
+        const onTouchMove = (event) => {
+            if (event.touches.length === 1 && typeof touchRotateMethod === "string" && touchRotateMethod.length > 0 && isDraggingTouch) {
+                event.preventDefault();
+                const touch = event.touches[0];
+                const dx = touch.clientX - lastTouchX;
+                const dy = touch.clientY - lastTouchY;
+                lastTouchX = touch.clientX;
+                lastTouchY = touch.clientY;
+
+                dotNetRef.invokeMethodAsync(touchRotateMethod, dx, dy).catch(() => { });
+                return;
+            }
+
+            if (event.touches.length === 2 && typeof touchZoomMethod === "string" && touchZoomMethod.length > 0) {
+                event.preventDefault();
+                const distance = getTouchDistance(event.touches[0], event.touches[1]);
+                if (isPinching) {
+                    const delta = lastPinchDistance - distance;
+                    dotNetRef.invokeMethodAsync(touchZoomMethod, delta).catch(() => { });
+                }
+
+                lastPinchDistance = distance;
+                isPinching = true;
+            }
+        };
+
+        const onTouchEnd = (event) => {
+            if (event.touches.length === 1) {
+                const touch = event.touches[0];
+                isDraggingTouch = true;
+                isPinching = false;
+                lastTouchX = touch.clientX;
+                lastTouchY = touch.clientY;
+                return;
+            }
+
+            if (event.touches.length === 2) {
+                isDraggingTouch = false;
+                isPinching = true;
+                lastPinchDistance = getTouchDistance(event.touches[0], event.touches[1]);
+                return;
+            }
+
+            isDraggingTouch = false;
+            isPinching = false;
+            lastPinchDistance = 0;
+        };
+
         canvas.addEventListener("mousedown", onMouseDown);
         canvas.addEventListener("mousemove", onMouseMove);
         canvas.addEventListener("mouseup", onMouseUp);
         canvas.addEventListener("mouseleave", onMouseLeave);
         canvas.addEventListener("wheel", onWheel, { passive: false });
+        canvas.addEventListener("touchstart", onTouchStart, { passive: true });
+        canvas.addEventListener("touchmove", onTouchMove, { passive: false });
+        canvas.addEventListener("touchend", onTouchEnd, { passive: true });
 
         const bindingId = `orbit-${nextOrbitBindingId++}`;
         canvasOrbitBindings.set(bindingId, {
@@ -93,19 +173,22 @@ window.CanvasHelpers = {
             onMouseMove,
             onMouseUp,
             onMouseLeave,
-            onWheel
+            onWheel,
+            onTouchStart,
+            onTouchMove,
+            onTouchEnd
         });
 
         return bindingId;
     },
 
-    bindOrbitInputById: function (canvasId, dotNetRef, mouseDownMethod, mouseMoveMethod, mouseUpMethod, wheelMethod) {
+    bindOrbitInputById: function (canvasId, dotNetRef, mouseDownMethod, mouseMoveMethod, mouseUpMethod, wheelMethod, touchRotateMethod, touchZoomMethod) {
         const canvas = document.getElementById(canvasId);
         if (!(canvas instanceof HTMLCanvasElement)) {
             throw new Error("CanvasHelpers.bindOrbitInputById: canvas not found or not a canvas: " + canvasId);
         }
 
-        return this.bindOrbitInput(canvas, dotNetRef, mouseDownMethod, mouseMoveMethod, mouseUpMethod, wheelMethod);
+        return this.bindOrbitInput(canvas, dotNetRef, mouseDownMethod, mouseMoveMethod, mouseUpMethod, wheelMethod, touchRotateMethod, touchZoomMethod);
     },
 
     unbindOrbitInput: function (bindingId) {
@@ -119,6 +202,9 @@ window.CanvasHelpers = {
         binding.canvas.removeEventListener("mouseup", binding.onMouseUp);
         binding.canvas.removeEventListener("mouseleave", binding.onMouseLeave);
         binding.canvas.removeEventListener("wheel", binding.onWheel);
+        binding.canvas.removeEventListener("touchstart", binding.onTouchStart);
+        binding.canvas.removeEventListener("touchmove", binding.onTouchMove);
+        binding.canvas.removeEventListener("touchend", binding.onTouchEnd);
         canvasOrbitBindings.delete(bindingId);
     },
 

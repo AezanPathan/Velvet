@@ -1,5 +1,4 @@
 using System.Buffers.Binary;
-using System.Text.Json;
 
 namespace Velvet.Core.Assets.Gltf;
 

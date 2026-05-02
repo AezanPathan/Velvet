@@ -1,6 +1,3 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Velvet.Core.Geometry;
 using Velvet.Core.Rendering;
 using Velvet.Core.Rendering.Resources;

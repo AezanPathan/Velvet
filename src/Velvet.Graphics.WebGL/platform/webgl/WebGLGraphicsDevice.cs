@@ -1,5 +1,3 @@
-using System;
-using System.Threading.Tasks;
 using Velvet.Core.Graphics;
 
 namespace Velvet.Graphics.WebGL;

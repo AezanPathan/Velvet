@@ -1,0 +1,19 @@
+@page
+@model Velvet.MvcSite.Pages.Scene2Model
+@{
+    ViewData["Title"] = "Fox Animation (Scene 2)";
+}
+
+<canvas id="scene2-canvas" style="width:100%;height:100vh;display:block;"></canvas>
+
+<component type="typeof(Velvet.MvcSite.Components.BlankCircuitHost)" render-mode="Server" />
+
+@section Scripts {
+    <script src="~/_content/Velvet.Graphics.WebGL/velvet.js" asp-append-version="true"></script>
+    <script src="~/_content/Velvet.Hosting.Web/js/canvas-helpers.js" asp-append-version="true"></script>
+    <script src="~/_content/Velvet.Hosting.Web/js/velvet-start.js" asp-append-version="true"></script>
+    <script src="~/_framework/blazor.server.js" autostart="false"></script>
+    <script>
+        Velvet.start("scene2-canvas");
+    </script>
+}

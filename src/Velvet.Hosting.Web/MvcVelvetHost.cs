@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
 using Microsoft.JSInterop;
-using Velvet.Core.Rendering;
 using Velvet.Core.Rendering.Batching;
 using Velvet.Core.Rendering.Cameras;
 using Velvet.Core.Rendering.Controllers;
@@ -11,8 +7,6 @@ using Velvet.Core.Rendering.Culling;
 using Velvet.Core.Rendering.Environment;
 using Velvet.Core.Rendering.Input;
 using Velvet.Core.Rendering.Lighting;
-using Velvet.Core.Rendering.Meshes;
-using Velvet.Core.Rendering.Skinning;
 using Velvet.Core.Scene;
 using Velvet.Graphics.WebGL;
 using Velvet.Hosting.Web.Core;
@@ -38,6 +32,7 @@ public sealed class MvcVelvetHost : VelvetHostCore
     private long _frameIndex;
 
     private OrbitInputBinder? _orbitBinder;
+    private TouchOrbitBinder? _touchOrbitBinder;
 
     private DotNetObjectReference<MvcVelvetHost>? _callbackRef;
     private string? _resizeBindingId;
@@ -50,7 +45,7 @@ public sealed class MvcVelvetHost : VelvetHostCore
     private TaskCompletionSource<object?>? _loopTcs;
     private Task? _loopTask;
 
-    public bool EnableDebugOverlay { get; set; } = true;
+    public bool EnableDebugOverlay { get; set; } = false;
 
     private MvcVelvetHost(IJSRuntime js, IWebGLBridge bridge, int rendererId, string canvasId)
         : base(bridge, rendererId)
@@ -92,7 +87,9 @@ public sealed class MvcVelvetHost : VelvetHostCore
             nameof(OnOrbitMouseDownFromJs),
             nameof(OnOrbitMouseMoveFromJs),
             nameof(OnOrbitMouseUpFromJs),
-            nameof(OnOrbitWheelFromJs)).AsTask().ConfigureAwait(false);
+            nameof(OnOrbitWheelFromJs),
+            nameof(OnTouchRotate),
+            nameof(OnTouchZoom)).AsTask().ConfigureAwait(false);
 
         return app;
     }
@@ -133,6 +130,7 @@ public sealed class MvcVelvetHost : VelvetHostCore
         }
 
         _orbitBinder = new OrbitInputBinder(controller, Camera);
+        _touchOrbitBinder = new TouchOrbitBinder(controller, Camera);
     }
 
     public async Task SetSkyboxAsync(Skybox skybox)
@@ -290,6 +288,20 @@ public sealed class MvcVelvetHost : VelvetHostCore
     public Task OnOrbitWheelFromJs(double delta)
     {
         _orbitBinder?.OnWheel((float)delta);
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnTouchRotate(double dx, double dy)
+    {
+        _touchOrbitBinder?.OnTouchRotate((float)dx, (float)dy);
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnTouchZoom(double delta)
+    {
+        _touchOrbitBinder?.OnTouchZoom((float)delta);
         return Task.CompletedTask;
     }
 
