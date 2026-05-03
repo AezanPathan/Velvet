@@ -3,15 +3,30 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Version>0.1.0</Version>
+
+    <PackageId>Velvet.Graphics.WebGL</PackageId>
+    <Authors>Aezan Pathan</Authors>
+    <Description>WebGL rendering backend for Velvet3D using JSInterop and WebAssembly.</Description>
+    <PackageTags>3D;Rendering;WebGL;Graphics;Engine</PackageTags>
+    <RepositoryUrl>https://github.com/AezanPathan/Velvet</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Velvet.Core\Velvet.Core.csproj" />
+    <PackageReference Include="Velvet.Core" Version="0.1.0" />
     <PackageReference Include="Microsoft.JSInterop" Version="10.0.0" />
     <PackageReference Include="Microsoft.NET.Runtime.WebAssembly.Sdk" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="" />
   </ItemGroup>
 
 </Project>

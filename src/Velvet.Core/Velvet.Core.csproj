@@ -3,11 +3,26 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Version>0.1.0</Version>
+
+    <Authors>Aezan Pathan</Authors>
+    <Description>Lightweight 3D rendering library for .NET with scene graph, camera system, particles, materials, and WebGL support.</Description>
+    <PackageTags>3D;Rendering;Engine;Math;Scene;Particles</PackageTags>
+
+    <PackageId>Velvet.Core</PackageId>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
+    <RepositoryUrl>https://github.com/AezanPathan/Velvet</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
 
-  <ItemGroup>
-  </ItemGroup>
+<ItemGroup>
+  <None Include="README.md" Pack="true" PackagePath="" />
+</ItemGroup>
 
 </Project>

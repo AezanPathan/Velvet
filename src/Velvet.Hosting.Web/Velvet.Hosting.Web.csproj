@@ -2,26 +2,39 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
+
+    <PackageId>Velvet.Hosting.Web</PackageId>
+    <Authors>Aezan Pathan</Authors>
+    <Description>Blazor WebAssembly hosting layer for Velvet3D. Provides integration between .NET, JSInterop, and WebGL rendering.</Description>
+    <PackageTags>Blazor;WebAssembly;3D;Rendering;Engine;WebGL</PackageTags>
+    <RepositoryUrl>https://github.com/AezanPathan/Velvet</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+
     <AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
     <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
     <EnableRazorRuntime Condition="'$(EnableRazorRuntime)' == ''">true</EnableRazorRuntime>
+
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Velvet.Core\Velvet.Core.csproj" />
-    <ProjectReference Include="..\Velvet.Graphics.WebGL\Velvet.Graphics.WebGL.csproj" />
+    <PackageReference Include="Velvet.Core" Version="0.1.0" />
+    <PackageReference Include="Velvet.Graphics.WebGL" Version="0.1.0" />
     <PackageReference Include="Microsoft.AspNetCore.Components" Version="10.0.0" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(EnableRazorRuntime)' == 'true' and '$(RuntimeIdentifier)' != 'browser-wasm'">
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(EnableRazorRuntime)' != 'true' or '$(RuntimeIdentifier)' == 'browser-wasm'">
     <Compile Remove="Razor\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="" />
   </ItemGroup>
 
 </Project>
