@@ -1,66 +1,32 @@
-# Velvet Graphics Engine
+# Velvet Graphics Library
 
-A minimal cross-platform graphics engine inspired by Three.js/Babylon.js.
+A Real-time graphics library built with C# and TypeScript.
 
-## Release status
+Velvet focuses on rendering architecture, scene management, and graphics systems while exploring modern web-based rendering through WebGL and JSInterop.
 
-Current aligned version: **0.1.0** (`Velvet.Core`, `Velvet.Graphics.WebGL`, `Velvet.Hosting.Web`, `Velvet-Site`, and WebGL package metadata).
+## Repositories
 
-Recent release-readiness updates:
+- Live Demo → `https://velvet3d.github.io`
+- Velvet Site → `velvet3d/velvet-site`
+- Velvet Razor → `velvet3d/velvet-razor`
 
-- Material migration noise is contained: docs/samples use non-obsolete material APIs (`ShaderMaterial` and `Velvet.Core.Rendering.Material`), while the legacy alias remains compatibility-only.
-- DI host setup is implemented via `Velvet.Hosting.Web.ServiceExtensions`.
+## Current Focus
 
-## Projects
+- Real-time rendering
+- Scene and camera systems
+- WebGL rendering pipelines
+- Modular rendering architecture
+- Blazor and Razor hosting experiments
+- JSInterop-based rendering integration
 
-- `Velvet.Core` – pure C# engine primitives
-- `Velvet.Graphics.WebGL` – WebGL backend and shared `velvet.js`
-- `Velvet.Hosting.Web` – Blazor hosting/orchestration API
-- `Velvet-Site` – Blazor WebAssembly sample app
+## Status
 
-## Usage
+Velvet is currently under active development and some APIs or hosting integrations may change over time.
 
-Direct host creation:
-
-```csharp
-var app = await VelvetHost.CreateAsync(canvasRef, JS, ShaderProgram.CreateDefaultAsync);
-app.Add(scene);
-app.Camera = camera;
-await app.StartAsync();
-```
-
-DI-based setup with `ServiceExtensions`:
-
-```csharp
-// Program.cs
-using Velvet.Hosting.Web;
-
-builder.Services.AddVelvetHost(); // or AddVelvetHost(customProgramFactory)
-
-// Component (.razor.cs)
-[Inject] private IServiceProvider Services { get; set; } = default!;
-
-app = await Services.CreateVelvetHostAsync(canvasRef); // optional per-host programFactory override
-```
-
-Shutdown:
-
-```csharp
-await app.StopAsync();
-```
-
-## Running demos
-
-```powershell
-cd Velvet
-dotnet run --project Velvet-Site/Velvet-Site.csproj
-```
-
-⚠️ Razor (SSR) Host Status
+### Razor (SSR) Hosting
 
 The Razor-based hosting mode is currently experimental.
 
-Due to the stateless nature of SSR and lifecycle limitations,
-full runtime persistence (like continuous rendering loops) is not yet stable.
+Due to rendering lifecycle and SSR limitations, continuous rendering and runtime persistence are still being refined.
 
-For production or demos, Blazor hosting is recommended.
+For stable demos and runtime rendering, Blazor hosting is currently recommended.
