@@ -1,10 +1,10 @@
 # Velvet Graphics Library
 
-A Real-time graphics library built with C# and TypeScript.
+A real-time graphics library built with C# and TypeScript.
 
 Velvet focuses on rendering architecture, scene management, and graphics systems while exploring modern web-based rendering through WebGL and JSInterop.
 
-## Repositories
+## Links
 
 - Live Demo → `https://velvet3d.github.io`
 - Velvet Site → `velvet3d/velvet-site`
