@@ -1,3 +1,6 @@
 [submodule "Velvet-Site"]
 	path = Velvet-Site
 	url = https://github.com/AezanPathan/Velvet-Site
+[submodule "demos/velvet-razor"]
+	path = demos/velvet-razor
+	url = https://github.com/Velvet3d/Velvet-Razor.git
