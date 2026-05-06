@@ -11,8 +11,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Velvet.Hosting.Web", "src\V
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{C79FDC70-AD46-4BB5-BB92-3F236CFB774F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Velvet.MvcSite", "src\Velvet.MvcSite\Velvet.MvcSite.csproj", "{0735B998-823E-4453-B5FB-7F1B1411B6E4}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
